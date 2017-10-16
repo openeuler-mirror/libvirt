@@ -1,0 +1,10 @@
+<cpu mode='custom' match='exact'>
+  <model fallback='forbid'>cortex-a57</model>
+  <feature policy='require' name='fp'/>
+  <feature policy='require' name='asimd'/>
+  <feature policy='require' name='aes'/>
+  <feature policy='require' name='pmull'/>
+  <feature policy='require' name='sha1'/>
+  <feature policy='require' name='sha2'/>
+  <feature policy='require' name='crc32'/>
+</cpu>

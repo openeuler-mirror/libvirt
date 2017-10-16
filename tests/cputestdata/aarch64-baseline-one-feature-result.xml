@@ -1,0 +1,5 @@
+<cpu mode='custom' match='exact'>
+  <model fallback='forbid'>cortex-a57</model>
+  <vendor>ARM</vendor>
+  <feature policy='require' name='fp'/>
+</cpu>
