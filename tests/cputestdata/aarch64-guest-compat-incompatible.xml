@@ -1,0 +1,4 @@
+<cpu mode='custom'>
+  <model>cortex-a72</model>
+  <vendor>ARM</vendor>
+</cpu>

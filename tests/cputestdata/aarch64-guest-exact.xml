@@ -1,0 +1,4 @@
+<cpu match='exact'>
+  <model>cortex-a72</model>
+  <vendor>ARM</vendor>
+</cpu>

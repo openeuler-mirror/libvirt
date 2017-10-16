@@ -1,0 +1,12 @@
+<cpu>
+  <arch>aarch64</arch>
+  <model>cortex-a57</model>
+  <vendor>ARM</vendor>
+  <feature name='fp'/>
+  <feature name='asimd'/>
+  <feature name='aes'/>
+  <feature name='pmull'/>
+  <feature name='sha1'/>
+  <feature name='sha2'/>
+  <feature name='crc32'/>
+</cpu>

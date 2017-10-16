@@ -1140,6 +1140,16 @@ mymain(void)
     DO_TEST_COMPARE(VIR_ARCH_PPC64, "host", "guest-compat-invalid", VIR_CPU_COMPARE_ERROR);
     DO_TEST_COMPARE(VIR_ARCH_PPC64, "host", "guest-compat-incompatible", VIR_CPU_COMPARE_INCOMPATIBLE);
 
+    DO_TEST_COMPARE(VIR_ARCH_AARCH64, "host", "guest-strict", VIR_CPU_COMPARE_IDENTICAL);
+    DO_TEST_COMPARE(VIR_ARCH_AARCH64, "host", "guest-exact", VIR_CPU_COMPARE_INCOMPATIBLE);
+    DO_TEST_COMPARE(VIR_ARCH_AARCH64, "host", "guest-legacy", VIR_CPU_COMPARE_IDENTICAL);
+    DO_TEST_COMPARE(VIR_ARCH_AARCH64, "host", "guest-legacy-incompatible", VIR_CPU_COMPARE_INCOMPATIBLE);
+    DO_TEST_COMPARE(VIR_ARCH_AARCH64, "host", "guest-compat-none", VIR_CPU_COMPARE_IDENTICAL);
+    DO_TEST_COMPARE(VIR_ARCH_AARCH64, "host", "guest-compat-valid", VIR_CPU_COMPARE_IDENTICAL);
+    DO_TEST_COMPARE(VIR_ARCH_AARCH64, "host", "guest-compat-incompatible", VIR_CPU_COMPARE_INCOMPATIBLE);
+    DO_TEST_COMPARE(VIR_ARCH_AARCH64, "host", "guest-features-valid", VIR_CPU_COMPARE_IDENTICAL);
+    DO_TEST_COMPARE(VIR_ARCH_AARCH64, "host", "guest-features-invalid", VIR_CPU_COMPARE_INCOMPATIBLE);
+
     /* guest updates for migration
      * automatically compares host CPU with the result */
     DO_TEST_UPDATE(VIR_ARCH_X86_64, "host", "min", VIR_CPU_COMPARE_IDENTICAL);

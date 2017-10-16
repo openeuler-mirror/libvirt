@@ -1,0 +1,4 @@
+<cpu match='strict'>
+  <model>cortex-a57</model>
+  <vendor>ARM</vendor>
+</cpu>

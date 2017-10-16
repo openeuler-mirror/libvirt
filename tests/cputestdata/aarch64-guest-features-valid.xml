@@ -1,0 +1,7 @@
+<cpu>
+  <model>cortex-a57</model>
+  <vendor>ARM</vendor>
+  <feature name='asimd'/>
+  <feature name='aes'/>
+  <feature name='crc32'/>
+</cpu>
