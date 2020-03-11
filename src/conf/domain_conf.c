@@ -30074,6 +30074,12 @@ virDomainObjCopyPersistentDef(virDomainObjPtr dom,
     virDomainDefPtr cur;
 
     cur = virDomainObjGetPersistentDef(xmlopt, dom, parseOpaque);
+    if (!cur) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                       _("failed to get persistent definition object"));
+        return NULL;
+    }
+
     return virDomainDefCopy(cur, xmlopt, parseOpaque, false);
 }
 
