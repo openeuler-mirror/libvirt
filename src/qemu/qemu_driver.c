@@ -17983,6 +17983,7 @@ qemuDomainBlockCopyCommon(virDomainObjPtr vm,
     virDomainDiskDefPtr disk = NULL;
     int ret = -1;
     bool need_unlink = false;
+    bool need_revoke = false;
     g_autoptr(virQEMUDriverConfig) cfg = virQEMUDriverGetConfig(driver);
     const char *format = NULL;
     bool mirror_reuse = !!(flags & VIR_DOMAIN_BLOCK_COPY_REUSE_EXT);
@@ -18157,6 +18158,7 @@ qemuDomainBlockCopyCommon(virDomainObjPtr vm,
 
     if (qemuDomainStorageSourceChainAccessAllow(driver, vm, mirror) < 0)
         goto endjob;
+    need_revoke = true;
 
     if (blockdev) {
         if (mirror_reuse) {
@@ -18265,14 +18267,17 @@ qemuDomainBlockCopyCommon(virDomainObjPtr vm,
 
  endjob:
     if (ret < 0 &&
-        virDomainObjIsActive(vm) &&
-        (data || crdata)) {
-        qemuDomainObjEnterMonitor(driver, vm);
-        if (data)
-            qemuBlockStorageSourceChainDetach(priv->mon, data);
-        if (crdata)
-            qemuBlockStorageSourceAttachRollback(priv->mon, crdata->srcdata[0]);
-        ignore_value(qemuDomainObjExitMonitor(driver, vm));
+        virDomainObjIsActive(vm)) {
+        if (data || crdata) {
+            qemuDomainObjEnterMonitor(driver, vm);
+            if (data)
+                qemuBlockStorageSourceChainDetach(priv->mon, data);
+            if (crdata)
+                qemuBlockStorageSourceAttachRollback(priv->mon, crdata->srcdata[0]);
+            ignore_value(qemuDomainObjExitMonitor(driver, vm));
+        }
+        if (need_revoke)
+            qemuDomainStorageSourceChainAccessRevoke(driver, vm, mirror);
     }
     if (need_unlink && virStorageFileUnlink(mirror) < 0)
         VIR_WARN("%s", _("unable to remove just-created copy target"));
