@@ -904,8 +904,11 @@ qemuSetupCpuCgroup(virDomainObjPtr vm)
             if (virTypedParamsAddULLong(&eventParams, &eventNparams,
                                         &eventMaxparams,
                                         VIR_DOMAIN_TUNABLE_CPU_CPU_SHARES,
-                                        val) < 0)
+                                        val) < 0) {
+                if (eventParams)
+                    virTypedParamsFree(eventParams, eventNparams);
                 return -1;
+            }
 
             event = virDomainEventTunableNewFromObj(vm, eventParams, eventNparams);
         }
