@@ -1048,6 +1048,11 @@ qemuMigrationSrcNBDStorageCopy(virQEMUDriverPtr driver,
         if (rv < 0)
             return -1;
 
+        if (!virDomainObjIsActive(vm)) {
+            VIR_ERROR(_("domain is no longer running, migrate will end"));
+            return -1;
+        }
+
         if (priv->job.abortJob) {
             priv->job.current->status = QEMU_DOMAIN_JOB_STATUS_CANCELED;
             virReportError(VIR_ERR_OPERATION_ABORTED, _("%s: %s"),
