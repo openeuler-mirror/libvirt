@@ -5175,6 +5175,8 @@ qemuDomainPinVcpuLive(virDomainObjPtr vm,
         goto cleanup;
 
     event = virDomainEventTunableNewFromObj(vm, eventParams, eventNparams);
+    eventParams = NULL;
+    eventNparams = 0;
 
     ret = 0;
 
@@ -5182,6 +5184,8 @@ qemuDomainPinVcpuLive(virDomainObjPtr vm,
     virBitmapFree(tmpmap);
     virCgroupFree(&cgroup_vcpu);
     virObjectEventStateQueue(driver->domainEventState, event);
+    if (eventParams)
+        virTypedParamsFree(eventParams, eventNparams);
     return ret;
 }
 
@@ -5388,6 +5392,8 @@ qemuDomainPinEmulator(virDomainPtr dom,
             goto endjob;
 
         event = virDomainEventTunableNewFromDom(dom, eventParams, eventNparams);
+        eventParams = NULL;
+        eventNparams = 0;
     }
 
     if (persistentDef) {
@@ -5409,6 +5415,8 @@ qemuDomainPinEmulator(virDomainPtr dom,
  cleanup:
     if (cgroup_emulator)
         virCgroupFree(&cgroup_emulator);
+    if (eventParams)
+        virTypedParamsFree(eventParams, eventNparams);
     virObjectEventStateQueue(driver->domainEventState, event);
     virBitmapFree(pcpumap);
     virDomainObjEndAPI(&vm);
@@ -5871,6 +5879,8 @@ qemuDomainPinIOThread(virDomainPtr dom,
             goto endjob;
 
         event = virDomainEventTunableNewFromDom(dom, eventParams, eventNparams);
+        eventParams = NULL;
+        eventNparams = 0;
     }
 
     if (persistentDef) {
@@ -5902,6 +5912,8 @@ qemuDomainPinIOThread(virDomainPtr dom,
  cleanup:
     if (cgroup_iothread)
         virCgroupFree(&cgroup_iothread);
+    if (eventParams)
+        virTypedParamsFree(eventParams, eventNparams);
     virObjectEventStateQueue(driver->domainEventState, event);
     virBitmapFree(pcpumap);
     virDomainObjEndAPI(&vm);
