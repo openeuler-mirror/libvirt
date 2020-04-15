@@ -19075,7 +19075,7 @@ msgid "rule node requires direction attribute"
 msgstr "rule 节点需要 direction 属性"
 
 msgid "running"
-msgstr "running"
+msgstr "运行中"
 
 msgid "sanlock is too old to support lock failure action"
 msgstr "sanlock 太旧不支持锁失败动作"
