@@ -966,7 +966,7 @@ qemuMonitorSend(qemuMonitorPtr mon,
 virErrorPtr
 qemuMonitorLastError(qemuMonitorPtr mon)
 {
-    if (mon->lastError.code == VIR_ERR_OK)
+    if (!mon || mon->lastError.code == VIR_ERR_OK)
         return NULL;
 
     return virErrorCopyNew(&mon->lastError);
