@@ -1,0 +1,24 @@
+<cpus>
+  <model name='Kunpeng-920'>
+    <vendor name='Hisilicon'/>
+    <pvr value='0xd01'/>
+    <feature name="fp"/>
+      <feature name="asimd"/>
+      <feature name="evtstrm"/>
+      <feature name="aes"/>
+      <feature name="pmull"/>
+      <feature name="sha1"/>
+      <feature name="sha2"/>
+      <feature name="crc32"/>
+      <feature name="atomics"/>
+      <feature name="fphp"/>
+      <feature name="asimdhp"/>
+      <feature name="cpuid"/>
+      <feature name="asimdrdm"/>
+      <feature name="jscvt"/>
+      <feature name="fcma"/>
+      <feature name="dcpop"/>
+      <feature name="asimddp"/>
+      <feature name="asimdfhm"/>
+  </model>
+</cpus>
