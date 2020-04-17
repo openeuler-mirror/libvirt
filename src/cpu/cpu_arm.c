@@ -61,6 +61,25 @@ virCPUarmFeatureFree(virCPUarmFeaturePtr feature)
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(virCPUarmFeature, virCPUarmFeatureFree);
 
+static void
+virCPUarmDataClear(virCPUarmData *data)
+{
+    if (!data)
+        return;
+
+    VIR_FREE(data->features);
+}
+
+static void
+virCPUarmDataFree(virCPUDataPtr cpuData)
+{
+    if (!cpuData)
+        return;
+
+    virCPUarmDataClear(&cpuData->data.arm);
+    VIR_FREE(cpuData);
+}
+
 typedef struct _virCPUarmMap virCPUarmMap;
 typedef virCPUarmMap *virCPUarmMapPtr;
 struct _virCPUarmMap {
@@ -259,6 +278,7 @@ struct cpuArchDriver cpuDriverArm = {
     .compare = virCPUarmCompare,
     .decode = NULL,
     .encode = NULL,
+    .dataFree = virCPUarmDataFree,
     .baseline = virCPUarmBaseline,
     .update = virCPUarmUpdate,
     .validateFeatures = virCPUarmValidateFeatures,
