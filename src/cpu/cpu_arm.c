@@ -67,7 +67,7 @@ virCPUarmDataClear(virCPUarmData *data)
     if (!data)
         return;
 
-    VIR_FREE(data->features);
+    g_free(data->features);
 }
 
 static void
@@ -77,12 +77,64 @@ virCPUarmDataFree(virCPUDataPtr cpuData)
         return;
 
     virCPUarmDataClear(&cpuData->data.arm);
-    VIR_FREE(cpuData);
+    g_free(cpuData);
 }
+
+typedef struct _virCPUarmVendor virCPUarmVendor;
+typedef virCPUarmVendor *virCPUarmVendorPtr;
+struct _virCPUarmVendor {
+    char *name;
+    unsigned long value;
+};
+
+static virCPUarmVendorPtr
+virCPUarmVendorNew(void)
+{
+    return g_new0(virCPUarmVendor, 1);
+}
+
+static void
+virCPUarmVendorFree(virCPUarmVendorPtr vendor)
+{
+    if (!vendor)
+        return;
+
+    g_free(vendor->name);
+    VIR_FREE(vendor);
+}
+
+typedef struct _virCPUarmModel virCPUarmModel;
+typedef virCPUarmModel *virCPUarmModelPtr;
+struct _virCPUarmModel {
+    char *name;
+    virCPUarmVendorPtr vendor;
+    virCPUarmData data;
+};
+
+static virCPUarmModelPtr
+virCPUarmModelNew(void)
+{
+    return g_new0(virCPUarmModel, 1);
+}
+
+static void
+virCPUarmModelFree(virCPUarmModelPtr model)
+{
+    if (!model)
+        return;
+
+    virCPUarmDataClear(&model->data);
+    g_free(model->name);
+    g_free(model);
+}
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(virCPUarmModel, virCPUarmModelFree);
 
 typedef struct _virCPUarmMap virCPUarmMap;
 typedef virCPUarmMap *virCPUarmMapPtr;
 struct _virCPUarmMap {
+    GPtrArray *vendors;
+    GPtrArray *models;
     GPtrArray *features;
 };
 
@@ -92,6 +144,14 @@ virCPUarmMapNew(void)
     virCPUarmMapPtr map;
 
     map = g_new0(virCPUarmMap, 1);
+
+    map->vendors = g_ptr_array_new();
+    g_ptr_array_set_free_func(map->vendors,
+                              (GDestroyNotify) virCPUarmVendorFree);
+
+    map->models = g_ptr_array_new();
+    g_ptr_array_set_free_func(map->models,
+                              (GDestroyNotify) virCPUarmModelFree);
 
     map->features = g_ptr_array_new();
     g_ptr_array_set_free_func(map->features,
@@ -106,6 +166,8 @@ virCPUarmMapFree(virCPUarmMapPtr map)
     if (!map)
         return;
 
+    g_ptr_array_free(map->vendors, TRUE);
+    g_ptr_array_free(map->models, TRUE);
     g_ptr_array_free(map->features, TRUE);
 
     g_free(map);
@@ -151,6 +213,161 @@ virCPUarmMapFeatureParse(xmlXPathContextPtr ctxt G_GNUC_UNUSED,
     return 0;
 }
 
+static virCPUarmVendorPtr
+virCPUarmVendorFindByID(virCPUarmMapPtr map,
+                        unsigned long vendor_id)
+{
+    size_t i;
+
+    for (i = 0; i < map->vendors->len; i++) {
+        virCPUarmVendorPtr vendor = g_ptr_array_index(map->vendors, i);
+
+        if (vendor->value == vendor_id)
+            return vendor;
+    }
+
+    return NULL;
+}
+
+static virCPUarmVendorPtr
+virCPUarmVendorFindByName(virCPUarmMapPtr map,
+                          const char *name)
+{
+    size_t i;
+
+    for (i = 0; i < map->vendors->len; i++) {
+        virCPUarmVendorPtr vendor = g_ptr_array_index(map->vendors, i);
+
+        if (STREQ(vendor->name, name))
+            return vendor;
+    }
+
+    return NULL;
+}
+
+static int
+virCPUarmVendorParse(xmlXPathContextPtr ctxt,
+                     const char *name,
+                     void *data)
+{
+    virCPUarmMapPtr map = (virCPUarmMapPtr)data;
+    g_autoptr(virCPUarmVendor) vendor = NULL;
+    int ret = -1;
+
+    if (virCPUarmVendorFindByName(map, name)) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("CPU vendor %s already defined"), name);
+        return -1;
+    }
+
+    vendor = virCPUarmVendorNew();
+    vendor->name = g_strdup(name);
+
+    if (virXPathULongHex("string(@value)", ctxt, &vendor->value) < 0) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       "%s", _("Missing CPU vendor value"));
+        return -1;
+    }
+
+    if (virCPUarmVendorFindByID(map, vendor->value)) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("CPU vendor value 0x%2lx already defined"), vendor->value);
+        return -1;
+    }
+
+    g_ptr_array_add(map->vendors, g_steal_pointer(&vendor));
+
+    return 0;
+}
+
+static virCPUarmModelPtr
+virCPUarmModelFindByPVR(virCPUarmMapPtr map,
+                        unsigned long pvr)
+{
+    size_t i;
+
+    for (i = 0; i < map->models->len; i++) {
+        virCPUarmModelPtr model = g_ptr_array_index(map->models, i);
+
+        if (STREQ(model->pvr, pvr))
+            return model;
+    }
+
+    return NULL;
+
+}
+
+static virCPUarmModelPtr
+virCPUarmModelFindByName(virCPUarmMapPtr map,
+                   const char *name)
+{
+    size_t i;
+
+    for (i = 0; i < map->models->len; i++) {
+        virCPUarmModelPtr model = g_ptr_array_index(map->models, i);
+
+        if (STREQ(model->name, name))
+            return model;
+    }
+
+    return NULL;
+}
+
+static int
+virCPUarmModelParse(xmlXPathContextPtr ctxt,
+                    const char *name,
+                    void *data)
+{
+    virCPUarmMapPtr map = (virCPUarmMapPtr)data;
+    g_autoptr(virCPUarmModel) model = NULL;
+    char *vendor = NULL;
+    int ret = -1;
+
+    if (virCPUarmModelFindByName(map, name)) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("CPU model %s already defined"), name);
+        return -1;
+    }
+
+    model = virCPUarmModelNew();
+    model->name = g_strdup(name);
+
+    if (virXPathBoolean("boolean(./vendor)", ctxt)) {
+        vendor = virXPathString("string(./vendor/@name)", ctxt);
+        if (!vendor) {
+            virReportError(VIR_ERR_INTERNAL_ERROR,
+                           _("Invalid vendor element in CPU model %s"),
+                           name);
+            return -1;
+        }
+
+        if (!(model->vendor = virCPUarmVendorFindByName(map, vendor))) {
+            virReportError(VIR_ERR_INTERNAL_ERROR,
+                           _("Unknown vendor %s referenced by CPU model %s"),
+                           vendor, model->name);
+            return -1;
+        }
+    }
+
+    if (!virXPathBoolean("boolean(./pvr)", ctxt)) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Missing PVR information for CPU model %s"),
+                       model->name);
+        return -1;
+    }
+
+    if (virXPathULongHex("string(./pvr/@value)", ctxt, &model->data.pvr) < 0) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Missing or invalid PVR value in CPU model %s"),
+                       model->name);
+        return -1;
+    }
+
+    g_ptr_array_add(map->models, g_steal_pointer(&model));
+
+    return 0;
+}
+
 static virCPUarmMapPtr
 virCPUarmLoadMap(void)
 {
@@ -158,7 +375,7 @@ virCPUarmLoadMap(void)
 
     map = virCPUarmMapNew();
 
-    if (cpuMapLoad("arm", NULL, virCPUarmMapFeatureParse, NULL, map) < 0)
+    if (cpuMapLoad("arm", virCPUarmVendorParse, virCPUarmMapFeatureParse, virCPUarmModelParse, map) < 0)
         return NULL;
 
     return g_steal_pointer(&map);
