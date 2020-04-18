@@ -86,9 +86,6 @@
 
   <arch name='arm'>
     <include filename='arm_features.xml'/>
-  </arch>
-
-  <arch name='arm'>
     <include filename="arm_vendors.xml"/>
 
     <!-- ARM-based CPU models -->

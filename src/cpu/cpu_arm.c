@@ -55,7 +55,6 @@ virCPUarmFeatureFree(virCPUarmFeaturePtr feature)
         return;
 
     g_free(feature->name);
-
     g_free(feature);
 }
 
@@ -80,6 +79,8 @@ virCPUarmDataFree(virCPUDataPtr cpuData)
     g_free(cpuData);
 }
 
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(virCPUData, virCPUarmDataFree);
+
 typedef struct _virCPUarmVendor virCPUarmVendor;
 typedef virCPUarmVendor *virCPUarmVendorPtr;
 struct _virCPUarmVendor {
@@ -102,6 +103,8 @@ virCPUarmVendorFree(virCPUarmVendorPtr vendor)
     g_free(vendor->name);
     VIR_FREE(vendor);
 }
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(virCPUarmVendor, virCPUarmVendorFree);
 
 typedef struct _virCPUarmModel virCPUarmModel;
 typedef virCPUarmModel *virCPUarmModelPtr;
@@ -175,6 +178,38 @@ virCPUarmMapFree(virCPUarmMapPtr map)
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(virCPUarmMap, virCPUarmMapFree);
 
+static virCPUarmVendorPtr
+virCPUarmVendorFindByID(virCPUarmMapPtr map,
+                        unsigned long vendor_id)
+{
+    size_t i;
+
+    for (i = 0; i < map->vendors->len; i++) {
+        virCPUarmVendorPtr vendor = g_ptr_array_index(map->vendors, i);
+
+        if (vendor->value == vendor_id)
+            return vendor;
+    }
+
+    return NULL;
+}
+
+static virCPUarmVendorPtr
+virCPUarmVendorFindByName(virCPUarmMapPtr map,
+                          const char *name)
+{
+    size_t i;
+
+    for (i = 0; i < map->vendors->len; i++) {
+        virCPUarmVendorPtr vendor = g_ptr_array_index(map->vendors, i);
+
+        if (STREQ(vendor->name, name))
+            return vendor;
+    }
+
+    return NULL;
+}
+
 static virCPUarmFeaturePtr
 virCPUarmMapFeatureFind(virCPUarmMapPtr map,
                         const char *name)
@@ -213,36 +248,43 @@ virCPUarmMapFeatureParse(xmlXPathContextPtr ctxt G_GNUC_UNUSED,
     return 0;
 }
 
-static virCPUarmVendorPtr
-virCPUarmVendorFindByID(virCPUarmMapPtr map,
-                        unsigned long vendor_id)
+static int
+armCpuDataParseFeatures(virCPUDefPtr cpu,
+                        const virCPUarmData *cpuData)
 {
+    int ret = -1;
     size_t i;
+    char **features;
 
-    for (i = 0; i < map->vendors->len; i++) {
-        virCPUarmVendorPtr vendor = g_ptr_array_index(map->vendors, i);
+    if (!cpu || !cpuData)
+        return ret;
 
-        if (vendor->value == vendor_id)
-            return vendor;
+    if (!(features = virStringSplitCount(cpuData->features, " ",
+                                         0, &cpu->nfeatures)))
+        return ret;
+
+    if (cpu->nfeatures) {
+        if (VIR_ALLOC_N(cpu->features, cpu->nfeatures) < 0)
+            goto error;
+
+        for (i = 0; i < cpu->nfeatures; i++) {
+            cpu->features[i].policy = VIR_CPU_FEATURE_REQUIRE;
+            cpu->features[i].name = g_strdup(features[i]);
+        }
     }
 
-    return NULL;
-}
+    ret = 0;
 
-static virCPUarmVendorPtr
-virCPUarmVendorFindByName(virCPUarmMapPtr map,
-                          const char *name)
-{
-    size_t i;
+cleanup:
+    virStringListFree(features);
+    return ret;
 
-    for (i = 0; i < map->vendors->len; i++) {
-        virCPUarmVendorPtr vendor = g_ptr_array_index(map->vendors, i);
-
-        if (STREQ(vendor->name, name))
-            return vendor;
-    }
-
-    return NULL;
+error:
+    for (i = 0; i < cpu->nfeatures; i++)
+        VIR_FREE(cpu->features[i].name);
+    VIR_FREE(cpu->features);
+    cpu->nfeatures = 0;
+    goto cleanup;
 }
 
 static int
@@ -252,7 +294,6 @@ virCPUarmVendorParse(xmlXPathContextPtr ctxt,
 {
     virCPUarmMapPtr map = (virCPUarmMapPtr)data;
     g_autoptr(virCPUarmVendor) vendor = NULL;
-    int ret = -1;
 
     if (virCPUarmVendorFindByName(map, name)) {
         virReportError(VIR_ERR_INTERNAL_ERROR,
@@ -289,7 +330,7 @@ virCPUarmModelFindByPVR(virCPUarmMapPtr map,
     for (i = 0; i < map->models->len; i++) {
         virCPUarmModelPtr model = g_ptr_array_index(map->models, i);
 
-        if (STREQ(model->pvr, pvr))
+        if (model->data.pvr == pvr)
             return model;
     }
 
@@ -299,7 +340,7 @@ virCPUarmModelFindByPVR(virCPUarmMapPtr map,
 
 static virCPUarmModelPtr
 virCPUarmModelFindByName(virCPUarmMapPtr map,
-                   const char *name)
+                         const char *name)
 {
     size_t i;
 
@@ -321,7 +362,6 @@ virCPUarmModelParse(xmlXPathContextPtr ctxt,
     virCPUarmMapPtr map = (virCPUarmMapPtr)data;
     g_autoptr(virCPUarmModel) model = NULL;
     char *vendor = NULL;
-    int ret = -1;
 
     if (virCPUarmModelFindByName(map, name)) {
         virReportError(VIR_ERR_INTERNAL_ERROR,
@@ -405,6 +445,60 @@ virCPUarmGetMap(void)
 }
 
 static int
+virCPUarmDecode(virCPUDefPtr cpu,
+                const virCPUarmData *cpuData,
+                virDomainCapsCPUModelsPtr models)
+{
+    virCPUarmMapPtr map;
+    virCPUarmModelPtr model;
+    virCPUarmVendorPtr vendor = NULL;
+
+    if (!cpuData || !(map = virCPUarmGetMap()))
+        return -1;
+
+    if (!(model = virCPUarmModelFindByPVR(map, cpuData->pvr))) {
+        virReportError(VIR_ERR_OPERATION_FAILED,
+                       _("Cannot find CPU model with PVR 0x%03lx"),
+                       cpuData->pvr);
+        return -1;
+    }
+
+    if (!virCPUModelIsAllowed(model->name, models)) {
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                       _("CPU model %s is not supported by hypervisor"),
+                       model->name);
+        return -1;
+    }
+
+    cpu->model = g_strdup(model->name);
+
+    if (cpuData->vendor_id &&
+        !(vendor = virCPUarmVendorFindByID(map, cpuData->vendor_id))) {
+        virReportError(VIR_ERR_OPERATION_FAILED,
+                       _("Cannot find CPU vendor with vendor id 0x%02lx"),
+                       cpuData->vendor_id);
+        return -1;
+    }
+
+    if (vendor)
+        cpu->vendor = g_strdup(vendor->name);
+
+    if (cpuData->features &&
+        armCpuDataParseFeatures(cpu, cpuData) < 0)
+        return -1;
+
+    return 0;
+}
+
+static int
+virCPUarmDecodeCPUData(virCPUDefPtr cpu,
+                       const virCPUData *data,
+                       virDomainCapsCPUModelsPtr models)
+{
+    return virCPUarmDecode(cpu, &data->data.arm, models);
+}
+
+static int
 virCPUarmUpdate(virCPUDefPtr guest,
                 const virCPUDef *host)
 {
@@ -432,7 +526,7 @@ virCPUarmUpdate(virCPUDefPtr guest,
     guest->match = VIR_CPU_MATCH_EXACT;
     ret = 0;
 
- cleanup:
+cleanup:
     virCPUDefFree(updated);
     return ret;
 }
@@ -493,7 +587,7 @@ struct cpuArchDriver cpuDriverArm = {
     .arch = archs,
     .narch = G_N_ELEMENTS(archs),
     .compare = virCPUarmCompare,
-    .decode = NULL,
+    .decode = virCPUarmDecodeCPUData,
     .encode = NULL,
     .dataFree = virCPUarmDataFree,
     .baseline = virCPUarmBaseline,
