@@ -26,8 +26,14 @@
 #include "cpu_map.h"
 #include "virstring.h"
 #include "virxml.h"
+#include "virfile.h"
 
 #define VIR_FROM_THIS VIR_FROM_CPU
+
+static const char *sysinfoCpuinfo = "/proc/cpuinfo";
+
+#define CPUINFO sysinfoCpuinfo
+#define CPUINFO_FILE_LEN (1024*1024)   /* 1MB limit for /proc/cpuinfo file */
 
 static const virArch archs[] = {
     VIR_ARCH_ARMV6L,
@@ -531,6 +537,85 @@ cleanup:
     return ret;
 }
 
+static int
+armCpuDataFromCpuInfo(virCPUarmData *data)
+{
+    g_autofree char *str_vendor = NULL;
+    g_autofree char *str_pvr = NULL;
+    g_autofree char *outbuf = NULL;
+    char *eol = NULL;
+    const char *cur;
+
+    if (!data)
+        return -1;
+
+    if (virFileReadAll(CPUINFO, CPUINFO_FILE_LEN, &outbuf) < 0) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Failed to open %s"), CPUINFO);
+        return -1;
+    }
+
+    /* Account for format 'CPU implementer : XXXX' */
+    if ((cur = strstr(outbuf, "CPU implementer")) == NULL) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("there is no \"CPU implementer\" info in %s"), CPUINFO);
+        return -1;
+    }
+
+    cur = strchr(cur, ':') + 1;
+    eol = strchr(cur, '\n');
+    virSkipSpaces(&cur);
+    if (!eol || !(str_vendor = g_strndup(cur, eol - cur)) ||
+        virStrToLong_ul(str_vendor, NULL, 16, &data->vendor_id) < 0)
+        return -1;
+
+    /* Account for format 'CPU part : XXXX' */
+    if ((cur = strstr(outbuf, "CPU part")) == NULL) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("there is no \"CPU part\" info in %s"), CPUINFO);
+        return -1;
+    }
+
+    cur = strchr(cur, ':') + 1;
+    eol = strchr(cur, '\n');
+    virSkipSpaces(&cur);
+    if (!eol || !(str_pvr = g_strndup(cur, eol - cur)) ||
+        virStrToLong_ul(str_pvr, NULL, 16, &data->pvr) < 0)
+        return -1;
+
+    /* Account for format 'CPU Features : XXXX' */
+    if ((cur = strstr(outbuf, "Features")) == NULL) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("there is no \"Features\" info in %s"), CPUINFO);
+        return -1;
+    }
+    cur = strchr(cur, ':') + 1;
+    eol = strchr(cur, '\n');
+    virSkipSpaces(&cur);
+    if (eol && !(data->features = g_strndup(cur, eol - cur)))
+        return -1;
+
+    return 0;
+}
+
+static int
+virCPUarmGetHost(virCPUDefPtr cpu,
+                 virDomainCapsCPUModelsPtr models)
+{
+    g_autoptr(virCPUData) cpuData = NULL;
+
+    if (virCPUarmDriverInitialize() < 0)
+        return -1;
+
+    if (!(cpuData = virCPUDataNew(archs[0])))
+        return -1;
+
+    if (armCpuDataFromCpuInfo(&cpuData->data.arm) < 0)
+        return -1;
+
+    return virCPUarmDecodeCPUData(cpu, cpuData, models);
+}
+
 
 static virCPUDefPtr
 virCPUarmBaseline(virCPUDefPtr *cpus,
@@ -590,6 +675,7 @@ struct cpuArchDriver cpuDriverArm = {
     .decode = virCPUarmDecodeCPUData,
     .encode = NULL,
     .dataFree = virCPUarmDataFree,
+    .getHost = virCPUarmGetHost,
     .baseline = virCPUarmBaseline,
     .update = virCPUarmUpdate,
     .validateFeatures = virCPUarmValidateFeatures,
