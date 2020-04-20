@@ -21,6 +21,7 @@
 
 #include <config.h>
 
+#include "virlog.h"
 #include "viralloc.h"
 #include "cpu.h"
 #include "cpu_map.h"
@@ -29,6 +30,8 @@
 #include "virfile.h"
 
 #define VIR_FROM_THIS VIR_FROM_CPU
+
+VIR_LOG_INIT("cpu.cpu_arm");
 
 static const char *sysinfoCpuinfo = "/proc/cpuinfo";
 
@@ -806,12 +809,199 @@ virCPUarmBaseline(virCPUDefPtr *cpus,
     return g_steal_pointer(&cpu);
 }
 
-static virCPUCompareResult
-virCPUarmCompare(virCPUDefPtr host G_GNUC_UNUSED,
-                 virCPUDefPtr cpu G_GNUC_UNUSED,
-                 bool failMessages G_GNUC_UNUSED)
+static bool
+virCPUarmFeaturesIsSub(char *subFeatures,
+                       char *fullFeatures)
 {
+    bool ret = false;
+    char **sub = NULL;
+    char **full = NULL;
+    size_t subCount = 0;
+    size_t fullCount = 0;
+    size_t i;
+
+    if (virStringIsEmpty(subFeatures))
+        return true;
+
+    if (virStringIsEmpty(fullFeatures))
+        return ret;
+
+    if (STREQ(subFeatures, fullFeatures))
+        return true;
+
+    if (!(sub = virStringSplitCount(subFeatures, " ", 0, &subCount)) ||
+        !(full = virStringSplitCount(fullFeatures, " ", 0, &fullCount)) ||
+        subCount > fullCount)
+        goto cleanup;
+
+    for (i = 0; i < subCount; i++) {
+        if (!virStringListHasString((const char**)full, sub[i]))
+            goto cleanup;
+    }
+
+    ret = true;
+
+ cleanup:
+    virStringListFree(sub);
+    virStringListFree(full);
+    return ret;
+}
+
+static virCPUDataPtr
+armMakeCPUData(virArch arch,
+               virCPUarmData *data)
+{
+    virCPUDataPtr cpuData;
+
+    if (!(cpuData = virCPUDataNew(arch)))
+        return NULL;
+
+    virCPUarmDataCopy(&cpuData->data.arm, data);
+
+    return cpuData;
+}
+
+static virCPUCompareResult
+armCompute(virCPUDefPtr host,
+           virCPUDefPtr cpu,
+           virCPUDataPtr *guestData,
+           char **message)
+{
+    virCPUarmMapPtr map = NULL;
+    g_autoptr(virCPUarmModel) hostModel = NULL;
+    g_autoptr(virCPUarmModel) guestModel = NULL;
+    virArch arch;
+    size_t i;
+
+    if (cpu->arch != VIR_ARCH_NONE) {
+        bool found = false;
+
+        for (i = 0; i < G_N_ELEMENTS(archs); i++) {
+            if (archs[i] == cpu->arch) {
+                found = true;
+                break;
+            }
+        }
+
+        if (!found) {
+            VIR_DEBUG("CPU arch %s does not match host arch",
+                      virArchToString(cpu->arch));
+            if (message)
+                *message = g_strdup_printf(_("CPU arch %s does not match host arch"),
+                                           virArchToString(cpu->arch));
+
+            return VIR_CPU_COMPARE_INCOMPATIBLE;
+        }
+        arch = cpu->arch;
+    } else {
+        arch = host->arch;
+    }
+
+    if (cpu->vendor &&
+        (!host->vendor || STRNEQ(cpu->vendor, host->vendor))) {
+        VIR_DEBUG("host CPU vendor does not match required CPU vendor %s",
+                  cpu->vendor);
+        if (message)
+            *message = g_strdup_printf(_("host CPU vendor does not match required "
+                                       "CPU vendor %s"),
+                        cpu->vendor);
+
+        return VIR_CPU_COMPARE_INCOMPATIBLE;
+    }
+
+    if (!(map = virCPUarmGetMap()))
+        return VIR_CPU_COMPARE_ERROR;
+
+    /* Host CPU information */
+    if (!(hostModel = virCPUarmModelFromCPU(host, map)))
+        return VIR_CPU_COMPARE_ERROR;
+
+    if (cpu->type == VIR_CPU_TYPE_GUEST) {
+        /* Guest CPU information */
+        switch (cpu->mode) {
+            case VIR_CPU_MODE_HOST_MODEL:
+            case VIR_CPU_MODE_HOST_PASSTHROUGH:
+                /* host-model and host-passthrough:
+                 * the guest CPU is the same as the host */
+                guestModel = virCPUarmModelCopy(hostModel);
+                break;
+
+            case VIR_CPU_MODE_CUSTOM:
+                /* custom:
+                 * look up guest CPU information */
+                guestModel = virCPUarmModelFromCPU(cpu, map);
+                break;
+        }
+    } else {
+        /* Other host CPU information */
+        guestModel = virCPUarmModelFromCPU(cpu, map);
+    }
+
+    if (!guestModel)
+        return VIR_CPU_COMPARE_ERROR;
+
+    if (STRNEQ(guestModel->name, hostModel->name)) {
+        VIR_DEBUG("host CPU model %s does not match required CPU model %s",
+                  hostModel->name, guestModel->name);
+        if (message)
+            *message = g_strdup_printf(_("host CPU model %s does not match required "
+                                       "CPU model %s"),
+                                       hostModel->name, guestModel->name);
+
+        return VIR_CPU_COMPARE_INCOMPATIBLE;
+    }
+
+    if (!virCPUarmFeaturesIsSub(guestModel->data.features, hostModel->data.features)) {
+        VIR_DEBUG("guest CPU features '%s' is not subset of "
+                  "host CPU features '%s'",
+                  guestModel->data.features, hostModel->data.features);
+        if (message)
+            *message = g_strdup_printf(_("guest CPU features '%s' is not subset of "
+                                       "host CPU features '%s'"),
+                                       guestModel->data.features,
+                                       hostModel->data.features);
+
+        return VIR_CPU_COMPARE_INCOMPATIBLE;
+    }
+
+    if (guestData &&
+        !(*guestData = armMakeCPUData(arch, &guestModel->data)))
+        return VIR_CPU_COMPARE_ERROR;
+
     return VIR_CPU_COMPARE_IDENTICAL;
+}
+
+static virCPUCompareResult
+virCPUarmCompare(virCPUDefPtr host,
+                 virCPUDefPtr cpu,
+                 bool failMessages)
+{
+    virCPUCompareResult ret = VIR_CPU_COMPARE_ERROR;
+    g_autofree char *message = NULL;
+
+    if (!host || !host->model) {
+        if (failMessages) {
+            virReportError(VIR_ERR_CPU_INCOMPATIBLE, "%s",
+                           _("unknown host CPU"));
+        } else {
+            VIR_WARN("unknown host CPU");
+            return VIR_CPU_COMPARE_INCOMPATIBLE;
+        }
+        return VIR_CPU_COMPARE_ERROR;
+    }
+
+    ret = armCompute(host, cpu, NULL, &message);
+
+    if (failMessages && ret == VIR_CPU_COMPARE_INCOMPATIBLE) {
+        if (message) {
+            virReportError(VIR_ERR_CPU_INCOMPATIBLE, "%s", message);
+        } else {
+            virReportError(VIR_ERR_CPU_INCOMPATIBLE, NULL);
+        }
+        return VIR_CPU_COMPARE_ERROR;
+    }
+
+    return ret;
 }
 
 static int
