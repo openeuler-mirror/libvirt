@@ -1829,6 +1829,7 @@ virCommandDaemonize;
 virCommandDoAsyncIO;
 virCommandExec;
 virCommandFree;
+virCommandGetArgList;
 virCommandGetGID;
 virCommandGetUID;
 virCommandHandshakeNotify;
