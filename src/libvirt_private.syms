@@ -2902,6 +2902,7 @@ virQEMUBuildCommandLineJSON;
 virQEMUBuildCommandLineJSONArrayBitmap;
 virQEMUBuildCommandLineJSONArrayNumbered;
 virQEMUBuildDriveCommandlineFromJSON;
+virQEMUBuildNetdevCommandlineFromJSON;
 virQEMUBuildObjectCommandlineFromJSON;
 virQEMUBuildQemuImgKeySecretOpts;
 
