@@ -8859,7 +8859,7 @@ qemuBuildChannelsCommandLine(virLogManagerPtr logManager,
         virDomainChrDefPtr channel = def->channels[i];
         char *devstr;
 
-        switch (channel->targetType) {
+        switch ((virDomainChrChannelTargetType) channel->targetType) {
         case VIR_DOMAIN_CHR_CHANNEL_TARGET_TYPE_GUESTFWD:
             if (!(devstr = qemuBuildChrChardevStr(logManager, secManager,
                                                   cmd, cfg, def,
@@ -8891,6 +8891,11 @@ qemuBuildChannelsCommandLine(virLogManagerPtr logManager,
             if (qemuBuildChrDeviceCommandLine(cmd, def, channel, qemuCaps) < 0)
                 return -1;
             break;
+
+        case VIR_DOMAIN_CHR_CHANNEL_TARGET_TYPE_XEN:
+        case VIR_DOMAIN_CHR_CHANNEL_TARGET_TYPE_NONE:
+        case VIR_DOMAIN_CHR_CHANNEL_TARGET_TYPE_LAST:
+            return -1;
         }
     }
 
