@@ -400,7 +400,8 @@ testCompareXMLToArgvCreateArgs(virQEMUDriverPtr drv,
                                virDomainObjPtr vm,
                                const char *migrateURI,
                                struct testQemuInfo *info,
-                               unsigned int flags)
+                               unsigned int flags,
+                               bool jsonPropsValidation)
 {
     size_t i;
 
@@ -475,6 +476,7 @@ testCompareXMLToArgvCreateArgs(virQEMUDriverPtr drv,
 
     return qemuProcessCreatePretendCmd(drv, vm, migrateURI,
                                        (flags & FLAG_FIPS), false,
+                                       jsonPropsValidation,
                                        VIR_QEMU_PROCESS_START_COLD);
 }
 
@@ -570,7 +572,7 @@ testCompareXMLToArgv(const void *data)
     virResetLastError();
 
     if (!(cmd = testCompareXMLToArgvCreateArgs(&driver, vm, migrateURI, info,
-                                               flags))) {
+                                               flags, false))) {
         if (flags & FLAG_EXPECT_FAILURE)
             goto ok;
         goto cleanup;

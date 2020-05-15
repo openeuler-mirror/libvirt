@@ -6750,7 +6750,7 @@ qemuProcessLaunch(virConnectPtr conn,
                                      snapshot, vmop,
                                      false,
                                      qemuCheckFips(),
-                                     &nnicindexes, &nicindexes)))
+                                     &nnicindexes, &nicindexes, 0)))
         goto cleanup;
 
     if (incoming && incoming->fd != -1)
@@ -7193,8 +7193,11 @@ qemuProcessCreatePretendCmd(virQEMUDriverPtr driver,
                             const char *migrateURI,
                             bool enableFips,
                             bool standalone,
+                            bool jsonPropsValidation,
                             unsigned int flags)
 {
+    unsigned int buildflags = 0;
+
     virCheckFlags(VIR_QEMU_PROCESS_START_COLD |
                   VIR_QEMU_PROCESS_START_PAUSED |
                   VIR_QEMU_PROCESS_START_AUTODESTROY, NULL);
@@ -7203,6 +7206,9 @@ qemuProcessCreatePretendCmd(virQEMUDriverPtr driver,
     flags |= VIR_QEMU_PROCESS_START_NEW;
     if (standalone)
         flags |= VIR_QEMU_PROCESS_START_STANDALONE;
+
+    if (jsonPropsValidation)
+        buildflags = QEMU_BUILD_COMMANDLINE_VALIDATE_KEEP_JSON;
 
     if (qemuProcessInit(driver, vm, NULL, QEMU_ASYNC_JOB_NONE,
                         !!migrateURI, flags) < 0)
@@ -7222,7 +7228,8 @@ qemuProcessCreatePretendCmd(virQEMUDriverPtr driver,
                                 standalone,
                                 enableFips,
                                 NULL,
-                                NULL);
+                                NULL,
+                                buildflags);
 }
 
 

@@ -8027,7 +8027,8 @@ qemuBuildInterfaceCommandLine(virQEMUDriverPtr driver,
                               virNetDevVPortProfileOp vmop,
                               bool standalone,
                               size_t *nnicindexes,
-                              int **nicindexes)
+                              int **nicindexes,
+                              unsigned int flags)
 {
     virDomainDefPtr def = vm->def;
     int ret = -1;
@@ -8256,7 +8257,8 @@ qemuBuildInterfaceCommandLine(virQEMUDriverPtr driver,
                                              slirpfdName)))
         goto cleanup;
 
-    if (!(host = virQEMUBuildNetdevCommandlineFromJSON(hostnetprops)))
+    if (!(host = virQEMUBuildNetdevCommandlineFromJSON(hostnetprops,
+                                                       (flags & QEMU_BUILD_COMMANDLINE_VALIDATE_KEEP_JSON))))
         goto cleanup;
 
     virCommandAddArgList(cmd, "-netdev", host, NULL);
@@ -8332,7 +8334,8 @@ qemuBuildNetCommandLine(virQEMUDriverPtr driver,
                         bool standalone,
                         size_t *nnicindexes,
                         int **nicindexes,
-                        unsigned int *bootHostdevNet)
+                        unsigned int *bootHostdevNet,
+                        unsigned int flags)
 {
     size_t i;
     int last_good_net = -1;
@@ -8356,7 +8359,7 @@ qemuBuildNetCommandLine(virQEMUDriverPtr driver,
             if (qemuBuildInterfaceCommandLine(driver, vm, logManager, secManager, cmd, net,
                                               qemuCaps, bootNet, vmop,
                                               standalone, nnicindexes,
-                                              nicindexes) < 0)
+                                              nicindexes, flags) < 0)
                 goto error;
 
             last_good_net = i;
@@ -8892,7 +8895,8 @@ qemuBuildChannelsCommandLine(virLogManagerPtr logManager,
                              virQEMUDriverConfigPtr cfg,
                              const virDomainDef *def,
                              virQEMUCapsPtr qemuCaps,
-                             bool chardevStdioLogd)
+                             bool chardevStdioLogd,
+                             unsigned int flags)
 {
     size_t i;
     unsigned int cdevflags = QEMU_BUILD_CHARDEV_TCP_NOWAIT |
@@ -8921,7 +8925,8 @@ qemuBuildChannelsCommandLine(virLogManagerPtr logManager,
             if (!(netdevprops = qemuBuildChannelGuestfwdNetdevProps(channel)))
                 return -1;
 
-            if (!(netdevstr = virQEMUBuildNetdevCommandlineFromJSON(netdevprops)))
+            if (!(netdevstr = virQEMUBuildNetdevCommandlineFromJSON(netdevprops,
+                                                                    (flags & QEMU_BUILD_COMMANDLINE_VALIDATE_KEEP_JSON))))
                 return -1;
 
             virCommandAddArgList(cmd, "-netdev", netdevstr, NULL);
@@ -9857,7 +9862,8 @@ qemuBuildCommandLine(virQEMUDriverPtr driver,
                      bool standalone,
                      bool enableFips,
                      size_t *nnicindexes,
-                     int **nicindexes)
+                     int **nicindexes,
+                     unsigned int flags)
 {
     size_t i;
     char uuid[VIR_UUID_STRING_BUFLEN];
@@ -9870,9 +9876,9 @@ qemuBuildCommandLine(virQEMUDriverPtr driver,
     bool chardevStdioLogd = priv->chardevStdioLogd;
 
     VIR_DEBUG("driver=%p def=%p mon=%p "
-              "qemuCaps=%p migrateURI=%s snapshot=%p vmop=%d",
+              "qemuCaps=%p migrateURI=%s snapshot=%p vmop=%d flags=0x%x",
               driver, def, priv->monConfig,
-              qemuCaps, migrateURI, snapshot, vmop);
+              qemuCaps, migrateURI, snapshot, vmop, flags);
 
     if (qemuBuildCommandLineValidate(driver, def) < 0)
         return NULL;
@@ -10017,7 +10023,7 @@ qemuBuildCommandLine(virQEMUDriverPtr driver,
 
     if (qemuBuildNetCommandLine(driver, vm, logManager, secManager, cmd,
                                 qemuCaps, vmop, standalone,
-                                nnicindexes, nicindexes, &bootHostdevNet) < 0)
+                                nnicindexes, nicindexes, &bootHostdevNet, flags) < 0)
         return NULL;
 
     if (qemuBuildSmartcardCommandLine(logManager, secManager, cmd, cfg, def, qemuCaps,
@@ -10033,7 +10039,7 @@ qemuBuildCommandLine(virQEMUDriverPtr driver,
         return NULL;
 
     if (qemuBuildChannelsCommandLine(logManager, secManager, cmd, cfg, def, qemuCaps,
-                                     chardevStdioLogd) < 0)
+                                     chardevStdioLogd, flags) < 0)
         return NULL;
 
     if (qemuBuildConsoleCommandLine(logManager, secManager, cmd, cfg, def, qemuCaps,
