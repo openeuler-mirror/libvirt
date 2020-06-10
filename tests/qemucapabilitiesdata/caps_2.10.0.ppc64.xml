@@ -140,6 +140,8 @@
   <flag name='egl-headless'/>
   <flag name='iothread.poll-max-ns'/>
   <flag name='i8042'/>
+  <flag name='migration-param.bandwidth'/>
+  <flag name='migration-param.downtime'/>
   <version>2010000</version>
   <kvmVersion>0</kvmVersion>
   <microcodeVersion>42900287</microcodeVersion>

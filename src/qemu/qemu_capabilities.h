@@ -552,6 +552,9 @@ typedef enum { /* virQEMUCapsFlags grouping marker for syntax-check */
     
     /* 360 */
     QEMU_CAPS_DEVICE_TPM_TIS_DEVICE, /* -device tpm-tis-device */
+    QEMU_CAPS_MIGRATION_PARAM_BANDWIDTH, /* max-bandwidth field in migrate-set-parameters */
+    QEMU_CAPS_MIGRATION_PARAM_DOWNTIME, /* downtime-limit field in migrate-set-parameters */
+    QEMU_CAPS_MIGRATION_PARAM_XBZRLE_CACHE_SIZE, /* xbzrle-cache-size field in migrate-set-parameters */
 
     QEMU_CAPS_LAST /* this must always be the last item */
 } virQEMUCapsFlags;

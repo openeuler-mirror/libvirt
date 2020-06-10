@@ -224,6 +224,9 @@
   <flag name='virtio-net.failover'/>
   <flag name='vhost-user-fs'/>
   <flag name='storage.werror'/>
+  <flag name='migration-param.bandwidth'/>
+  <flag name='migration-param.downtime'/>
+  <flag name='migration-param.xbzrle-cache-size'/>
   <version>4002000</version>
   <kvmVersion>0</kvmVersion>
   <microcodeVersion>43100242</microcodeVersion>
