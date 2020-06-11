@@ -2241,7 +2241,7 @@ struct _virDomainHugePage {
     unsigned long long size;    /* hugepage size in KiB */
 };
 
-#define VIR_DOMAIN_CPUMASK_LEN 1024
+#define VIR_DOMAIN_CPUMASK_LEN 16384
 
 struct _virDomainIOThreadIDDef {
     bool autofill;
