@@ -2906,6 +2906,7 @@ virQEMUBuildCommandLineJSONArrayNumbered;
 virQEMUBuildDriveCommandlineFromJSON;
 virQEMUBuildNetdevCommandlineFromJSON;
 virQEMUBuildQemuImgKeySecretOpts;
+virQEMUFileOpenAs;
 
 
 # util/virrandom.h
