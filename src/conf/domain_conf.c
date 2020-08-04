@@ -24565,10 +24565,14 @@ virDomainSourceDefFormatSeclabel(virBufferPtr buf,
 
 static void
 virDomainDiskSourceFormatNetworkCookies(virBufferPtr buf,
-                                        virStorageSourcePtr src)
+                                        virStorageSourcePtr src,
+                                        unsigned int flags)
 {
     g_auto(virBuffer) childBuf = VIR_BUFFER_INIT_CHILD(buf);
     size_t i;
+
+    if (!(flags & VIR_DOMAIN_DEF_FORMAT_SECURE))
+        return;
 
     for (i = 0; i < src->ncookies; i++) {
         virBufferEscapeString(&childBuf, "<cookie name='%s'>", src->cookies[i]->name);
@@ -24630,7 +24634,7 @@ virDomainDiskSourceFormatNetwork(virBufferPtr attrBuf,
                           virTristateBoolTypeToString(src->sslverify));
     }
 
-    virDomainDiskSourceFormatNetworkCookies(childBuf, src);
+    virDomainDiskSourceFormatNetworkCookies(childBuf, src, flags);
 
     if (src->readahead)
         virBufferAsprintf(childBuf, "<readahead size='%llu'/>\n", src->readahead);
