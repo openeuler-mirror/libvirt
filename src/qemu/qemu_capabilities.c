@@ -568,6 +568,9 @@ VIR_ENUM_IMPL(virQEMUCaps,
               "blockdev-snapshot.allow-write-only-overlay",
               "blockdev-reopen",
               "storage.werror",
+	      
+              /* 360 */
+              "tpm-tis-device",
     );
 
 
@@ -1285,6 +1288,7 @@ struct virQEMUCapsStringFlags virQEMUCapsObjectTypes[] = {
     { "rng-builtin", QEMU_CAPS_OBJECT_RNG_BUILTIN },
     { "tpm-spapr", QEMU_CAPS_DEVICE_TPM_SPAPR },
     { "vhost-user-fs-device", QEMU_CAPS_DEVICE_VHOST_USER_FS },
+    { "tpm-tis-device", QEMU_CAPS_DEVICE_TPM_TIS_DEVICE },
 };
 
 static struct virQEMUCapsStringFlags virQEMUCapsDevicePropsVirtioBalloon[] = {
@@ -3064,6 +3068,10 @@ const struct tpmTypeToCaps virQEMUCapsTPMModelsToCaps[] = {
     {
         .type = VIR_DOMAIN_TPM_MODEL_SPAPR,
         .caps = QEMU_CAPS_DEVICE_TPM_SPAPR,
+    },
+    {
+	.type = VIR_DOMAIN_TPM_MODEL_TIS_DEVICE,
+	.caps = QEMU_CAPS_DEVICE_TPM_TIS_DEVICE,
     },
 };
 

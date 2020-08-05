@@ -1140,6 +1140,7 @@ VIR_ENUM_IMPL(virDomainTPMModel,
               "tpm-tis",
               "tpm-crb",
               "tpm-spapr",
+              "tpm-tis-device",
 );
 
 VIR_ENUM_IMPL(virDomainTPMBackend,
