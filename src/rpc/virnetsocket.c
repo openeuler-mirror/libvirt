@@ -1400,7 +1400,7 @@ int virNetSocketDupFD(virNetSocketPtr sock, bool cloexec)
     }
 #ifndef F_DUPFD_CLOEXEC
     if (cloexec &&
-        virSetCloseExec(fd < 0)) {
+        virSetCloseExec(fd) < 0) {
         int saveerr = errno;
         closesocket(fd);
         errno = saveerr;
