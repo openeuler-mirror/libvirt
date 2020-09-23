@@ -749,6 +749,13 @@ qemuStateInitialize(bool privileged,
         goto error;
     }
 
+    if (virDirCreate(cfg->dbusStateDir, 0770, cfg->user, cfg->group,
+                     VIR_DIR_CREATE_ALLOW_EXIST) < 0) {
+        virReportSystemError(errno, _("Failed to create dbus state dir %s"),
+                             cfg->dbusStateDir);
+        goto error;
+    }
+
     if ((qemu_driver->lockFD =
          virPidFileAcquire(cfg->stateDir, "driver", false, getpid())) < 0)
         goto error;
@@ -9728,6 +9735,10 @@ qemuDomainSetNumaParamsLive(virDomainObjPtr vm,
         virCgroupFree(&cgroup_temp);
     }
 
+    /* set nodeset for root cgroup */
+    if (virCgroupSetCpusetMems(priv->cgroup, nodeset_str) < 0)
+        goto cleanup;
+
     ret = 0;
  cleanup:
     virCgroupFree(&cgroup_temp);
@@ -17972,6 +17983,7 @@ qemuDomainBlockCopyCommon(virDomainObjPtr vm,
     virDomainDiskDefPtr disk = NULL;
     int ret = -1;
     bool need_unlink = false;
+    bool need_revoke = false;
     g_autoptr(virQEMUDriverConfig) cfg = virQEMUDriverGetConfig(driver);
     const char *format = NULL;
     bool mirror_reuse = !!(flags & VIR_DOMAIN_BLOCK_COPY_REUSE_EXT);
@@ -18146,6 +18158,7 @@ qemuDomainBlockCopyCommon(virDomainObjPtr vm,
 
     if (qemuDomainStorageSourceChainAccessAllow(driver, vm, mirror) < 0)
         goto endjob;
+    need_revoke = true;
 
     if (blockdev) {
         if (mirror_reuse) {
@@ -18254,14 +18267,17 @@ qemuDomainBlockCopyCommon(virDomainObjPtr vm,
 
  endjob:
     if (ret < 0 &&
-        virDomainObjIsActive(vm) &&
-        (data || crdata)) {
-        qemuDomainObjEnterMonitor(driver, vm);
-        if (data)
-            qemuBlockStorageSourceChainDetach(priv->mon, data);
-        if (crdata)
-            qemuBlockStorageSourceAttachRollback(priv->mon, crdata->srcdata[0]);
-        ignore_value(qemuDomainObjExitMonitor(driver, vm));
+        virDomainObjIsActive(vm)) {
+        if (data || crdata) {
+            qemuDomainObjEnterMonitor(driver, vm);
+            if (data)
+                qemuBlockStorageSourceChainDetach(priv->mon, data);
+            if (crdata)
+                qemuBlockStorageSourceAttachRollback(priv->mon, crdata->srcdata[0]);
+            ignore_value(qemuDomainObjExitMonitor(driver, vm));
+        }
+        if (need_revoke)
+            qemuDomainStorageSourceChainAccessRevoke(driver, vm, mirror);
     }
     if (need_unlink && virStorageFileUnlink(mirror) < 0)
         VIR_WARN("%s", _("unable to remove just-created copy target"));

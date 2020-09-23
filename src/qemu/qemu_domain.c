@@ -1203,6 +1203,7 @@ qemuDomainStorageSourcePrivateDispose(void *obj)
 
     g_clear_pointer(&priv->secinfo, qemuDomainSecretInfoFree);
     g_clear_pointer(&priv->encinfo, qemuDomainSecretInfoFree);
+    g_clear_pointer(&priv->httpcookie, qemuDomainSecretInfoFree);
 }
 
 
@@ -4971,6 +4972,14 @@ qemuDomainDefPostParse(virDomainDefPtr def,
     if (!def->os.machine) {
         const char *machine = virQEMUCapsGetPreferredMachine(qemuCaps,
                                                              def->virtType);
+        if (!machine) {
+            virReportError(VIR_ERR_INVALID_ARG,
+                           _("could not get preferred machine for %s type=%s"),
+                           def->emulator,
+                           virDomainVirtTypeToString(def->virtType));
+            return -1;
+        }
+
         def->os.machine = g_strdup(machine);
     }
 
@@ -8118,6 +8127,9 @@ qemuDomainDeviceDefValidateTPM(virDomainTPMDef *tpm,
     case VIR_DOMAIN_TPM_MODEL_SPAPR:
         flag = QEMU_CAPS_DEVICE_TPM_SPAPR;
         break;
+    case VIR_DOMAIN_TPM_MODEL_TIS_DEVICE:
+        flag = QEMU_CAPS_DEVICE_TPM_TIS_DEVICE;
+        break;
     case VIR_DOMAIN_TPM_MODEL_LAST:
     default:
         virReportEnumRangeError(virDomainTPMModel, tpm->model);
@@ -9330,6 +9342,7 @@ qemuDomainDeviceNetDefPostParse(virDomainNetDefPtr net,
                                 virQEMUCapsPtr qemuCaps)
 {
     if (net->type != VIR_DOMAIN_NET_TYPE_HOSTDEV &&
+        virDomainNetResolveActualType(net) != VIR_DOMAIN_NET_TYPE_HOSTDEV &&
         !virDomainNetGetModelString(net))
         net->model = qemuDomainDefaultNetModel(def, qemuCaps);
 
@@ -11558,18 +11571,14 @@ qemuDomainCleanupRun(virQEMUDriverPtr driver,
                      virDomainObjPtr vm)
 {
     qemuDomainObjPrivatePtr priv = vm->privateData;
-    size_t i;
 
     VIR_DEBUG("driver=%p, vm=%s", driver, vm->def->name);
 
     /* run cleanup callbacks in reverse order */
-    for (i = 0; i < priv->ncleanupCallbacks; i++) {
-        if (priv->cleanupCallbacks[priv->ncleanupCallbacks - (i + 1)])
-            priv->cleanupCallbacks[i](driver, vm);
-    }
+    while (priv->ncleanupCallbacks)
+        priv->cleanupCallbacks[--priv->ncleanupCallbacks](driver, vm);
 
     VIR_FREE(priv->cleanupCallbacks);
-    priv->ncleanupCallbacks = 0;
     priv->ncleanupCallbacks_max = 0;
 }
 

@@ -1140,6 +1140,7 @@ VIR_ENUM_IMPL(virDomainTPMModel,
               "tpm-tis",
               "tpm-crb",
               "tpm-spapr",
+              "tpm-tis-device",
 );
 
 VIR_ENUM_IMPL(virDomainTPMBackend,
@@ -24565,10 +24566,14 @@ virDomainSourceDefFormatSeclabel(virBufferPtr buf,
 
 static void
 virDomainDiskSourceFormatNetworkCookies(virBufferPtr buf,
-                                        virStorageSourcePtr src)
+                                        virStorageSourcePtr src,
+                                        unsigned int flags)
 {
     g_auto(virBuffer) childBuf = VIR_BUFFER_INIT_CHILD(buf);
     size_t i;
+
+    if (!(flags & VIR_DOMAIN_DEF_FORMAT_SECURE))
+        return;
 
     for (i = 0; i < src->ncookies; i++) {
         virBufferEscapeString(&childBuf, "<cookie name='%s'>", src->cookies[i]->name);
@@ -24630,7 +24635,7 @@ virDomainDiskSourceFormatNetwork(virBufferPtr attrBuf,
                           virTristateBoolTypeToString(src->sslverify));
     }
 
-    virDomainDiskSourceFormatNetworkCookies(childBuf, src);
+    virDomainDiskSourceFormatNetworkCookies(childBuf, src, flags);
 
     if (src->readahead)
         virBufferAsprintf(childBuf, "<readahead size='%llu'/>\n", src->readahead);
@@ -27849,6 +27854,9 @@ virDomainHostdevDefFormat(virBufferPtr buf,
             if (mdevsrc->display != VIR_TRISTATE_SWITCH_ABSENT)
                 virBufferAsprintf(buf, " display='%s'",
                                   virTristateSwitchTypeToString(mdevsrc->display));
+            if (mdevsrc->ramfb != VIR_TRISTATE_SWITCH_ABSENT)
+                virBufferAsprintf(buf, " ramfb='%s'",
+                                  virTristateSwitchTypeToString(mdevsrc->ramfb));
         }
 
     }
@@ -29022,7 +29030,11 @@ virDomainDefFormatInternalSetRootName(virDomainDefPtr def,
          * Thankfully, libxml maps what looks like globals into
          * thread-local uses, so we are thread-safe.  */
         xmlIndentTreeOutput = 1;
-        xmlbuf = xmlBufferCreate();
+        if (!(xmlbuf = xmlBufferCreate())) {
+            virReportOOMError();
+            goto error;
+        }
+
         if (xmlNodeDump(xmlbuf, def->metadata->doc, def->metadata,
                         virBufferGetIndent(buf) / 2, 1) < 0) {
             xmlBufferFree(xmlbuf);

@@ -6481,9 +6481,6 @@ qemuProcessPrepareHost(virQEMUDriverPtr driver,
     qemuDomainObjPrivatePtr priv = vm->privateData;
     g_autoptr(virQEMUDriverConfig) cfg = virQEMUDriverGetConfig(driver);
 
-    if (qemuDBusPrepareHost(driver) < 0)
-        return -1;
-
     if (qemuPrepareNVRAM(cfg, vm) < 0)
         return -1;
 
@@ -6998,8 +6995,6 @@ qemuProcessLaunch(virConnectPtr conn,
     ret = 0;
 
  cleanup:
-    if (ret < 0)
-        qemuExtDevicesStop(driver, vm);
     qemuDomainSecretDestroy(vm);
     return ret;
 }
@@ -7605,8 +7600,13 @@ void qemuProcessStop(virQEMUDriverPtr driver,
         for (i = 0; i < def->ndisks; i++) {
             virDomainDiskDefPtr disk = def->disks[i];
 
-            if (disk->mirror)
-                qemuBlockRemoveImageMetadata(driver, vm, disk->dst, disk->mirror);
+            if (disk->mirror) {
+                if (qemuSecurityRestoreImageLabel(driver, vm, disk->mirror, false) < 0)
+                    VIR_WARN("Unable to restore security label on %s", disk->dst);
+
+                if (virStorageSourceChainHasNVMe(disk->mirror))
+                    qemuHostdevReAttachOneNVMeDisk(driver, vm->def->name, disk->mirror);
+            }
 
             qemuBlockRemoveImageMetadata(driver, vm, disk->dst, disk->src);
         }
