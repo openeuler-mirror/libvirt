@@ -464,6 +464,8 @@ virLogHandlerDomainLogFileDrain(virLogHandlerLogFilePtr file)
             if (errno == EINTR)
                 continue;
             return;
+        } else if (len == 0) {
+            return;
         }
 
         if (virRotatingFileWriterAppend(file->file, buf, len) != len)
