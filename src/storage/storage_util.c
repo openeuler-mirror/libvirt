@@ -1818,7 +1818,7 @@ virStorageBackendUpdateVolTargetInfoFD(virStorageSourcePtr target,
                                        struct stat *sb)
 {
 #if WITH_SELINUX
-    security_context_t filecon = NULL;
+    char *filecon = NULL;
 #endif
 
     if (virStorageSourceUpdateBackingSizes(target, fd, sb) < 0)
