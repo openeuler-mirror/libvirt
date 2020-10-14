@@ -64,6 +64,7 @@ typedef enum {
     VIR_NODE_DEV_CAP_MDEV_TYPES,        /* Device capable of mediated devices */
     VIR_NODE_DEV_CAP_MDEV,              /* Mediated device */
     VIR_NODE_DEV_CAP_CCW_DEV,           /* s390 CCW device */
+    VIR_NODE_DEV_CAP_VDPA,              /* vDPA device */
 
     VIR_NODE_DEV_CAP_LAST
 } virNodeDevCapType;
@@ -271,6 +272,12 @@ struct _virNodeDevCapCCW {
     unsigned int devno;
 };
 
+typedef struct _virNodeDevCapVDPA virNodeDevCapVDPA;
+typedef virNodeDevCapVDPA *virNodeDevCapVDPAPtr;
+struct _virNodeDevCapVDPA {
+    char *chardev;
+};
+
 typedef struct _virNodeDevCapData virNodeDevCapData;
 typedef virNodeDevCapData *virNodeDevCapDataPtr;
 struct _virNodeDevCapData {
@@ -289,6 +296,7 @@ struct _virNodeDevCapData {
         virNodeDevCapDRM drm;
         virNodeDevCapMdev mdev;
         virNodeDevCapCCW ccw_dev;
+        virNodeDevCapVDPA vdpa;
     };
 };
 
@@ -364,7 +372,8 @@ virNodeDevCapsDefFree(virNodeDevCapsDefPtr caps);
                  VIR_CONNECT_LIST_NODE_DEVICES_CAP_DRM           | \
                  VIR_CONNECT_LIST_NODE_DEVICES_CAP_MDEV_TYPES    | \
                  VIR_CONNECT_LIST_NODE_DEVICES_CAP_MDEV          | \
-                 VIR_CONNECT_LIST_NODE_DEVICES_CAP_CCW_DEV)
+                 VIR_CONNECT_LIST_NODE_DEVICES_CAP_CCW_DEV       | \
+                 VIR_CONNECT_LIST_NODE_DEVICES_CAP_VDPA)
 
 int
 virNodeDeviceGetSCSIHostCaps(virNodeDevCapSCSIHostPtr scsi_host);
