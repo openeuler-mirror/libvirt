@@ -450,6 +450,7 @@ int virProcessSetAffinity(pid_t pid, virBitmapPtr map)
     int numcpus = 1024;
     size_t masklen;
     cpu_set_t *mask;
+    int rv = -1;
 
     /* Not only may the statically allocated cpu_set_t be too small,
      * but there is no way to ask the kernel what size is large enough.
@@ -473,8 +474,10 @@ int virProcessSetAffinity(pid_t pid, virBitmapPtr map)
             CPU_SET_S(i, masklen, mask);
     }
 
-    if (sched_setaffinity(pid, masklen, mask) < 0) {
-        CPU_FREE(mask);
+    rv = sched_setaffinity(pid, masklen, mask);
+    CPU_FREE(mask);
+
+    if (rv < 0) {
         if (errno == EINVAL &&
             numcpus < (1024 << 8)) { /* 262144 cpus ought to be enough for anyone */
             numcpus = numcpus << 2;
@@ -484,7 +487,6 @@ int virProcessSetAffinity(pid_t pid, virBitmapPtr map)
                              _("cannot set CPU affinity on process %d"), pid);
         return -1;
     }
-    CPU_FREE(mask);
 
     return 0;
 }
