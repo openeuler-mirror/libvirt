@@ -2078,7 +2078,7 @@ struct _virDomainTimerDef {
     int track;  /* host|guest */
 
     /* frequency & mode are only valid for name='tsc' */
-    unsigned long frequency; /* in Hz, unspecified = 0 */
+    unsigned long long frequency; /* in Hz, unspecified = 0 */
     int mode;       /* auto|native|emulate|paravirt */
 };
 
