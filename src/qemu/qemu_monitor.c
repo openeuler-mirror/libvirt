@@ -2966,10 +2966,13 @@ qemuMonitorAddObject(qemuMonitorPtr mon,
     if (alias)
         tmp = g_strdup(id);
 
-    ret = qemuMonitorJSONAddObject(mon, props);
+    if (qemuMonitorJSONAddObject(mon, props) < 0)
+        goto cleanup;
 
     if (alias)
         *alias = g_steal_pointer(&tmp);
+
+    ret = 0;
 
  cleanup:
     VIR_FREE(tmp);
