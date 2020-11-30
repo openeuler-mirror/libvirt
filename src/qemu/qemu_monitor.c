@@ -32,6 +32,7 @@
 #include "qemu_monitor_json.h"
 #include "qemu_domain.h"
 #include "qemu_process.h"
+#include "qemu_capabilities.h"
 #include "virerror.h"
 #include "viralloc.h"
 #include "virlog.h"
@@ -666,6 +667,7 @@ qemuMonitorOpenInternal(virDomainObjPtr vm,
                         qemuMonitorCallbacksPtr cb,
                         void *opaque)
 {
+    qemuDomainObjPrivatePtr priv = vm->privateData;
     qemuMonitorPtr mon;
     g_autoptr(GError) gerr = NULL;
 
@@ -697,6 +699,9 @@ qemuMonitorOpenInternal(virDomainObjPtr vm,
     mon->waitGreeting = true;
     mon->cb = cb;
     mon->callbackOpaque = opaque;
+
+    if (priv)
+        mon->objectAddNoWrap = virQEMUCapsGet(priv->qemuCaps, QEMU_CAPS_OBJECT_QAPIFIED);
 
     if (virSetCloseExec(mon->fd) < 0) {
         virReportError(VIR_ERR_INTERNAL_ERROR,
