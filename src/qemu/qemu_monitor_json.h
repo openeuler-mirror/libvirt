@@ -234,7 +234,7 @@ int qemuMonitorJSONDelDevice(qemuMonitorPtr mon,
                              const char *devalias);
 
 int qemuMonitorJSONAddObject(qemuMonitorPtr mon,
-                             virJSONValuePtr props);
+                             virJSONValuePtr *props);
 
 int qemuMonitorJSONDelObject(qemuMonitorPtr mon,
                              const char *objalias,
