@@ -4238,7 +4238,7 @@ doSave(void *opaque)
 
     sigemptyset(&sigmask);
     sigaddset(&sigmask, SIGINT);
-    if (pthread_sigmask(SIG_BLOCK, &sigmask, &oldsigmask) < 0)
+    if (pthread_sigmask(SIG_BLOCK, &sigmask, &oldsigmask) != 0)
         goto out_sig;
 #endif /* !WIN32 */
 
@@ -4768,7 +4768,7 @@ doManagedsave(void *opaque)
 
     sigemptyset(&sigmask);
     sigaddset(&sigmask, SIGINT);
-    if (pthread_sigmask(SIG_BLOCK, &sigmask, &oldsigmask) < 0)
+    if (pthread_sigmask(SIG_BLOCK, &sigmask, &oldsigmask) != 0)
         goto out_sig;
 #endif /* !WIN32 */
 
@@ -5450,7 +5450,7 @@ doDump(void *opaque)
 
     sigemptyset(&sigmask);
     sigaddset(&sigmask, SIGINT);
-    if (pthread_sigmask(SIG_BLOCK, &sigmask, &oldsigmask) < 0)
+    if (pthread_sigmask(SIG_BLOCK, &sigmask, &oldsigmask) != 0)
         goto out_sig;
 #endif /* !WIN32 */
 
@@ -10740,7 +10740,7 @@ doMigrate(void *opaque)
 
     sigemptyset(&sigmask);
     sigaddset(&sigmask, SIGINT);
-    if (pthread_sigmask(SIG_BLOCK, &sigmask, &oldsigmask) < 0)
+    if (pthread_sigmask(SIG_BLOCK, &sigmask, &oldsigmask) != 0)
         goto out_sig;
 #endif /* !WIN32 */
 
