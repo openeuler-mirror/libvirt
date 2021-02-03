@@ -21510,8 +21510,14 @@ qemuDomainGetStatsBlockExportDisk(virDomainDiskDefPtr disk,
         VIR_INFO("optional disk '%s' source file is missing, "
                  "skip getting stats", disk->dst);
 
-        return qemuDomainGetStatsBlockExportHeader(disk, disk->src, *recordnr,
-                                                   params);
+        if (qemuDomainGetStatsBlockExportHeader(disk, disk->src, *recordnr,
+                                                params) < 0) {
+            return -1;
+        }
+
+        (*recordnr)++;
+
+        return 0;
     }
 
     for (n = disk->src; virStorageSourceIsBacking(n); n = n->backingStore) {
