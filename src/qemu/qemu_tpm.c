@@ -200,11 +200,15 @@ qemuTPMCreateEmulatorSocket(const char *swtpmStateDir,
  * @tpm: TPM definition for an emulator type
  * @swtpmStorageDir: the general swtpm storage dir which is used as a base
  *                   directory for creating VM specific directories
+ * @logDir: directory where swtpm writes its logs into
+ * @vmname: name of the VM
  * @uuid: the UUID of the VM
  */
 static int
 qemuTPMEmulatorInitPaths(virDomainTPMDefPtr tpm,
                          const char *swtpmStorageDir,
+                         const char *logDir,
+                         const char *vmname,
                          const unsigned char *uuid)
 {
     char uuidstr[VIR_UUID_STRING_BUFLEN];
@@ -216,6 +220,11 @@ qemuTPMEmulatorInitPaths(virDomainTPMDefPtr tpm,
             qemuTPMCreateEmulatorStoragePath(swtpmStorageDir, uuidstr,
                                              tpm->version)))
         return -1;
+
+    if (!tpm->data.emulator.logfile) {
+        tpm->data.emulator.logfile = qemuTPMCreateEmulatorLogPath(logDir,
+                                                                  vmname);
+    }
 
     return 0;
 }
@@ -273,7 +282,6 @@ qemuTPMEmulatorGetPid(const char *swtpmStateDir,
  *
  * @tpm: tpm definition
  * @logDir: directory where swtpm writes its logs into
- * @vmname: name of the VM
  * @swtpm_user: uid to run the swtpm with
  * @swtpm_group: gid to run the swtpm with
  * @swtpmStateDir: directory for swtpm's persistent state
@@ -287,7 +295,6 @@ qemuTPMEmulatorGetPid(const char *swtpmStateDir,
 static int
 qemuTPMEmulatorPrepareHost(virDomainTPMDefPtr tpm,
                            const char *logDir,
-                           const char *vmname,
                            uid_t swtpm_user,
                            gid_t swtpm_group,
                            const char *swtpmStateDir,
@@ -305,10 +312,6 @@ qemuTPMEmulatorPrepareHost(virDomainTPMDefPtr tpm,
     if (virDirCreate(logDir, 0730, swtpm_user, swtpm_group,
                      VIR_DIR_CREATE_ALLOW_EXIST) < 0)
         return -1;
-
-    /* create logfile name ... */
-    if (!tpm->data.emulator.logfile)
-        tpm->data.emulator.logfile = qemuTPMCreateEmulatorLogPath(logDir, vmname);
 
     if (!virFileExists(tpm->data.emulator.logfile) &&
         virFileTouch(tpm->data.emulator.logfile, 0644) < 0) {
@@ -704,7 +707,10 @@ qemuExtTPMInitPaths(virQEMUDriverPtr driver,
 
     switch (def->tpm->type) {
     case VIR_DOMAIN_TPM_TYPE_EMULATOR:
-        return qemuTPMEmulatorInitPaths(def->tpm, cfg->swtpmStorageDir,
+        return qemuTPMEmulatorInitPaths(def->tpm,
+                                        cfg->swtpmStorageDir,
+                                        cfg->swtpmLogDir,
+                                        def->name,
                                         def->uuid);
     case VIR_DOMAIN_TPM_TYPE_PASSTHROUGH:
     case VIR_DOMAIN_TPM_TYPE_LAST:
@@ -729,7 +735,7 @@ qemuExtTPMPrepareHost(virQEMUDriverPtr driver,
             return -1;
 
         return qemuTPMEmulatorPrepareHost(def->tpm, cfg->swtpmLogDir,
-                                          def->name, cfg->swtpm_user,
+                                          cfg->swtpm_user,
                                           cfg->swtpm_group,
                                           cfg->swtpmStateDir, cfg->user,
                                           shortName);
