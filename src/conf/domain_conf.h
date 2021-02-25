@@ -396,6 +396,7 @@ typedef enum {
     VIR_DOMAIN_DISK_ERROR_POLICY_REPORT,
     VIR_DOMAIN_DISK_ERROR_POLICY_IGNORE,
     VIR_DOMAIN_DISK_ERROR_POLICY_ENOSPACE,
+    VIR_DOMAIN_DISK_ERROR_POLICY_RETRY,
 
     VIR_DOMAIN_DISK_ERROR_POLICY_LAST
 } virDomainDiskErrorPolicy;
@@ -561,6 +562,8 @@ struct _virDomainDiskDef {
     int cachemode; /* enum virDomainDiskCache */
     int error_policy;  /* enum virDomainDiskErrorPolicy */
     int rerror_policy; /* enum virDomainDiskErrorPolicy */
+    long retry_interval;
+    long retry_timeout;
     int iomode; /* enum virDomainDiskIo */
     int ioeventfd; /* enum virTristateSwitch */
     int event_idx; /* enum virTristateSwitch */
