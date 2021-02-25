@@ -898,7 +898,7 @@ static void qemuMonitorJSONHandleWatchdog(qemuMonitorPtr mon, virJSONValuePtr da
 VIR_ENUM_DECL(qemuMonitorIOErrorAction);
 VIR_ENUM_IMPL(qemuMonitorIOErrorAction,
               VIR_DOMAIN_EVENT_IO_ERROR_LAST,
-              "ignore", "stop", "report",
+              "ignore", "stop", "report", "retry",
 );
 
 
