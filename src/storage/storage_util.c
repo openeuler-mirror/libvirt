@@ -3363,13 +3363,11 @@ storageBackendProbeTarget(virStorageSourcePtr target,
         return -1;
 
     if (meta->backingStoreRaw) {
-        if (virStorageSourceNewFromBacking(meta, &target->backingStore) < 0)
-            return -1;
-
         /* XXX: Remote storage doesn't play nicely with volumes backed by
          * remote storage. To avoid trouble, just fake the backing store is RAW
          * and put the string from the metadata as the path of the target. */
-        if (!virStorageSourceIsLocalStorage(target->backingStore)) {
+        if (virStorageSourceNewFromBacking(meta, &target->backingStore) < 0 ||
+            !virStorageSourceIsLocalStorage(target->backingStore)) {
             virObjectUnref(target->backingStore);
 
             if (!(target->backingStore = virStorageSourceNew()))
