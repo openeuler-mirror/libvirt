@@ -3637,7 +3637,7 @@ qemuMigrationSrcRun(virQEMUDriverPtr driver,
     }
 
     if (qemuMigrationSetDBusVMState(driver, vm) < 0)
-        goto exit_monitor;
+        goto error;
 
     /* Before EnterMonitor, since already qemuProcessStopCPUs does that */
     if (!(flags & VIR_MIGRATE_LIVE) &&
