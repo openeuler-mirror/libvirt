@@ -5011,4 +5011,8 @@ virDomainHotpatchManage(virDomainPtr domain,
                         const char *id,
                         unsigned int flags);
 
+int virDomainStartDirtyRateCalc(virDomainPtr domain,
+                                int seconds,
+                                unsigned int flags);
+
 #endif /* LIBVIRT_DOMAIN_H */
