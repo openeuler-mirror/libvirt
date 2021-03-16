@@ -2130,6 +2130,10 @@ static const vshCmdOptDef opts_domstats[] = {
      .type = VSH_OT_BOOL,
      .help = N_("report domain memory usage"),
     },
+    {.name = "dirtyrate",
+     .type = VSH_OT_BOOL,
+     .help = N_("report domain dirty rate information"),
+    },
     {.name = "list-active",
      .type = VSH_OT_BOOL,
      .help = N_("list only active domains"),
@@ -2248,6 +2252,9 @@ cmdDomstats(vshControl *ctl, const vshCmd *cmd)
 
     if (vshCommandOptBool(cmd, "memory"))
         stats |= VIR_DOMAIN_STATS_MEMORY;
+
+    if (vshCommandOptBool(cmd, "dirtyrate"))
+        stats |= VIR_DOMAIN_STATS_DIRTYRATE;
 
     if (vshCommandOptBool(cmd, "list-active"))
         flags |= VIR_CONNECT_GET_ALL_DOMAINS_STATS_ACTIVE;
