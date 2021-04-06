@@ -1555,7 +1555,7 @@ vshCommandParse(vshControl *ctl, vshCommandParser *parser, vshCmd **partial)
 
             if (!partial &&
                 vshCommandCheckOpts(ctl, c, opts_required, opts_seen) < 0) {
-                VIR_FREE(c);
+                vshCommandFree(c);
                 goto syntaxError;
             }
 
