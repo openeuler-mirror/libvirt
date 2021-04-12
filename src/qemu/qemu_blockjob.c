@@ -958,6 +958,7 @@ qemuBlockJobProcessEventCompletedPull(virQEMUDriverPtr driver,
                                       qemuBlockJobDataPtr job,
                                       qemuDomainAsyncJob asyncJob)
 {
+    virStorageSource *base = NULL;
     virStorageSourcePtr baseparent = NULL;
     virDomainDiskDefPtr cfgdisk = NULL;
     virStorageSourcePtr cfgbase = NULL;
@@ -979,8 +980,11 @@ qemuBlockJobProcessEventCompletedPull(virQEMUDriverPtr driver,
         return;
 
     if (job->data.pull.base) {
+        base = job->data.pull.base;
+
         if (cfgdisk)
             cfgbase = cfgdisk->src->backingStore;
+
         for (n = job->disk->src->backingStore; n && n != job->data.pull.base; n = n->backingStore) {
             /* find the image on top of 'base' */
 
@@ -991,10 +995,17 @@ qemuBlockJobProcessEventCompletedPull(virQEMUDriverPtr driver,
 
             baseparent = n;
         }
+    } else {
+        /* create terminators for the chain; since we are pulling everything
+         * into the top image the chain is automatically considered terminated */
+        base = virStorageSourceNew();
+
+        if (cfgdisk)
+            cfgbase = virStorageSourceNew();
     }
 
     tmp = job->disk->src->backingStore;
-    job->disk->src->backingStore = job->data.pull.base;
+    job->disk->src->backingStore = base;
     if (baseparent)
         baseparent->backingStore = NULL;
     qemuBlockJobEventProcessConcludedRemoveChain(driver, vm, asyncJob, tmp);
