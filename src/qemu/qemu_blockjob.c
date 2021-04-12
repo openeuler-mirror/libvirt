@@ -971,10 +971,7 @@ qemuBlockJobProcessEventCompletedPull(virQEMUDriverPtr driver,
     if (!job->disk)
         return;
 
-    if ((cfgdisk = qemuBlockJobGetConfigDisk(vm, job->disk, job->data.pull.base)))
-        cfgbase = cfgdisk->src->backingStore;
-
-    if (!cfgdisk)
+    if (!(cfgdisk = qemuBlockJobGetConfigDisk(vm, job->disk, job->data.pull.base)))
         qemuBlockJobClearConfigChain(vm, job->disk);
 
     /* when pulling if 'base' is right below the top image we don't have to modify it */
@@ -982,6 +979,8 @@ qemuBlockJobProcessEventCompletedPull(virQEMUDriverPtr driver,
         return;
 
     if (job->data.pull.base) {
+        if (cfgdisk)
+            cfgbase = cfgdisk->src->backingStore;
         for (n = job->disk->src->backingStore; n && n != job->data.pull.base; n = n->backingStore) {
             /* find the image on top of 'base' */
 
