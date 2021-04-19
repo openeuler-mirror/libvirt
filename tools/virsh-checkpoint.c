@@ -720,7 +720,6 @@ cmdCheckpointList(vshControl *ctl,
     virDomainCheckpointPtr checkpoint = NULL;
     long long creation_longlong;
     g_autoptr(GDateTime) then = NULL;
-    g_autofree gchar *thenstr = NULL;
     bool tree = vshCommandOptBool(cmd, "tree");
     bool name = vshCommandOptBool(cmd, "name");
     bool from = vshCommandOptBool(cmd, "from");
@@ -803,6 +802,7 @@ cmdCheckpointList(vshControl *ctl,
     }
 
     for (i = 0; i < checkpointlist->nchks; i++) {
+        g_autofree gchar *thenstr = NULL;
         const char *chk_name;
 
         /* free up memory from previous iterations of the loop */
