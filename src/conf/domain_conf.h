@@ -396,6 +396,7 @@ typedef enum {
     VIR_DOMAIN_DISK_ERROR_POLICY_REPORT,
     VIR_DOMAIN_DISK_ERROR_POLICY_IGNORE,
     VIR_DOMAIN_DISK_ERROR_POLICY_ENOSPACE,
+    VIR_DOMAIN_DISK_ERROR_POLICY_RETRY,
 
     VIR_DOMAIN_DISK_ERROR_POLICY_LAST
 } virDomainDiskErrorPolicy;
@@ -522,6 +523,9 @@ typedef enum {
 } virDomainMemoryAllocation;
 
 
+#define VIR_DOMAIN_DISK_DEFAULT_RETRY_INTERVAL    1000
+#define VIR_DOMAIN_DISK_DEFAULT_RETRY_TIMEOUT     0
+
 /* Stores the virtual disk configuration */
 struct _virDomainDiskDef {
     virStorageSourcePtr src; /* non-NULL.  XXX Allow NULL for empty cdrom? */
@@ -561,6 +565,8 @@ struct _virDomainDiskDef {
     int cachemode; /* enum virDomainDiskCache */
     int error_policy;  /* enum virDomainDiskErrorPolicy */
     int rerror_policy; /* enum virDomainDiskErrorPolicy */
+    long retry_interval;
+    long retry_timeout;
     int iomode; /* enum virDomainDiskIo */
     int ioeventfd; /* enum virTristateSwitch */
     int event_idx; /* enum virTristateSwitch */

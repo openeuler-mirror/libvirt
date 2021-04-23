@@ -1723,6 +1723,14 @@ qemuBuildDiskFrontendAttributeErrorPolicy(virDomainDiskDefPtr disk,
         virBufferAsprintf(buf, ",werror=%s", wpolicy);
     if (rpolicy)
         virBufferAsprintf(buf, ",rerror=%s", rpolicy);
+    if ((disk->error_policy == VIR_DOMAIN_DISK_ERROR_POLICY_RETRY ||
+         disk->rerror_policy == VIR_DOMAIN_DISK_ERROR_POLICY_RETRY) &&
+        disk->retry_interval >= 0)
+        virBufferAsprintf(buf, ",retry_interval=%ld", disk->retry_interval);
+    if ((disk->error_policy == VIR_DOMAIN_DISK_ERROR_POLICY_RETRY ||
+         disk->rerror_policy == VIR_DOMAIN_DISK_ERROR_POLICY_RETRY) &&
+        disk->retry_timeout >= 0)
+        virBufferAsprintf(buf, ",retry_timeout=%ld", disk->retry_timeout);
 }
 
 
