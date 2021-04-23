@@ -13065,7 +13065,8 @@ VIR_ENUM_IMPL(virshDomainEventIOError,
               VIR_DOMAIN_EVENT_IO_ERROR_LAST,
               N_("none"),
               N_("pause"),
-              N_("report"));
+              N_("report"),
+              N_("retry"));
 
 static const char *
 virshDomainEventIOErrorToString(int action)
