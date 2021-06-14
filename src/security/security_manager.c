@@ -1302,7 +1302,8 @@ virSecurityManagerMetadataLock(virSecurityManagerPtr mgr G_GNUC_UNUSED,
      * paths in the same order and thus no deadlock can occur.
      * Lastly, it makes searching for duplicate paths below
      * simpler. */
-    qsort(paths, npaths, sizeof(*paths), cmpstringp);
+    if (paths)
+        qsort(paths, npaths, sizeof(*paths), cmpstringp);
 
     for (i = 0; i < npaths; i++) {
         const char *p = paths[i];
