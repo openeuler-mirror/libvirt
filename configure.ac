@@ -396,6 +396,7 @@ AC_CHECK_HEADERS([\
 dnl Check whether endian provides handy macros.
 AC_CHECK_DECLS([htole64], [], [], [[#include <endian.h>]])
 AC_CHECK_FUNCS([stat stat64 __xstat __xstat64 lstat lstat64 __lxstat __lxstat64])
+AC_CHECK_DECLS([stat, stat64, __xstat, __xstat64, lstat, lstat64, __lxstat, __lxstat64], [], [], [[#include <sys/stat.h>]])
 
 AC_CHECK_TYPE([struct ifreq],
   [AC_DEFINE([HAVE_STRUCT_IFREQ],[1],

@@ -69,35 +69,45 @@
  *  - If __xstat & __xstat64 exist, then stat & stat64 will not exist
  *    as symbols in the library, so the latter should not be mocked.
  *
+ *  - If __xstat exists in the library, but not the header than it
+ *    it is just there for binary back compat and should not be
+ *    mocked
+ *
  * The same all applies to lstat()
  */
 
 
+#if !HAVE_DECL___XSTAT
+# if defined(HAVE_STAT) && !defined(_FILE_OFFSET_BITS) || defined(__APPLE__)
+#  define MOCK_STAT
+# endif
+# if defined(HAVE_STAT64)
+#  define MOCK_STAT64
+# endif
+#else /* HAVE_DECL___XSTAT */
+# if defined(HAVE___XSTAT) && !defined(_FILE_OFFSET_BITS)
+#  define MOCK___XSTAT
+# endif
+# if defined(HAVE___XSTAT64)
+#  define MOCK___XSTAT64
+# endif
+#endif /* HAVE_DECL___XSTAT */
 
-#if defined(HAVE_STAT) && !defined(HAVE___XSTAT) && !defined(_FILE_OFFSET_BITS)
-# define MOCK_STAT
-#endif
-#if defined(HAVE_STAT64) && !defined(HAVE___XSTAT64)
-# define MOCK_STAT64
-#endif
-#if defined(HAVE___XSTAT) && !defined(_FILE_OFFSET_BITS)
-# define MOCK___XSTAT
-#endif
-#if defined(HAVE___XSTAT64)
-# define MOCK___XSTAT64
-#endif
-#if defined(HAVE_LSTAT) && !defined(HAVE___LXSTAT) && !defined(_FILE_OFFSET_BITS)
-# define MOCK_LSTAT
-#endif
-#if defined(HAVE_LSTAT64) && !defined(HAVE___LXSTAT64)
-# define MOCK_LSTAT64
-#endif
-#if defined(HAVE___LXSTAT) && !defined(_FILE_OFFSET_BITS)
-# define MOCK___LXSTAT
-#endif
-#if defined(HAVE___LXSTAT64)
-# define MOCK___LXSTAT64
-#endif
+#if !HAVE_DECL___LXSTAT
+# if defined(HAVE_LSTAT) && !defined(_FILE_OFFSET_BITS) || defined(__APPLE__)
+#  define MOCK_LSTAT
+# endif
+# if defined(HAVE_LSTAT64)
+#  define MOCK_LSTAT64
+# endif
+#else /* HAVE_DECL___LXSTAT */
+# if defined(HAVE___LXSTAT) && !defined(_FILE_OFFSET_BITS)
+#  define MOCK___LXSTAT
+# endif
+# if defined(HAVE___LXSTAT64)
+#  define MOCK___LXSTAT64
+# endif
+#endif /* HAVE_DECL___LXSTAT */
 
 #ifdef MOCK_STAT
 static int (*real_stat)(const char *path, struct stat *sb);
