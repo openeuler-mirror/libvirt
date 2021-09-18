@@ -24977,6 +24977,12 @@ virDomainDiskDefFormatDriver(virBufferPtr buf,
         virBufferAsprintf(&driverBuf, " rerror_policy='%s'",
                           virDomainDiskErrorPolicyTypeToString(disk->rerror_policy));
 
+    if (disk->retry_interval)
+        virBufferAsprintf(&driverBuf, " retry_interval='%ld'", disk->retry_interval);
+
+    if (disk->retry_timeout)
+        virBufferAsprintf(&driverBuf, " retry_timeout='%ld'", disk->retry_timeout);
+
     if (disk->iomode)
         virBufferAsprintf(&driverBuf, " io='%s'",
                           virDomainDiskIoTypeToString(disk->iomode));
