@@ -13866,6 +13866,9 @@ static int qemuDomainAbortJob(virDomainPtr dom)
         ret = 0;
         break;
 
+    case QEMU_ASYNC_JOB_HOTPATCH:
+        break;
+
     case QEMU_ASYNC_JOB_LAST:
     default:
         virReportEnumRangeError(qemuDomainAsyncJob, priv->job.asyncJob);
@@ -23180,6 +23183,7 @@ qemuDomainHotpatchManage(virDomainPtr domain,
                          unsigned int flags)
 {
     virDomainObjPtr vm;
+    virQEMUDriverPtr driver = domain->conn->privateData;
     char *ret = NULL;
     size_t len;
 
@@ -23187,6 +23191,12 @@ qemuDomainHotpatchManage(virDomainPtr domain,
 
     if (!(vm = qemuDomainObjFromDomain(domain)))
         goto cleanup;
+
+    if (qemuDomainObjBeginAsyncJob(driver, vm, QEMU_ASYNC_JOB_HOTPATCH,
+                                   VIR_DOMAIN_JOB_OPERATION_HOTPATCH, 0) < 0)
+        goto cleanup;
+
+    qemuDomainObjSetAsyncJobMask(vm, QEMU_JOB_DEFAULT_MASK);
 
     switch (action) {
     case VIR_DOMAIN_HOTPATCH_APPLY:
@@ -23213,6 +23223,9 @@ qemuDomainHotpatchManage(virDomainPtr domain,
     len = strlen(ret);
     if (len > 0)
         ret[len - 1] = '\0';
+
+ endjob:
+    qemuDomainObjEndAsyncJob(driver, vm);
 
  cleanup:
     virDomainObjEndAPI(&vm);
