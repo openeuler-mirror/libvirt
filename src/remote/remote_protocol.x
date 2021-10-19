@@ -3771,6 +3771,18 @@ struct remote_domain_backup_get_xml_desc_ret {
     remote_nonnull_string xml;
 };
 
+struct remote_domain_hotpatch_manage_args {
+    remote_nonnull_domain dom;
+    int action;
+    remote_string patch;
+    remote_string id;
+    unsigned int flags;
+};
+
+struct remote_domain_hotpatch_manage_ret {
+    remote_string info;
+};
+
 /*----- Protocol. -----*/
 
 /* Define the program number, protocol version and procedure numbers here. */
@@ -6668,5 +6680,11 @@ enum remote_procedure {
      * @priority: high
      * @acl: domain:read
      */
-    REMOTE_PROC_DOMAIN_BACKUP_GET_XML_DESC = 422
+    REMOTE_PROC_DOMAIN_BACKUP_GET_XML_DESC = 422,
+
+    /**
+     * @generate: both
+     * @acl: domain:read
+     */
+    REMOTE_PROC_DOMAIN_HOTPATCH_MANAGE = 800
 };

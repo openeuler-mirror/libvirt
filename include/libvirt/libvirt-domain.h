@@ -4991,4 +4991,22 @@ int virDomainBackupBegin(virDomainPtr domain,
 char *virDomainBackupGetXMLDesc(virDomainPtr domain,
                                 unsigned int flags);
 
+typedef enum {
+    VIR_DOMAIN_HOTPATCH_NONE = 0, /* No action */
+    VIR_DOMAIN_HOTPATCH_APPLY,    /* Apply hotpatch */
+    VIR_DOMAIN_HOTPATCH_UNAPPLY,  /* Unapply hotpatch */
+    VIR_DOMAIN_HOTPATCH_QUERY,    /* Query hotpatch */
+
+# ifdef VIR_ENUM_SENTINELS
+    VIR_DOMAIN_HOTPATCH_LAST
+# endif
+} virDomainHotpatchAction;
+
+char *
+virDomainHotpatchManage(virDomainPtr domain,
+                        int action,
+                        const char *patch,
+                        const char *id,
+                        unsigned int flags);
+
 #endif /* LIBVIRT_DOMAIN_H */

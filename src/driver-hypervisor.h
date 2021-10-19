@@ -1387,6 +1387,13 @@ typedef char *
 (*virDrvDomainBackupGetXMLDesc)(virDomainPtr domain,
                                 unsigned int flags);
 
+typedef char *
+(*virDrvDomainHotpatchManage)(virDomainPtr domain,
+                              int action,
+                              const char *patch,
+                              const char *id,
+                              unsigned int flags);
+
 typedef struct _virHypervisorDriver virHypervisorDriver;
 typedef virHypervisorDriver *virHypervisorDriverPtr;
 
@@ -1650,4 +1657,5 @@ struct _virHypervisorDriver {
     virDrvDomainAgentSetResponseTimeout domainAgentSetResponseTimeout;
     virDrvDomainBackupBegin domainBackupBegin;
     virDrvDomainBackupGetXMLDesc domainBackupGetXMLDesc;
+    virDrvDomainHotpatchManage domainHotpatchManage;
 };

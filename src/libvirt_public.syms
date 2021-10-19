@@ -873,4 +873,8 @@ LIBVIRT_6.0.0 {
         virDomainBackupGetXMLDesc;
 } LIBVIRT_5.10.0;
 
+LIBVIRT_6.2.0 {
+    global:
+        virDomainHotpatchManage;
+} LIBVIRT_6.0.0;
 # .... define new API here using predicted next version number ....
