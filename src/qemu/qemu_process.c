@@ -234,15 +234,11 @@ qemuConnectAgent(virQEMUDriverPtr driver, virDomainObjPtr vm)
      * deleted while the agent is active */
     virObjectRef(vm);
 
-    virObjectUnlock(vm);
-
     agent = qemuAgentOpen(vm,
                           config->source,
                           virEventThreadGetContext(priv->eventThread),
                           &agentCallbacks,
                           virQEMUCapsGet(priv->qemuCaps, QEMU_CAPS_VSERPORT_CHANGE));
-
-    virObjectLock(vm);
 
     if (agent == NULL)
         virObjectUnref(vm);
