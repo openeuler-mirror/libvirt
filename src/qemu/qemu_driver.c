@@ -23196,6 +23196,9 @@ qemuDomainHotpatchManage(virDomainPtr domain,
                                    VIR_DOMAIN_JOB_OPERATION_HOTPATCH, 0) < 0)
         goto cleanup;
 
+    if (virDomainObjCheckActive(vm) < 0)
+        goto endjob;
+
     qemuDomainObjSetAsyncJobMask(vm, QEMU_JOB_DEFAULT_MASK);
 
     switch (action) {

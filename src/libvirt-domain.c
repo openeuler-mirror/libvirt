@@ -12777,12 +12777,21 @@ virDomainHotpatchManage(virDomainPtr domain,
     if (action == VIR_DOMAIN_HOTPATCH_UNAPPLY)
         virCheckNonNullArgGoto(id, error);
 
+    VIR_INFO("enter virDomainHotpatchManage domainname=%s, action=%d, "
+             "patch=%s, id=%s, flags=%d",
+             NULLSTR(domain->name), action,
+             NULLSTR(patch), NULLSTR(id), flags);
+
     if (conn->driver->domainHotpatchManage) {
         char *ret;
         ret = conn->driver->domainHotpatchManage(domain, action, patch, id, flags);
-        if (!ret)
+        if (!ret) {
+            VIR_ERROR("domain %s managed hotpatch failed",
+                      NULLSTR(domain->name));
             goto error;
-
+        }
+        VIR_INFO("domain %s managed hotpatch successfully",
+                 NULLSTR(domain->name));
         return ret;
     }
 
