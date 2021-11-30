@@ -50,6 +50,7 @@
 #include "qemu_security.h"
 #include "qemu_checkpoint.h"
 #include "qemu_backup.h"
+#include "qemu_hotpatch.h"
 
 #include "virerror.h"
 #include "virlog.h"
@@ -13865,6 +13866,9 @@ static int qemuDomainAbortJob(virDomainPtr dom)
         ret = 0;
         break;
 
+    case QEMU_ASYNC_JOB_HOTPATCH:
+        break;
+
     case QEMU_ASYNC_JOB_LAST:
     default:
         virReportEnumRangeError(qemuDomainAsyncJob, priv->job.asyncJob);
@@ -23171,6 +23175,62 @@ qemuDomainAgentSetResponseTimeout(virDomainPtr dom,
     return ret;
 }
 
+static char *
+qemuDomainHotpatchManage(virDomainPtr domain,
+                         int action,
+                         const char *patch,
+                         const char *id,
+                         unsigned int flags)
+{
+    virDomainObjPtr vm;
+    virQEMUDriverPtr driver = domain->conn->privateData;
+    char *ret = NULL;
+    size_t len;
+
+    virCheckFlags(0, NULL);
+
+    if (!(vm = qemuDomainObjFromDomain(domain)))
+        goto cleanup;
+
+    if (qemuDomainObjBeginAsyncJob(driver, vm, QEMU_ASYNC_JOB_HOTPATCH,
+                                   VIR_DOMAIN_JOB_OPERATION_HOTPATCH, 0) < 0)
+        goto cleanup;
+
+    qemuDomainObjSetAsyncJobMask(vm, QEMU_JOB_DEFAULT_MASK);
+
+    switch (action) {
+    case VIR_DOMAIN_HOTPATCH_APPLY:
+        ret = qemuDomainHotpatchApply(vm, patch);
+        break;
+
+    case VIR_DOMAIN_HOTPATCH_UNAPPLY:
+        ret = qemuDomainHotpatchUnapply(vm, id);
+        break;
+
+    case VIR_DOMAIN_HOTPATCH_QUERY:
+        ret = qemuDomainHotpatchQuery(vm);
+        break;
+
+    default:
+        virReportError(VIR_ERR_OPERATION_INVALID, "%s",
+                       _("Unknow hotpatch action"));
+    }
+
+    if (!ret)
+        goto endjob;
+
+    /* Wipeout redundant empty line */
+    len = strlen(ret);
+    if (len > 0)
+        ret[len - 1] = '\0';
+
+ endjob:
+    qemuDomainObjEndAsyncJob(driver, vm);
+
+ cleanup:
+    virDomainObjEndAPI(&vm);
+    return ret;
+}
 
 static virHypervisorDriver qemuHypervisorDriver = {
     .name = QEMU_DRIVER_NAME,
@@ -23411,6 +23471,7 @@ static virHypervisorDriver qemuHypervisorDriver = {
     .domainAgentSetResponseTimeout = qemuDomainAgentSetResponseTimeout, /* 5.10.0 */
     .domainBackupBegin = qemuDomainBackupBegin, /* 6.0.0 */
     .domainBackupGetXMLDesc = qemuDomainBackupGetXMLDesc, /* 6.0.0 */
+    .domainHotpatchManage = qemuDomainHotpatchManage, /* 6.2.0 */
 };
 
 

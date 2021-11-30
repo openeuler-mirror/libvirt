@@ -12733,3 +12733,61 @@ virDomainBackupGetXMLDesc(virDomainPtr domain,
     virDispatchError(conn);
     return NULL;
 }
+
+/**
+ * virDomainHotpatchManage:
+ * @domain: a domain object
+ * @action: the action type from virDomainHotpatchAction
+ * @patch: the target hotpatch file
+ * @id: the patch id of the target hotpatch
+ * @flags: extra flags; not used yet, so callers should always pass 0
+ *
+ * Manage hotpatch for the current domain according to @action.
+ *
+ * If the @action is set to VIR_DOMAIN_HOTPATCH_APPLY, apply hotpatch
+ * @patch to the current domain.
+ *
+ * If the @action is set to VIR_DOMAIN_HOTPATCH_UNAPPLY, unapply the
+ * hotpatch which is matched with @id from the current domain.
+ *
+ * If the @action is set to VIR_DOMAIN_HOTPATCH_QUERY, query infomations
+ * of the applied hotpatch of the current domain.
+ *
+ * Returns success messages in case of success, NULL otherwise.
+ */
+char *
+virDomainHotpatchManage(virDomainPtr domain,
+                        int action,
+                        const char *patch,
+                        const char *id,
+                        unsigned int flags)
+{
+    virConnectPtr conn;
+
+    virResetLastError();
+
+    virCheckDomainReturn(domain, NULL);
+    conn = domain->conn;
+
+    virCheckReadOnlyGoto(conn->flags, error);
+
+    if (action == VIR_DOMAIN_HOTPATCH_APPLY)
+        virCheckNonNullArgGoto(patch, error);
+
+    if (action == VIR_DOMAIN_HOTPATCH_UNAPPLY)
+        virCheckNonNullArgGoto(id, error);
+
+    if (conn->driver->domainHotpatchManage) {
+        char *ret;
+        ret = conn->driver->domainHotpatchManage(domain, action, patch, id, flags);
+        if (!ret)
+            goto error;
+
+        return ret;
+    }
+
+    virReportUnsupportedError();
+ error:
+    virDispatchError(conn);
+    return NULL;
+}

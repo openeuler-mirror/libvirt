@@ -3295,6 +3295,7 @@ typedef enum {
     VIR_DOMAIN_JOB_OPERATION_SNAPSHOT_REVERT = 7,
     VIR_DOMAIN_JOB_OPERATION_DUMP = 8,
     VIR_DOMAIN_JOB_OPERATION_BACKUP = 9,
+    VIR_DOMAIN_JOB_OPERATION_HOTPATCH = 10,
 
 # ifdef VIR_ENUM_SENTINELS
     VIR_DOMAIN_JOB_OPERATION_LAST
@@ -4990,5 +4991,23 @@ int virDomainBackupBegin(virDomainPtr domain,
 
 char *virDomainBackupGetXMLDesc(virDomainPtr domain,
                                 unsigned int flags);
+
+typedef enum {
+    VIR_DOMAIN_HOTPATCH_NONE = 0, /* No action */
+    VIR_DOMAIN_HOTPATCH_APPLY,    /* Apply hotpatch */
+    VIR_DOMAIN_HOTPATCH_UNAPPLY,  /* Unapply hotpatch */
+    VIR_DOMAIN_HOTPATCH_QUERY,    /* Query hotpatch */
+
+# ifdef VIR_ENUM_SENTINELS
+    VIR_DOMAIN_HOTPATCH_LAST
+# endif
+} virDomainHotpatchAction;
+
+char *
+virDomainHotpatchManage(virDomainPtr domain,
+                        int action,
+                        const char *patch,
+                        const char *id,
+                        unsigned int flags);
 
 #endif /* LIBVIRT_DOMAIN_H */

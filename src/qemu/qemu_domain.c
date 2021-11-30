@@ -111,6 +111,7 @@ VIR_ENUM_IMPL(qemuDomainAsyncJob,
               "snapshot",
               "start",
               "backup",
+              "hotpatch",
 );
 
 VIR_ENUM_IMPL(qemuDomainNamespace,
@@ -217,6 +218,7 @@ qemuDomainAsyncJobPhaseToString(qemuDomainAsyncJob job,
     case QEMU_ASYNC_JOB_START:
     case QEMU_ASYNC_JOB_NONE:
     case QEMU_ASYNC_JOB_BACKUP:
+    case QEMU_ASYNC_JOB_HOTPATCH:
         G_GNUC_FALLTHROUGH;
     case QEMU_ASYNC_JOB_LAST:
         break;
@@ -243,6 +245,7 @@ qemuDomainAsyncJobPhaseFromString(qemuDomainAsyncJob job,
     case QEMU_ASYNC_JOB_START:
     case QEMU_ASYNC_JOB_NONE:
     case QEMU_ASYNC_JOB_BACKUP:
+    case QEMU_ASYNC_JOB_HOTPATCH:
         G_GNUC_FALLTHROUGH;
     case QEMU_ASYNC_JOB_LAST:
         break;
