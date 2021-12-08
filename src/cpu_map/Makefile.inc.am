@@ -73,6 +73,8 @@ cpumap_DATA = \
 	cpu_map/arm_cortex-a57.xml \
 	cpu_map/arm_cortex-a72.xml \
 	cpu_map/arm_Kunpeng-920.xml \
+	cpu_map/arm_FT-2000plus.xml \
+	cpu_map/arm_Tengyun-S2500.xml \
 	$(NULL)
 
 EXTRA_DIST += $(cpumap_DATA)
