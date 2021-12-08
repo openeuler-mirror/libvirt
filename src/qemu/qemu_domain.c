@@ -14923,7 +14923,7 @@ qemuDomainSetupDisk(virQEMUDriverConfigPtr cfg G_GNUC_UNUSED,
                 return -1;
 
             if (virDevMapperGetTargets(next->path, &targetPaths) < 0 &&
-                errno != ENOSYS && errno != EBADF) {
+                errno != ENOSYS) {
                 virReportSystemError(errno,
                                      _("Unable to get devmapper targets for %s"),
                                      next->path);
@@ -15976,7 +15976,7 @@ qemuDomainNamespaceSetupDisk(virDomainObjPtr vm,
             tmpPath = g_strdup(next->path);
 
             if (virDevMapperGetTargets(next->path, &targetPaths) < 0 &&
-                errno != ENOSYS && errno != EBADF) {
+                errno != ENOSYS) {
                 virReportSystemError(errno,
                                      _("Unable to get devmapper targets for %s"),
                                      next->path);
