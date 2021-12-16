@@ -665,7 +665,8 @@ cmdDomblklist(vshControl *ctl, const vshCmd *cmd)
                                     "|./source/@dev"
                                     "|./source/@dir"
                                     "|./source/@name"
-                                    "|./source/@volume)", ctxt);
+                                    "|./source/@volume"
+                                    "|./source/@path)", ctxt);
         }
 
         if (details) {
