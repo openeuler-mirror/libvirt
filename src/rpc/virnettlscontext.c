@@ -1235,8 +1235,6 @@ virNetTLSSessionPtr virNetTLSSessionNew(virNetTLSContextPtr ctxt,
      */
     if (ctxt->isServer) {
         gnutls_certificate_server_set_request(sess->session, GNUTLS_CERT_REQUEST);
-
-        gnutls_dh_set_prime_bits(sess->session, DH_BITS);
     }
 
     gnutls_transport_set_ptr(sess->session, sess);
