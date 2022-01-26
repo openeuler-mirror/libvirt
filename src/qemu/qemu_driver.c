@@ -23186,6 +23186,7 @@ qemuDomainHotpatchManage(virDomainPtr domain,
     virQEMUDriverPtr driver = domain->conn->privateData;
     char *ret = NULL;
     size_t len;
+    g_autoptr(virQEMUDriverConfig) cfg = virQEMUDriverGetConfig(driver);
 
     virCheckFlags(0, NULL);
 
@@ -23212,6 +23213,10 @@ qemuDomainHotpatchManage(virDomainPtr domain,
 
     case VIR_DOMAIN_HOTPATCH_QUERY:
         ret = qemuDomainHotpatchQuery(vm);
+        break;
+
+    case VIR_DOMAIN_HOTPATCH_AUTOLOAD:
+        ret = qemuDomainHotpatchAutoload(vm, cfg->hotpatchPath);
         break;
 
     default:

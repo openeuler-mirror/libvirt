@@ -220,6 +220,7 @@ struct _virQEMUDriverConfig {
     gid_t swtpm_group;
 
     char **capabilityfilters;
+    char *hotpatchPath;
 };
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(virQEMUDriverConfig, virObjectUnref);
