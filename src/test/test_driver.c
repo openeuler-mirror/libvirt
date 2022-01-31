@@ -3845,7 +3845,6 @@ testDomainSetBlockIoTune(virDomainPtr dom,
 
     if (virDomainDiskSetBlockIOTune(conf_disk, &info) < 0)
         goto cleanup;
-    info.group_name = NULL;
 
     ret = 0;
  cleanup:
