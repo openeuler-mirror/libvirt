@@ -59,6 +59,7 @@
 #include "qemu_firmware.h"
 #include "qemu_backup.h"
 #include "qemu_dbus.h"
+#include "qemu_hotpatch.h"
 
 #include "cpu/cpu.h"
 #include "cpu/cpu_x86.h"
@@ -6684,6 +6685,7 @@ qemuProcessLaunch(virConnectPtr conn,
     g_autoptr(virQEMUDriverConfig) cfg = NULL;
     size_t nnicindexes = 0;
     g_autofree int *nicindexes = NULL;
+    g_autofree char *autoLoadStatus = NULL;
     size_t i;
 
     VIR_DEBUG("conn=%p driver=%p vm=%p name=%s if=%d asyncJob=%d "
@@ -6993,6 +6995,10 @@ qemuProcessLaunch(virConnectPtr conn,
         qemuProcessAutoDestroyAdd(driver, vm, conn) < 0)
         goto cleanup;
 
+    /* Autoload hotpatch */
+    if ((autoLoadStatus = qemuDomainHotpatchAutoload(vm, cfg->hotpatchPath)) == NULL) {
+        VIR_WARN("Failed to autoload the hotpatch for %s.", vm->def->name);
+    }
     ret = 0;
 
  cleanup:

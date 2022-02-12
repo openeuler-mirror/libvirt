@@ -34,3 +34,6 @@ qemuDomainHotpatchApply(virDomainObjPtr vm,
 char *
 qemuDomainHotpatchUnapply(virDomainObjPtr vm,
                           const char *id);
+
+char *
+qemuDomainHotpatchAutoload(virDomainObjPtr vm, char *path_config);
