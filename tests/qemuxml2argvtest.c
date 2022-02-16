@@ -18,6 +18,7 @@
 # include "qemu/qemu_migration.h"
 # include "qemu/qemu_process.h"
 # include "qemu/qemu_slirp.h"
+# include "qemu/qemu_qapi.h"
 # include "datatypes.h"
 # include "conf/storage_conf.h"
 # include "cpu/cpu_map.h"
@@ -26,6 +27,8 @@
 # include "virmock.h"
 # include "virfilewrapper.h"
 # include "configmake.h"
+# include "testutilsqemuschema.h"
+# include "qemu/qemu_monitor_json.h"
 
 # define LIBVIRT_QEMU_CAPSPRIV_H_ALLOW
 # include "qemu/qemu_capspriv.h"
@@ -395,6 +398,162 @@ testCheckExclusiveFlags(int flags)
 }
 
 
+static virCommandPtr
+testCompareXMLToArgvCreateArgs(virQEMUDriverPtr drv,
+                               virDomainObjPtr vm,
+                               const char *migrateURI,
+                               struct testQemuInfo *info,
+                               unsigned int flags,
+                               bool jsonPropsValidation)
+{
+    size_t i;
+
+    for (i = 0; i < vm->def->nhostdevs; i++) {
+        virDomainHostdevDefPtr hostdev = vm->def->hostdevs[i];
+
+        if (hostdev->mode == VIR_DOMAIN_HOSTDEV_MODE_SUBSYS &&
+            hostdev->source.subsys.type == VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_PCI &&
+            hostdev->source.subsys.u.pci.backend == VIR_DOMAIN_HOSTDEV_PCI_BACKEND_DEFAULT) {
+            hostdev->source.subsys.u.pci.backend = VIR_DOMAIN_HOSTDEV_PCI_BACKEND_VFIO;
+        }
+    }
+
+    for (i = 0; i < vm->def->nfss; i++) {
+        virDomainFSDefPtr fs = vm->def->fss[i];
+        char *s;
+
+        if (fs->fsdriver != VIR_DOMAIN_FS_DRIVER_TYPE_VIRTIOFS ||
+            QEMU_DOMAIN_FS_PRIVATE(fs)->vhostuser_fs_sock)
+            continue;
+
+        s = g_strdup_printf("/tmp/lib/domain--1-guest/fs%zu.vhost-fs.sock", i);
+        QEMU_DOMAIN_FS_PRIVATE(fs)->vhostuser_fs_sock = s;
+    }
+
+    if (vm->def->vsock) {
+        virDomainVsockDefPtr vsock = vm->def->vsock;
+        qemuDomainVsockPrivatePtr vsockPriv =
+            (qemuDomainVsockPrivatePtr)vsock->privateData;
+
+        if (vsock->auto_cid == VIR_TRISTATE_BOOL_YES)
+            vsock->guest_cid = 42;
+
+        vsockPriv->vhostfd = 6789;
+    }
+
+    if (vm->def->tpm) {
+        switch (vm->def->tpm->type) {
+        case VIR_DOMAIN_TPM_TYPE_EMULATOR:
+            VIR_FREE(vm->def->tpm->data.emulator.source.data.file.path);
+            vm->def->tpm->data.emulator.source.data.file.path = g_strdup("/dev/test");
+            vm->def->tpm->data.emulator.source.type = VIR_DOMAIN_CHR_TYPE_FILE;
+            break;
+        case VIR_DOMAIN_TPM_TYPE_PASSTHROUGH:
+        case VIR_DOMAIN_TPM_TYPE_LAST:
+            break;
+       }
+    }
+
+    for (i = 0; i < vm->def->nvideos; i++) {
+        virDomainVideoDefPtr video = vm->def->videos[i];
+
+        if (video->backend == VIR_DOMAIN_VIDEO_BACKEND_TYPE_VHOSTUSER) {
+            qemuDomainVideoPrivatePtr vpriv = QEMU_DOMAIN_VIDEO_PRIVATE(video);
+
+            vpriv->vhost_user_fd = 1729;
+        }
+    }
+
+    if (flags & FLAG_SLIRP_HELPER) {
+        for (i = 0; i < vm->def->nnets; i++) {
+            virDomainNetDefPtr net = vm->def->nets[i];
+
+            if (net->type == VIR_DOMAIN_NET_TYPE_USER &&
+                virQEMUCapsGet(info->qemuCaps, QEMU_CAPS_DBUS_VMSTATE)) {
+                qemuSlirpPtr slirp = qemuSlirpNew();
+                slirp->fd[0] = 42;
+                QEMU_DOMAIN_NETWORK_PRIVATE(net)->slirp = slirp;
+            }
+        }
+    }
+
+    return qemuProcessCreatePretendCmd(drv, vm, migrateURI,
+                                       (flags & FLAG_FIPS), false,
+                                       jsonPropsValidation,
+                                       VIR_QEMU_PROCESS_START_COLD);
+}
+
+
+static int
+testCompareXMLToArgvValidateSchema(virQEMUDriverPtr drv,
+                                   virDomainObjPtr vm,
+                                   const char *migrateURI,
+                                   struct testQemuInfo *info,
+                                   unsigned int flags)
+{
+    VIR_AUTOSTRINGLIST args = NULL;
+    size_t nargs = 0;
+    size_t i;
+    g_autoptr(virHashTable) schema = NULL;
+    g_autoptr(virCommand) cmd = NULL;
+
+    if (info->schemafile)
+        schema = testQEMUSchemaLoad(info->schemafile);
+
+    /* comment out with line comment to enable schema checking for non _CAPS tests
+    if (!schema)
+        schema = testQEMUSchemaLoadLatest(virArchToString(info->arch));
+    // */
+
+    if (!schema)
+        return 0;
+
+    if (!(cmd = testCompareXMLToArgvCreateArgs(drv, vm, migrateURI, info, flags,
+                                               true)))
+        return -1;
+
+    if (virCommandGetArgList(cmd, &args, &nargs) < 0)
+        return -1;
+
+    for (i = 0; i < nargs; i++) {
+        g_auto(virBuffer) debug = VIR_BUFFER_INITIALIZER;
+        g_autoptr(virJSONValue) jsonargs = NULL;
+
+        if (STREQ(args[i], "-blockdev")) {
+            if (!(jsonargs = virJSONValueFromString(args[i + 1])))
+                return -1;
+
+            if (testQEMUSchemaValidateCommand("blockdev-add", jsonargs,
+                                              schema, &debug) < 0) {
+                VIR_TEST_VERBOSE("failed to validate -blockdev '%s' against QAPI schema: %s",
+                                 args[i + 1], virBufferCurrentContent(&debug));
+                return -1;
+            }
+
+            i++;
+        } else if (STREQ(args[i], "-netdev")) {
+            if (!(jsonargs = virJSONValueFromString(args[i + 1])))
+                return -1;
+
+            /* skip the validation for pre-QAPIfication cases */
+            if (virQEMUQAPISchemaPathExists("netdev_add/arg-type/type/!string", schema))
+                continue;
+
+            if (testQEMUSchemaValidateCommand("netdev_add", jsonargs,
+                                              schema, &debug) < 0) {
+                VIR_TEST_VERBOSE("failed to validate -netdev '%s' against QAPI schema: %s",
+                                 args[i + 1], virBufferCurrentContent(&debug));
+                return -1;
+            }
+
+            i++;
+        }
+    }
+
+    return 0;
+}
+
+
 static int
 testCompareXMLToArgv(const void *data)
 {
@@ -409,7 +568,6 @@ testCompareXMLToArgv(const void *data)
     virConnectPtr conn;
     char *log = NULL;
     virCommandPtr cmd = NULL;
-    size_t i;
     qemuDomainObjPrivatePtr priv = NULL;
 
     if (info->arch != VIR_ARCH_NONE && info->arch != VIR_ARCH_X86_64)
@@ -486,77 +644,8 @@ testCompareXMLToArgv(const void *data)
     VIR_FREE(log);
     virResetLastError();
 
-    for (i = 0; i < vm->def->nhostdevs; i++) {
-        virDomainHostdevDefPtr hostdev = vm->def->hostdevs[i];
-
-        if (hostdev->mode == VIR_DOMAIN_HOSTDEV_MODE_SUBSYS &&
-            hostdev->source.subsys.type == VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_PCI &&
-            hostdev->source.subsys.u.pci.backend == VIR_DOMAIN_HOSTDEV_PCI_BACKEND_DEFAULT) {
-            hostdev->source.subsys.u.pci.backend = VIR_DOMAIN_HOSTDEV_PCI_BACKEND_VFIO;
-        }
-    }
-
-    for (i = 0; i < vm->def->nfss; i++) {
-        virDomainFSDefPtr fs = vm->def->fss[i];
-        char *s;
-
-        if (fs->fsdriver != VIR_DOMAIN_FS_DRIVER_TYPE_VIRTIOFS)
-            continue;
-
-        s = g_strdup_printf("/tmp/lib/domain--1-guest/fs%zu.vhost-fs.sock", i);
-        QEMU_DOMAIN_FS_PRIVATE(fs)->vhostuser_fs_sock = s;
-    }
-
-    if (vm->def->vsock) {
-        virDomainVsockDefPtr vsock = vm->def->vsock;
-        qemuDomainVsockPrivatePtr vsockPriv =
-            (qemuDomainVsockPrivatePtr)vsock->privateData;
-
-        if (vsock->auto_cid == VIR_TRISTATE_BOOL_YES)
-            vsock->guest_cid = 42;
-
-        vsockPriv->vhostfd = 6789;
-    }
-
-    if (vm->def->tpm) {
-        switch (vm->def->tpm->type) {
-        case VIR_DOMAIN_TPM_TYPE_EMULATOR:
-            VIR_FREE(vm->def->tpm->data.emulator.source.data.file.path);
-            vm->def->tpm->data.emulator.source.data.file.path = g_strdup("/dev/test");
-            vm->def->tpm->data.emulator.source.type = VIR_DOMAIN_CHR_TYPE_FILE;
-            break;
-        case VIR_DOMAIN_TPM_TYPE_PASSTHROUGH:
-        case VIR_DOMAIN_TPM_TYPE_LAST:
-            break;
-       }
-    }
-
-    for (i = 0; i < vm->def->nvideos; i++) {
-        virDomainVideoDefPtr video = vm->def->videos[i];
-
-        if (video->backend == VIR_DOMAIN_VIDEO_BACKEND_TYPE_VHOSTUSER) {
-            qemuDomainVideoPrivatePtr vpriv = QEMU_DOMAIN_VIDEO_PRIVATE(video);
-
-            vpriv->vhost_user_fd = 1729;
-        }
-    }
-
-    if (flags & FLAG_SLIRP_HELPER) {
-        for (i = 0; i < vm->def->nnets; i++) {
-            virDomainNetDefPtr net = vm->def->nets[i];
-
-            if (net->type == VIR_DOMAIN_NET_TYPE_USER &&
-                virQEMUCapsGet(info->qemuCaps, QEMU_CAPS_DBUS_VMSTATE)) {
-                qemuSlirpPtr slirp = qemuSlirpNew();
-                slirp->fd[0] = 42;
-                QEMU_DOMAIN_NETWORK_PRIVATE(net)->slirp = slirp;
-            }
-        }
-    }
-
-    if (!(cmd = qemuProcessCreatePretendCmd(&driver, vm, migrateURI,
-                                            (flags & FLAG_FIPS), false,
-                                            VIR_QEMU_PROCESS_START_COLD))) {
+    if (!(cmd = testCompareXMLToArgvCreateArgs(&driver, vm, migrateURI, info,
+                                               flags, false))) {
         if (flags & FLAG_EXPECT_FAILURE)
             goto ok;
         goto cleanup;
@@ -565,6 +654,9 @@ testCompareXMLToArgv(const void *data)
         VIR_TEST_DEBUG("passed instead of expected failure");
         goto cleanup;
     }
+
+    if (testCompareXMLToArgvValidateSchema(&driver, vm, migrateURI, info, flags) < 0)
+        goto cleanup;
 
     if (!(actualargv = virCommandToString(cmd, false)))
         goto cleanup;
