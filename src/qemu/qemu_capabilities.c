@@ -586,6 +586,7 @@ struct _virQEMUCapsMachineType {
     bool hotplugCpus;
     bool qemuDefault;
     char *defaultCPU;
+    bool numaMemSupported;
 };
 
 typedef struct _virQEMUCapsHostCPUData virQEMUCapsHostCPUData;
@@ -1813,6 +1814,7 @@ virQEMUCapsAccelCopyMachineTypes(virQEMUCapsAccelPtr dst,
         dst->machineTypes[i].maxCpus = src->machineTypes[i].maxCpus;
         dst->machineTypes[i].hotplugCpus = src->machineTypes[i].hotplugCpus;
         dst->machineTypes[i].qemuDefault = src->machineTypes[i].qemuDefault;
+        dst->machineTypes[i].numaMemSupported = src->machineTypes[i].numaMemSupported;
     }
 }
 
@@ -2453,6 +2455,25 @@ virQEMUCapsGetMachineDefaultCPU(virQEMUCapsPtr qemuCaps,
 }
 
 
+bool
+virQEMUCapsGetMachineNumaMemSupported(virQEMUCapsPtr qemuCaps,
+                                      virDomainVirtType virtType,
+                                      const char *name)
+{
+    virQEMUCapsAccelPtr accel;
+    size_t i;
+
+    accel = virQEMUCapsGetAccel(qemuCaps, virtType);
+
+    for (i = 0; i < accel->nmachineTypes; i++) {
+        if (STREQ(accel->machineTypes[i].name, name))
+            return accel->machineTypes[i].numaMemSupported;
+    }
+
+    return false;
+}
+
+
 /**
  * virQEMUCapsSetGICCapabilities:
  * @qemuCaps: QEMU capabilities
@@ -2665,7 +2686,8 @@ virQEMUCapsAddMachine(virQEMUCapsPtr qemuCaps,
                       const char *defaultCPU,
                       int maxCpus,
                       bool hotplugCpus,
-                      bool isDefault)
+                      bool isDefault,
+                      bool numaMemSupported)
 {
     virQEMUCapsAccelPtr accel = virQEMUCapsGetAccel(qemuCaps, virtType);
     virQEMUCapsMachineTypePtr mach;
@@ -2684,6 +2706,8 @@ virQEMUCapsAddMachine(virQEMUCapsPtr qemuCaps,
     mach->hotplugCpus = hotplugCpus;
 
     mach->qemuDefault = isDefault;
+
+    mach->numaMemSupported = numaMemSupported;
 }
 
 /**
@@ -2729,7 +2753,8 @@ virQEMUCapsProbeQMPMachineTypes(virQEMUCapsPtr qemuCaps,
                               machines[i]->defaultCPU,
                               machines[i]->maxCpus,
                               machines[i]->hotplugCpus,
-                              machines[i]->isDefault);
+                              machines[i]->isDefault,
+                              machines[i]->numaMemSupported);
 
         if (preferredMachine &&
             (STREQ_NULLABLE(machines[i]->alias, preferredMachine) ||
@@ -3949,6 +3974,11 @@ virQEMUCapsLoadMachines(virQEMUCapsAccelPtr caps,
             caps->machineTypes[i].qemuDefault = true;
         VIR_FREE(str);
 
+        str = virXMLPropString(nodes[i], "numaMemSupported");
+        if (STREQ_NULLABLE(str, "yes"))
+            caps->machineTypes[i].numaMemSupported = true;
+        VIR_FREE(str);
+
         caps->machineTypes[i].defaultCPU = virXMLPropString(nodes[i], "defaultCPU");
     }
 
@@ -4069,7 +4099,7 @@ virQEMUCapsParseSEVInfo(virQEMUCapsPtr qemuCaps, xmlXPathContextPtr ctxt)
  *   ...
  *   <cpu name="pentium3"/>
  *   ...
- *   <machine name="pc-1.0" alias="pc" hotplugCpus='yes' maxCpus="4" default="yes"/>
+ *   <machine name='pc-1.0' alias='pc' hotplugCpus='yes' maxCpus='4' default='yes' numaMemSupported='yes'/>
  *   ...
  * </qemuCaps>
  */
@@ -4405,6 +4435,8 @@ virQEMUCapsFormatMachines(virQEMUCapsAccelPtr caps,
             virBufferAddLit(buf, " default='yes'");
         virBufferEscapeString(buf, " defaultCPU='%s'",
                               caps->machineTypes[i].defaultCPU);
+        if (caps->machineTypes[i].numaMemSupported)
+            virBufferAddLit(buf, " numaMemSupported='yes'");
         virBufferAddLit(buf, "/>\n");
     }
 }
@@ -6108,7 +6140,8 @@ virQEMUCapsStripMachineAliasesForVirtType(virQEMUCapsPtr qemuCaps,
 
         if (name) {
             virQEMUCapsAddMachine(qemuCaps, virtType, name, NULL, mach->defaultCPU,
-                                  mach->maxCpus, mach->hotplugCpus, mach->qemuDefault);
+                                  mach->maxCpus, mach->hotplugCpus, mach->qemuDefault,
+                                  mach->numaMemSupported);
         }
     }
 }
