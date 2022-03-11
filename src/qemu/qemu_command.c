@@ -7414,6 +7414,11 @@ qemuBuildNumaArgStr(virQEMUDriverConfigPtr cfg,
     if (!virDomainNumatuneNodesetIsAvailable(def->numa, priv->autoNodeset))
         goto cleanup;
 
+    if (!virQEMUCapsGetMachineNumaMemSupported(qemuCaps,
+                                               def->virtType,
+                                               def->os.machine))
+        needBackend = true;
+
     if (VIR_ALLOC_N(nodeBackends, ncells) < 0)
         goto cleanup;
 
@@ -7431,6 +7436,11 @@ qemuBuildNumaArgStr(virQEMUDriverConfigPtr cfg,
             if (rc == 0)
                 needBackend = true;
         }
+    } else if (needBackend) {
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                       _("NUMA without specified memory backing is not "
+                         "supported with this QEMU binary"));
+        goto cleanup;
     }
 
     if (!needBackend &&
