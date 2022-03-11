@@ -182,6 +182,9 @@
   <flag name='cpu.kvm-no-adjvtime'/>
   <flag name='vhost-user-fs'/>
   <flag name='storage.werror'/>
+  <flag name='migration-param.bandwidth'/>
+  <flag name='migration-param.downtime'/>
+  <flag name='migration-param.xbzrle-cache-size'/>
   <version>4002050</version>
   <kvmVersion>0</kvmVersion>
   <microcodeVersion>61700241</microcodeVersion>

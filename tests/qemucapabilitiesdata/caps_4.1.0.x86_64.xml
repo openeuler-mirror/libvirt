@@ -218,6 +218,9 @@
   <flag name='smp-dies'/>
   <flag name='i8042'/>
   <flag name='storage.werror'/>
+  <flag name='migration-param.bandwidth'/>
+  <flag name='migration-param.downtime'/>
+  <flag name='migration-param.xbzrle-cache-size'/>
   <version>4001000</version>
   <kvmVersion>0</kvmVersion>
   <microcodeVersion>43100241</microcodeVersion>
