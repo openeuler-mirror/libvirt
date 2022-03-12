@@ -8130,9 +8130,6 @@ qemuDomainDeviceDefValidateTPM(virDomainTPMDef *tpm,
     case VIR_DOMAIN_TPM_MODEL_SPAPR:
         flag = QEMU_CAPS_DEVICE_TPM_SPAPR;
         break;
-    case VIR_DOMAIN_TPM_MODEL_TIS_DEVICE:
-        flag = QEMU_CAPS_DEVICE_TPM_TIS_DEVICE;
-        break;
     case VIR_DOMAIN_TPM_MODEL_LAST:
     default:
         virReportEnumRangeError(virDomainTPMModel, tpm->model);

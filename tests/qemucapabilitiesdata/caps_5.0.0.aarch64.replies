@@ -2735,6 +2735,10 @@
       "parent": "sys-bus-device"
     },
     {
+      "name": "tpm-emulator",
+      "parent": "tpm-backend"
+    },
+    {
       "name": "imx6ul.ccm",
       "parent": "imx.ccm"
     },
@@ -3199,6 +3203,10 @@
       "parent": "authz"
     },
     {
+      "name": "tpm-passthrough",
+      "parent": "tpm-backend"
+    },
+    {
       "name": "xlnx.ps7-spi",
       "parent": "sys-bus-device"
     },
@@ -3284,6 +3292,10 @@
     },
     {
       "name": "bcm2835-peripherals",
+      "parent": "sys-bus-device"
+    },
+    {
+      "name": "tpm-tis-device",
       "parent": "sys-bus-device"
     },
     {
@@ -7768,6 +7780,7 @@
 
 {
   "return": [
+    "tpm-tis"
   ],
   "id": "libvirt-36"
 }
@@ -7779,6 +7792,8 @@
 
 {
   "return": [
+    "passthrough",
+    "emulator"
   ],
   "id": "libvirt-37"
 }
