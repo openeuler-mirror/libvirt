@@ -569,9 +569,11 @@ VIR_ENUM_IMPL(virQEMUCaps,
               "blockdev-reopen",
               "storage.werror",
 
-	      "migration-param.bandwidth",
-	      "migration-param.downtime",
-	      "migration-param.xbzrle-cache-size",
+	          "migration-param.bandwidth",
+	          "migration-param.downtime",
+	          "migration-param.xbzrle-cache-size",
+
+              "object.qapified",
     );
 
 
