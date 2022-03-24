@@ -546,20 +546,18 @@ qemuMonitorJSONTransactionAdd(virJSONValuePtr actions,
  *
  * Create a JSON object used on the QMP monitor to call a command.
  *
- * Note that @arguments is always consumed and should not be referenced after
- * the call to this function.
+ * Note that @arguments is consumed and cleared.
  */
 static virJSONValuePtr
 qemuMonitorJSONMakeCommandInternal(const char *cmdname,
-                                   virJSONValuePtr arguments)
+                                   virJSONValuePtr *arguments)
 {
     virJSONValuePtr ret = NULL;
 
     ignore_value(virJSONValueObjectCreate(&ret,
                                           "s:execute", cmdname,
-                                          "A:arguments", &arguments, NULL));
+                                          "A:arguments", arguments, NULL));
 
-    virJSONValueFree(arguments);
     return ret;
 }
 
@@ -569,7 +567,7 @@ qemuMonitorJSONMakeCommand(const char *cmdname,
                            ...)
 {
     virJSONValuePtr obj = NULL;
-    virJSONValuePtr jargs = NULL;
+    g_autoptr(virJSONValue) jargs = NULL;
     va_list args;
 
     va_start(args, cmdname);
@@ -577,7 +575,7 @@ qemuMonitorJSONMakeCommand(const char *cmdname,
     if (virJSONValueObjectCreateVArgs(&jargs, args) < 0)
         goto cleanup;
 
-    obj = qemuMonitorJSONMakeCommandInternal(cmdname, jargs);
+    obj = qemuMonitorJSONMakeCommandInternal(cmdname, &jargs);
 
  cleanup:
     va_end(args);
@@ -3465,7 +3463,7 @@ qemuMonitorJSONGetMigrationParams(qemuMonitorPtr mon,
 
 int
 qemuMonitorJSONSetMigrationParams(qemuMonitorPtr mon,
-                                  virJSONValuePtr params)
+                                  virJSONValuePtr *params)
 {
     g_autoptr(virJSONValue) cmd = NULL;
     g_autoptr(virJSONValue) reply = NULL;
@@ -3997,9 +3995,8 @@ qemuMonitorJSONAddNetdev(qemuMonitorPtr mon,
 {
     g_autoptr(virJSONValue) cmd = NULL;
     g_autoptr(virJSONValue) reply = NULL;
-    virJSONValuePtr pr = g_steal_pointer(props);
 
-    if (!(cmd = qemuMonitorJSONMakeCommandInternal("netdev_add", pr)))
+    if (!(cmd = qemuMonitorJSONMakeCommandInternal("netdev_add", props)))
         return -1;
 
     if (qemuMonitorJSONCommand(mon, cmd, &reply) < 0)
@@ -4426,7 +4423,7 @@ qemuMonitorJSONAddDevice(qemuMonitorPtr mon,
 
 int
 qemuMonitorJSONAddObject(qemuMonitorPtr mon,
-                         virJSONValuePtr props)
+                         virJSONValuePtr *props)
 {
     g_autoptr(virJSONValue) cmd = NULL;
     g_autoptr(virJSONValue) reply = NULL;
@@ -8810,9 +8807,8 @@ qemuMonitorJSONBlockdevAdd(qemuMonitorPtr mon,
 {
     g_autoptr(virJSONValue) cmd = NULL;
     g_autoptr(virJSONValue) reply = NULL;
-    virJSONValuePtr pr = g_steal_pointer(props);
 
-    if (!(cmd = qemuMonitorJSONMakeCommandInternal("blockdev-add", pr)))
+    if (!(cmd = qemuMonitorJSONMakeCommandInternal("blockdev-add", props)))
         return -1;
 
     if (qemuMonitorJSONCommand(mon, cmd, &reply) < 0)
@@ -8831,9 +8827,8 @@ qemuMonitorJSONBlockdevReopen(qemuMonitorPtr mon,
 {
     g_autoptr(virJSONValue) cmd = NULL;
     g_autoptr(virJSONValue) reply = NULL;
-    virJSONValuePtr pr = g_steal_pointer(props);
 
-    if (!(cmd = qemuMonitorJSONMakeCommandInternal("blockdev-reopen", pr)))
+    if (!(cmd = qemuMonitorJSONMakeCommandInternal("blockdev-reopen", props)))
         return -1;
 
     if (qemuMonitorJSONCommand(mon, cmd, &reply) < 0)

@@ -547,6 +547,24 @@ testCompareXMLToArgvValidateSchema(virQEMUDriverPtr drv,
             }
 
             i++;
+        } else if (STREQ(args[i], "-object")) {
+
+            if (*args[i + 1] != '{') {
+                i++;
+                continue;
+            }
+
+            if (!(jsonargs = virJSONValueFromString(args[i + 1])))
+                return -1;
+
+            if (testQEMUSchemaValidateCommand("object-add", jsonargs,
+                                              schema, &debug) < 0) {
+                VIR_TEST_VERBOSE("failed to validate -object '%s' against QAPI schema: %s",
+                                 args[i + 1], virBufferCurrentContent(&debug));
+                return -1;
+            }
+
+            i++;
         }
     }
 

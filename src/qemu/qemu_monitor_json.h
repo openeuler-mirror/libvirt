@@ -142,7 +142,7 @@ int qemuMonitorJSONSetMigrationCacheSize(qemuMonitorPtr mon,
 int qemuMonitorJSONGetMigrationParams(qemuMonitorPtr mon,
                                       virJSONValuePtr *params);
 int qemuMonitorJSONSetMigrationParams(qemuMonitorPtr mon,
-                                      virJSONValuePtr params);
+                                      virJSONValuePtr *params);
 
 int qemuMonitorJSONGetMigrationStats(qemuMonitorPtr mon,
                                      qemuMonitorMigrationStatsPtr stats,
@@ -234,7 +234,7 @@ int qemuMonitorJSONDelDevice(qemuMonitorPtr mon,
                              const char *devalias);
 
 int qemuMonitorJSONAddObject(qemuMonitorPtr mon,
-                             virJSONValuePtr props);
+                             virJSONValuePtr *props);
 
 int qemuMonitorJSONDelObject(qemuMonitorPtr mon,
                              const char *objalias,

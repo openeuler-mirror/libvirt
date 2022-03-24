@@ -32,6 +32,7 @@
 #include "qemu_monitor_json.h"
 #include "qemu_domain.h"
 #include "qemu_process.h"
+#include "qemu_capabilities.h"
 #include "virerror.h"
 #include "viralloc.h"
 #include "virlog.h"
@@ -112,6 +113,9 @@ struct _qemuMonitor {
     qemuMonitorReportDomainLogError logFunc;
     void *logOpaque;
     virFreeCallback logDestroy;
+
+    /* true if qemu no longer wants 'props' sub-object of object-add */
+    bool objectAddNoWrap;
 };
 
 /**
@@ -663,6 +667,7 @@ qemuMonitorOpenInternal(virDomainObjPtr vm,
                         qemuMonitorCallbacksPtr cb,
                         void *opaque)
 {
+    qemuDomainObjPrivatePtr priv = vm->privateData;
     qemuMonitorPtr mon;
     g_autoptr(GError) gerr = NULL;
 
@@ -694,6 +699,9 @@ qemuMonitorOpenInternal(virDomainObjPtr vm,
     mon->waitGreeting = true;
     mon->cb = cb;
     mon->callbackOpaque = opaque;
+
+    if (priv)
+        mon->objectAddNoWrap = virQEMUCapsGet(priv->qemuCaps, QEMU_CAPS_OBJECT_QAPIFIED);
 
     if (virSetCloseExec(mon->fd) < 0) {
         virReportError(VIR_ERR_INTERNAL_ERROR,
@@ -2463,22 +2471,17 @@ qemuMonitorGetMigrationParams(qemuMonitorPtr mon,
  * @mon: Pointer to the monitor object.
  * @params: Migration parameters.
  *
- * The @params object is consumed and should not be referenced by the caller
- * after this function returns.
+ * The @params object is consumed and cleared on success and some errors.
  *
  * Returns 0 on success, -1 on error.
  */
 int
 qemuMonitorSetMigrationParams(qemuMonitorPtr mon,
-                              virJSONValuePtr params)
+                              virJSONValuePtr *params)
 {
-    QEMU_CHECK_MONITOR_GOTO(mon, error);
+    QEMU_CHECK_MONITOR(mon);
 
     return qemuMonitorJSONSetMigrationParams(mon, params);
-
- error:
-    virJSONValueFree(params);
-    return -1;
 }
 
 
@@ -2872,23 +2875,6 @@ qemuMonitorAddDeviceArgs(qemuMonitorPtr mon,
 }
 
 
-virJSONValuePtr
-qemuMonitorCreateObjectPropsWrap(const char *type,
-                                 const char *alias,
-                                 virJSONValuePtr *props)
-{
-    virJSONValuePtr ret;
-
-    ignore_value(virJSONValueObjectCreate(&ret,
-                                          "s:qom-type", type,
-                                          "s:id", alias,
-                                          "A:props", props,
-                                          NULL));
-    return ret;
-}
-
-
-
 /**
  * qemuMonitorCreateObjectProps:
  * @propsret: returns full object properties
@@ -2904,26 +2890,28 @@ qemuMonitorCreateObjectProps(virJSONValuePtr *propsret,
                              const char *alias,
                              ...)
 {
-    virJSONValuePtr props = NULL;
-    int ret = -1;
+    g_autoptr(virJSONValue) props = NULL;
+    int rc;
     va_list args;
 
-    *propsret = NULL;
+    if (virJSONValueObjectCreate(&props,
+                                 "s:qom-type", type,
+                                 "s:id", alias,
+                                 NULL) < 0)
+        return -1;
+
 
     va_start(args, alias);
 
-    if (virJSONValueObjectCreateVArgs(&props, args) < 0)
-        goto cleanup;
+    rc = virJSONValueObjectAddVArgs(props, args);
 
-    if (!(*propsret = qemuMonitorCreateObjectPropsWrap(type, alias, &props)))
-        goto cleanup;
-
-    ret = 0;
-
- cleanup:
-    virJSONValueFree(props);
     va_end(args);
-    return ret;
+
+    if (rc < 0)
+        return -1;
+
+    *propsret = g_steal_pointer(&props);
+    return 0;
 }
 
 
@@ -2943,15 +2931,15 @@ qemuMonitorAddObject(qemuMonitorPtr mon,
                      virJSONValuePtr *props,
                      char **alias)
 {
+    g_autoptr(virJSONValue) pr = NULL;
     const char *type = NULL;
     const char *id = NULL;
-    char *tmp = NULL;
-    int ret = -1;
+    g_autofree char *aliasCopy = NULL;
 
     if (!*props) {
         virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
                        _("object props can't be NULL"));
-        goto cleanup;
+        return -1;
     }
 
     type = virJSONValueObjectGetString(*props, "qom-type");
@@ -2959,29 +2947,49 @@ qemuMonitorAddObject(qemuMonitorPtr mon,
 
     VIR_DEBUG("type=%s id=%s", NULLSTR(type), NULLSTR(id));
 
-    QEMU_CHECK_MONITOR_GOTO(mon, cleanup);
+    QEMU_CHECK_MONITOR(mon);
 
     if (!id || !type) {
         virReportError(VIR_ERR_INTERNAL_ERROR,
                        _("missing alias or qom-type for qemu object '%s'"),
                        NULLSTR(type));
-        goto cleanup;
+        return -1;
     }
 
     if (alias)
-        tmp = g_strdup(id);
+        aliasCopy = g_strdup(id);
 
-    ret = qemuMonitorJSONAddObject(mon, *props);
-    *props = NULL;
+    if (mon->objectAddNoWrap) {
+        pr = g_steal_pointer(props);
+    } else {
+        /* we need to create a wrapper which has the 'qom-type' and 'id' and
+         * store everything else under a 'props' sub-object */
+        g_autoptr(virJSONValue) typeobj = NULL;
+        g_autoptr(virJSONValue) idobj = NULL;
+
+        ignore_value(virJSONValueObjectRemoveKey(*props, "qom-type", &typeobj));
+        ignore_value(virJSONValueObjectRemoveKey(*props, "id", &idobj));
+
+        if (!virJSONValueObjectGetKey(*props, 0)) {
+            virJSONValueFree(*props);
+            *props = NULL;
+        }
+
+        if (virJSONValueObjectCreate(&pr,
+                                     "s:qom-type", type,
+                                     "s:id", id,
+                                     "A:props", props,
+                                     NULL) < 0)
+            return -1;
+    }
+
+    if (qemuMonitorJSONAddObject(mon, &pr) < 0)
+        return -1;
 
     if (alias)
-        *alias = g_steal_pointer(&tmp);
+        *alias = g_steal_pointer(&aliasCopy);
 
- cleanup:
-    VIR_FREE(tmp);
-    virJSONValueFree(*props);
-    *props = NULL;
-    return ret;
+    return 0;
 }
 
 

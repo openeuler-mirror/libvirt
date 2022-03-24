@@ -754,7 +754,7 @@ int qemuMonitorSetMigrationCacheSize(qemuMonitorPtr mon,
 int qemuMonitorGetMigrationParams(qemuMonitorPtr mon,
                                   virJSONValuePtr *params);
 int qemuMonitorSetMigrationParams(qemuMonitorPtr mon,
-                                  virJSONValuePtr params);
+                                  virJSONValuePtr *params);
 
 typedef enum {
     QEMU_MONITOR_MIGRATION_STATUS_INACTIVE,
@@ -918,10 +918,6 @@ int qemuMonitorAddDeviceWithFd(qemuMonitorPtr mon,
 
 int qemuMonitorDelDevice(qemuMonitorPtr mon,
                          const char *devalias);
-
-virJSONValuePtr qemuMonitorCreateObjectPropsWrap(const char *type,
-                                                 const char *alias,
-                                                 virJSONValuePtr *props);
 
 int qemuMonitorCreateObjectProps(virJSONValuePtr *propsret,
                                  const char *type,
