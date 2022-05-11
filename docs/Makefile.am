@@ -420,11 +420,11 @@ manpages/%.html.in: manpages/%.rst
 	 grep -v '^:Manual ' < $< | \
 	  sed -e 's|SYSCONFDIR|$(sysconfdir)|g' \
 	     -e 's|RUNSTATEDIR|$(runstatedir)|g' | \
-	  $(RST2HTML) --strict > $@ || { rm $@ && exit 1; }
+	  $(RST2HTML) --stylesheet= --strict > $@ || { rm $@ && exit 1; }
 
 %.html.in: %.rst
 	$(AM_V_GEN)$(MKDIR_P) `dirname $@` && \
-	  $(RST2HTML) --strict $< > $@ || { rm $@ && exit 1; }
+	  $(RST2HTML) --stylesheet= --strict $< > $@ || { rm $@ && exit 1; }
 
 %.html.tmp: %.html.in site.xsl subsite.xsl page.xsl \
 		$(acl_generated)
