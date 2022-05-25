@@ -89,6 +89,8 @@ VIR_LOG_INIT("util.process");
 #   define __NR_setns 350
 #  elif defined(__s390__)
 #   define __NR_setns 339
+#  elif defined(__sw_64__)
+#   define __NR_setns 501
 #  endif
 # endif
 
