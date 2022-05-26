@@ -69,6 +69,8 @@ typedef enum {
     VIR_ARCH_XTENSA,       /* XTensa      32 LE http://en.wikipedia.org/wiki/Xtensa#Processor_Cores */
     VIR_ARCH_XTENSAEB,     /* XTensa      32 BE http://en.wikipedia.org/wiki/Xtensa#Processor_Cores */
 
+    VIR_ARCH_SW_64,        /* SW64        64 LE XHB*/
+
     VIR_ARCH_LAST,
 } virArch;
 
@@ -94,6 +96,8 @@ typedef enum {
 
 #define ARCH_IS_S390(arch) ((arch) == VIR_ARCH_S390 ||\
                             (arch) == VIR_ARCH_S390X)
+
+#define ARCH_IS_SW64(arch)   ((arch) == VIR_ARCH_SW_64)
 
 typedef enum {
     VIR_ARCH_LITTLE_ENDIAN,

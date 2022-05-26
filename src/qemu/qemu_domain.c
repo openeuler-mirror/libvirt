@@ -4350,6 +4350,10 @@ qemuDomainDefAddDefaultDevices(virDomainDefPtr def,
         addPCIRoot = true;
         break;
 
+    case VIR_ARCH_SW_64:
+	addPCIeRoot = true;
+	break;
+
     case VIR_ARCH_ARMV7B:
     case VIR_ARCH_CRIS:
     case VIR_ARCH_ITANIUM:
@@ -12959,6 +12963,7 @@ qemuDomainMachineHasBuiltinIDE(const char *machine,
     return qemuDomainMachineIsI440FX(machine, arch) ||
         STREQ(machine, "malta") ||
         STREQ(machine, "sun4u") ||
+        STREQ(machine, "core3") ||
         STREQ(machine, "g3beige");
 }
 
