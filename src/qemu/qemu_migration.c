@@ -1184,6 +1184,15 @@ qemuMigrationSrcIsAllowedHostdev(const virDomainDef *def)
      * forbidden. */
     for (i = 0; i < def->nhostdevs; i++) {
         virDomainHostdevDefPtr hostdev = def->hostdevs[i];
+
+#ifdef WITH_VFIO_MIG
+        if ((virDomainHostdevMode)hostdev->mode == VIR_DOMAIN_HOSTDEV_MODE_SUBSYS &&
+            (virDomainHostdevSubsysType)hostdev->source.subsys.type == VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_PCI &&
+            hostdev->source.subsys.u.pci.backend == VIR_DOMAIN_HOSTDEV_PCI_BACKEND_VFIO) {
+            continue;
+        }
+#endif
+
         switch ((virDomainHostdevMode)hostdev->mode) {
         case VIR_DOMAIN_HOSTDEV_MODE_CAPABILITIES:
             virReportError(VIR_ERR_OPERATION_UNSUPPORTED, "%s",

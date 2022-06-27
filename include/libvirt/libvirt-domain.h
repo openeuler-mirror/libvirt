@@ -849,6 +849,9 @@ typedef enum {
      */
     VIR_MIGRATE_PARALLEL          = (1 << 17),
 
+#ifdef WITH_VFIO_MIG
+    VIR_MIGRATE_MEMORY_CHECK      = (1 << 18),
+#endif
 } virDomainMigrateFlags;
 
 
@@ -1077,6 +1080,16 @@ typedef enum {
  * the migration.
  */
 # define VIR_MIGRATE_PARAM_TLS_DESTINATION          "tls.destination"
+
+/**
+ * VIR_MIGRATE_PARAM_MEMORY_CHECK:
+ *
+ * whether to enable memory check during live migration
+ *
+ */
+#ifdef WITH_VFIO_MIG
+# define VIR_MIGRATE_PARAM_MEMORY_CHECK             "memory.check"
+#endif
 
 /* Domain migration. */
 virDomainPtr virDomainMigrate (virDomainPtr domain, virConnectPtr dconn,

@@ -108,6 +108,9 @@ VIR_ENUM_IMPL(qemuMigrationParam,
               "xbzrle-cache-size",
               "max-postcopy-bandwidth",
               "multifd-channels",
+#ifdef WITH_VFIO_MIG
+              "memory-check",
+#endif
 );
 
 typedef struct _qemuMigrationParamsAlwaysOnItem qemuMigrationParamsAlwaysOnItem;
@@ -201,6 +204,12 @@ static const qemuMigrationParamsTPMapItem qemuMigrationParamsTPMap[] = {
     {.typedParam = VIR_MIGRATE_PARAM_TLS_DESTINATION,
      .param = QEMU_MIGRATION_PARAM_TLS_HOSTNAME,
      .party = QEMU_MIGRATION_SOURCE},
+
+#ifdef WITH_VFIO_MIG
+    {.typedParam = VIR_MIGRATE_PARAM_MEMORY_CHECK,
+     .param = QEMU_MIGRATION_PARAM_MEMORY_CHECK,
+     .party = QEMU_MIGRATION_SOURCE},
+#endif
 };
 
 static const qemuMigrationParamType qemuMigrationParamTypes[] = {
@@ -217,6 +226,9 @@ static const qemuMigrationParamType qemuMigrationParamTypes[] = {
     [QEMU_MIGRATION_PARAM_XBZRLE_CACHE_SIZE] = QEMU_MIGRATION_PARAM_TYPE_ULL,
     [QEMU_MIGRATION_PARAM_MAX_POSTCOPY_BANDWIDTH] = QEMU_MIGRATION_PARAM_TYPE_ULL,
     [QEMU_MIGRATION_PARAM_MULTIFD_CHANNELS] = QEMU_MIGRATION_PARAM_TYPE_INT,
+#ifdef WITH_VFIO_MIG
+    [QEMU_MIGRATION_PARAM_MEMORY_CHECK] = QEMU_MIGRATION_PARAM_TYPE_BOOL,
+#endif
 };
 G_STATIC_ASSERT(G_N_ELEMENTS(qemuMigrationParamTypes) == QEMU_MIGRATION_PARAM_LAST);
 
@@ -406,6 +418,32 @@ qemuMigrationParamsSetTPULL(qemuMigrationParamsPtr migParams,
 }
 
 
+#ifdef WITH_VFIO_MIG 
+static int qemuMigrationParamsGetTPBool(qemuMigrationParamsPtr migParams,
+                                        qemuMigrationParam param,
+                                        virTypedParameterPtr params,
+                                        int nparams,
+                                        const char *name)
+{
+    int rc;
+    int val = 0;
+
+    if (qemuMigrationParamsCheckType(param, QEMU_MIGRATION_PARAM_TYPE_BOOL) < 0)
+        return -1;
+    
+    if (!params)
+        return 0;
+
+    if ((rc = virTypedParamsGetBoolean(params, nparams, name, &val)) < 0)
+        return -1;
+
+    migParams->params[param].value.b = (val == 0) ? false : true;
+    migParams->params[param].set = !!rc;
+
+    return 0;
+}
+#endif
+
 static int
 qemuMigrationParamsGetTPString(qemuMigrationParamsPtr migParams,
                                qemuMigrationParam param,
@@ -572,6 +610,12 @@ qemuMigrationParamsFromFlags(virTypedParameterPtr params,
             break;
 
         case QEMU_MIGRATION_PARAM_TYPE_BOOL:
+#ifdef WITH_VFIO_MIG
+            if (item->param == QEMU_MIGRATION_PARAM_MEMORY_CHECK &&
+                qemuMigrationParamsGetTPBool(migParams, item->param, params,
+                                             nparams, item->typedParam) < 0)
+                return NULL;
+#endif
             break;
 
         case QEMU_MIGRATION_PARAM_TYPE_STRING:

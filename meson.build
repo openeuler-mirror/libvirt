@@ -1713,6 +1713,10 @@ if not get_option('driver_qemu').disabled()
   endif
 
   if use_qemu
+    if get_option('migration_vfio').enabled()
+        conf.set('WITH_VFIO_MIG', 1)
+    endif
+
     conf.set('WITH_QEMU', 1)
 
     qemu_moddir = get_option('qemu_moddir')
