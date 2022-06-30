@@ -3846,6 +3846,9 @@ virDomainMigrate3(virDomainPtr domain,
     const char *dname = NULL;
     const char *dxml = NULL;
     unsigned long long bandwidth = 0;
+#ifdef WITH_VFIO_MIG
+    int enable_memory_check = 0;
+#endif
 
     VIR_DOMAIN_DEBUG(domain, "dconn=%p, params=%p, nparms=%u flags=0x%x",
                      dconn, params, nparams, flags);
@@ -3892,6 +3895,17 @@ virDomainMigrate3(virDomainPtr domain,
                              "the destination host"));
             goto error;
         }
+#ifdef WITH_VFIO_MIG
+        if (virTypedParamsGetBoolean(params, nparams,
+                                     VIR_MIGRATE_PARAM_MEMORY_CHECK,
+                                     &enable_memory_check) < 0)
+            goto error;
+        if (enable_memory_check == 1) {
+            virReportError(VIR_ERR_ARGUMENT_UNSUPPORTED, "%s",
+                           _("offline migration can't support memory check"));
+            goto error;
+        }
+#endif
     }
 
     /* Change protection requires support only on source side, and

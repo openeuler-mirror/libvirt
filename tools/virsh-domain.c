@@ -67,6 +67,9 @@
 #define VIRSH_COMMON_OPT_DOMAIN_CURRENT \
     VIRSH_COMMON_OPT_CURRENT(N_("affect current domain"))
 
+#ifdef WITH_VFIO_MIG
+#define DEFAULT_TIMEOUT_CANCEL  3600
+#endif
 
 static virDomainPtr
 virshDomainDefine(virConnectPtr conn, const char *xml, unsigned int flags)
@@ -10630,8 +10633,13 @@ static const vshCmdOptDef opts_migrate[] = {
     },
     {.name = "timeout",
      .type = VSH_OT_INT,
+#ifdef WITH_VFIO_MIG
+     .help = N_("run action specified by --timeout-* option (cancel by "
+                "default) if live migration exceeds timeout (in seconds)")
+#else
      .help = N_("run action specified by --timeout-* option (suspend by "
                 "default) if live migration exceeds timeout (in seconds)")
+#endif
     },
     {.name = "timeout-suspend",
      .type = VSH_OT_BOOL,
@@ -10713,6 +10721,16 @@ static const vshCmdOptDef opts_migrate[] = {
      .type = VSH_OT_STRING,
      .help = N_("override the destination host name used for TLS verification")
     },
+#ifdef WITH_VFIO_MIG
+    {.name = "memory-check",
+     .type = VSH_OT_BOOL,
+     .help = N_("whether enable the vm's memory check during live migration")
+    },
+    {.name = "timeout-cancel",
+     .type = VSH_OT_BOOL,
+     .help = N_("cancel migration after timeout")
+    },
+#endif
     {.name = NULL}
 };
 
@@ -10951,6 +10969,14 @@ doMigrate(void *opaque)
                                 VIR_MIGRATE_PARAM_TLS_DESTINATION, opt) < 0)
         goto save_error;
 
+#ifdef WITH_VFIO_MIG
+    if (vshCommandOptBool(cmd, "memory-check") &&
+        virTypedParamsAddBoolean(&params, &nparams, &maxparams,
+                                 VIR_MIGRATE_PARAM_MEMORY_CHECK, 1) < 0) {
+        goto save_error;
+    }
+#endif
+
     if (vshCommandOptBool(cmd, "live"))
         flags |= VIR_MIGRATE_LIVE;
     if (vshCommandOptBool(cmd, "p2p"))
@@ -11033,6 +11059,9 @@ doMigrate(void *opaque)
 typedef enum {
     VIRSH_MIGRATE_TIMEOUT_DEFAULT,
     VIRSH_MIGRATE_TIMEOUT_SUSPEND,
+#ifdef WITH_VFIO_MIG
+    VIRSH_MIGRATE_TIMEOUT_CANCEL,
+#endif
     VIRSH_MIGRATE_TIMEOUT_POSTCOPY,
 } virshMigrateTimeoutAction;
 
@@ -11051,7 +11080,13 @@ virshMigrateTimeout(vshControl *ctl,
         if (virDomainSuspend(dom) < 0)
             vshDebug(ctl, VSH_ERR_INFO, "suspending domain failed\n");
         break;
-
+#ifdef WITH_VFIO_MIG
+    case VIRSH_MIGRATE_TIMEOUT_CANCEL:
+        vshDebug(ctl, VSH_ERR_DEBUG, "migration timed out, cancel live migration\n");
+        if (virDomainAbortJob(dom) < 0)
+            vshDebug(ctl, VSH_ERR_INFO, "canceling migration failed\n");
+        break;
+#endif
     case VIRSH_MIGRATE_TIMEOUT_POSTCOPY:
         vshDebug(ctl, VSH_ERR_DEBUG,
                  "migration timed out; switching to post-copy\n");
@@ -11101,6 +11136,10 @@ cmdMigrate(vshControl *ctl, const vshCmd *cmd)
 
     VSH_EXCLUSIVE_OPTIONS("live", "offline");
     VSH_EXCLUSIVE_OPTIONS("timeout-suspend", "timeout-postcopy");
+#ifdef WITH_VFIO_MIG
+    VSH_EXCLUSIVE_OPTIONS("timeout-cancel", "timeout-suspend");
+    VSH_EXCLUSIVE_OPTIONS("timeout-cancel", "timeout-postcopy");
+#endif
     VSH_REQUIRE_OPTION("postcopy-after-precopy", "postcopy");
     VSH_REQUIRE_OPTION("timeout-postcopy", "postcopy");
     VSH_REQUIRE_OPTION("persistent-xml", "persistent");
@@ -11126,6 +11165,29 @@ cmdMigrate(vshControl *ctl, const vshCmd *cmd)
         timeoutAction = VIRSH_MIGRATE_TIMEOUT_SUSPEND;
     if (vshCommandOptBool(cmd, "timeout-postcopy"))
         timeoutAction = VIRSH_MIGRATE_TIMEOUT_POSTCOPY;
+
+#ifdef WITH_VFIO_MIG
+    if (vshCommandOptBool(cmd, "timeout-cancel"))
+        timeoutAction = VIRSH_MIGRATE_TIMEOUT_CANCEL;
+    if (timeout > 0) {
+        if (timeoutAction == VIRSH_MIGRATE_TIMEOUT_DEFAULT)
+            timeoutAction = VIRSH_MIGRATE_TIMEOUT_CANCEL;
+    } else if (timeoutAction) {
+        if (timeoutAction == VIRSH_MIGRATE_TIMEOUT_CANCEL) {
+            timeout = DEFAULT_TIMEOUT_CANCEL;
+        } else {
+            vshError(ctl, "%s",
+                     _("migrate: Unexpected --timeout-* option without --timeout"));
+            goto cleanup;
+        }
+    }
+
+    if (vshCommandOptBool(cmd, "memory-check") && !live_flag) {
+        vshError(ctl, "%s",
+                 _("migrate: Unexpected memory check for offline migration"));
+        goto cleanup;
+    }
+#else
     if (timeout > 0) {
         if (timeoutAction == VIRSH_MIGRATE_TIMEOUT_DEFAULT)
             timeoutAction = VIRSH_MIGRATE_TIMEOUT_SUSPEND;
@@ -11134,6 +11196,7 @@ cmdMigrate(vshControl *ctl, const vshCmd *cmd)
                  _("migrate: Unexpected --timeout-* option without --timeout"));
         goto cleanup;
     }
+#endif
 
     if (vshCommandOptBool(cmd, "postcopy-after-precopy")) {
         iterEvent = virConnectDomainEventRegisterAny(
