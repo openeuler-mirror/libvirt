@@ -4451,11 +4451,15 @@ qemuDomainPinVcpuLive(virDomainObj *vm,
         goto cleanup;
 
     event = virDomainEventTunableNewFromObj(vm, eventParams, eventNparams);
+    eventParams = NULL;
+    eventNparams = 0;
 
     ret = 0;
 
  cleanup:
     virObjectEventStateQueue(driver->domainEventState, event);
+    if (eventParams)
+        virTypedParamsFree(eventParams, eventNparams);
     return ret;
 }
 
@@ -4660,6 +4664,8 @@ qemuDomainPinEmulator(virDomainPtr dom,
             goto endjob;
 
         event = virDomainEventTunableNewFromDom(dom, eventParams, eventNparams);
+        eventParams = NULL;
+        eventNparams = 0;
     }
 
     if (persistentDef) {
@@ -4676,6 +4682,8 @@ qemuDomainPinEmulator(virDomainPtr dom,
     qemuDomainObjEndJob(vm);
 
  cleanup:
+    if (eventParams)
+        virTypedParamsFree(eventParams, eventNparams);
     virObjectEventStateQueue(driver->domainEventState, event);
     virDomainObjEndAPI(&vm);
     return ret;
@@ -5061,6 +5069,8 @@ qemuDomainPinIOThread(virDomainPtr dom,
             goto endjob;
 
         event = virDomainEventTunableNewFromDom(dom, eventParams, eventNparams);
+        eventParams = NULL;
+        eventNparams = 0;
     }
 
     if (persistentDef) {
@@ -5086,6 +5096,8 @@ qemuDomainPinIOThread(virDomainPtr dom,
     qemuDomainObjEndJob(vm);
 
  cleanup:
+    if (eventParams)
+        virTypedParamsFree(eventParams, eventNparams);
     virObjectEventStateQueue(driver->domainEventState, event);
     virDomainObjEndAPI(&vm);
     return ret;
