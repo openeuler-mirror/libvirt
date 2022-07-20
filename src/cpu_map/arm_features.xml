@@ -19,4 +19,23 @@
   <feature name='sve1920'/>
   <feature name='sve2048'/>
 
+  <!-- Kunpeng-920 cpu features -->
+  <feature name='fp'/>
+  <feature name='asimd'/>
+  <feature name='evtstrm'/>
+  <feature name='aes'/>
+  <feature name='pmull'/>
+  <feature name='sha1'/>
+  <feature name='sha2'/>
+  <feature name='crc32'/>
+  <feature name='atomics'/>
+  <feature name='fphp'/>
+  <feature name='asimdhp'/>
+  <feature name='cpuid'/>
+  <feature name='asimdrdm'/>
+  <feature name='jscvt'/>
+  <feature name='fcma'/>
+  <feature name='dcpop'/>
+  <feature name='asimddp'/>
+  <feature name='asimdfhm'/>
 </cpus>
