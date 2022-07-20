@@ -6564,7 +6564,7 @@ qemuBuildCpuModelArgStr(virQEMUDriver *driver,
         break;
     }
 
-    if ((ARCH_IS_S390(def->os.arch) || ARCH_IS_ARM(def->os.arch)) &&
+    if (ARCH_IS_S390(def->os.arch) &&
         cpu->features &&
         !virQEMUCapsGet(qemuCaps, QEMU_CAPS_QUERY_CPU_MODEL_EXPANSION)) {
         virReportError(VIR_ERR_INTERNAL_ERROR,
