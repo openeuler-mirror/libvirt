@@ -1,19 +1,6 @@
 # -*- rpm-spec -*-
 
-# This spec file assumes you are building on a Fedora or RHEL version
-# that's still supported by the vendor. It may work on other distros
-# or versions, but no effort will be made to ensure that going forward.
-%define min_rhel 8
-%define min_fedora 33
-
 %define arches_qemu_kvm         %{ix86} x86_64 %{power64} %{arm} aarch64 s390x
-%if 0%{?rhel}
-    %if 0%{?rhel} > 8
-        %define arches_qemu_kvm     x86_64 aarch64 s390x
-    %else
-        %define arches_qemu_kvm     x86_64 %{power64} aarch64 s390x
-    %endif
-%endif
 
 %define arches_64bit            x86_64 %{power64} aarch64 s390x riscv64
 %define arches_x86              %{ix86} x86_64
@@ -41,11 +28,6 @@
 
 %define with_qemu_tcg      %{with_qemu}
 
-# RHEL disables TCG on all architectures
-%if 0%{?rhel}
-    %define with_qemu_tcg 0
-%endif
-
 %if ! %{with_qemu_tcg} && ! %{with_qemu_kvm}
     %define with_qemu 0
 %endif
@@ -58,40 +40,14 @@
 
 # Then the secondary host drivers, which run inside libvirtd
 %define with_storage_rbd      0%{!?_without_storage_rbd:1}
-%if 0%{?fedora}
-    %define with_storage_sheepdog 0%{!?_without_storage_sheepdog:1}
-%else
-    %define with_storage_sheepdog 0
-%endif
-
+%define with_storage_sheepdog 0%{!?_without_storage_sheepdog:0}
 %define with_storage_gluster 0%{!?_without_storage_gluster:1}
-%if 0%{?rhel}
-    # Glusterfs has been dropped in RHEL-9, and before that
-    # was only enabled on arches where KVM exists
-    %if 0%{?rhel} > 8
-        %define with_storage_gluster 0
-    %else
-        %ifnarch %{arches_qemu_kvm}
-            %define with_storage_gluster 0
-        %endif
-    %endif
-%endif
-
-# Fedora has zfs-fuse
-%if 0%{?fedora}
-    %define with_storage_zfs      0%{!?_without_storage_zfs:1}
-%else
-    %define with_storage_zfs      0
-%endif
-
+%define with_storage_zfs      0%{!?_without_storage_zfs:1}
 %define with_storage_iscsi_direct 0%{!?_without_storage_iscsi_direct:1}
-# libiscsi has been dropped in RHEL-9
-%if 0%{?rhel} > 8
-    %define with_storage_iscsi_direct 0
-%endif
 
 # Other optional features
 %define with_numactl          0%{!?_without_numactl:1}
+%define with_bash_completion  0%{!?_without_bash_completion:1}
 
 # A few optional bits off by default, we enable later
 %define with_fuse             0
@@ -103,6 +59,8 @@
 %define with_wireshark        0
 %define with_libssh           0
 %define with_dmidecode        0
+# openEuler do not provide zfs yet
+%define with_storage_zfs      0
 
 # Finally set the OS / architecture specific special cases
 
@@ -113,33 +71,24 @@
 %ifnarch %{arches_vbox}
     %define with_vbox 0
 %endif
-%ifnarch %{arches_numactl}
-    %define with_numactl 0
+%ifnarch %{arches_ceph}
+    %define with_storage_rbd 0
+%endif
+# Glusterfs only enabled on arches where KVM exists
+%ifnarch %{arches_qemu_kvm}
+    %define with_storage_gluster 0
 %endif
 %ifnarch %{arches_zfs}
     %define with_storage_zfs 0
 %endif
-%ifnarch %{arches_ceph}
-    %define with_storage_rbd 0
+%ifnarch %{arches_numactl}
+    %define with_numactl 0
 %endif
 
 # RHEL doesn't ship many hypervisor drivers
-%if 0%{?rhel}
-    %define with_openvz 0
-    %define with_vbox 0
-    %define with_vmware 0
-    %define with_libxl 0
-    %define with_hyperv 0
-    %define with_vz 0
-    %define with_lxc 0
-%endif
+%define with_libxl 0
 
 %define with_firewalld_zone 0%{!?_without_firewalld_zone:1}
-
-%if (0%{?fedora} && 0%{?fedora} < 34) || (0%{?rhel} && 0%{?rhel} < 9)
-    %define with_netcf 0%{!?_without_netcf:1}
-%endif
-
 
 # fuse is used to provide virtualized /proc for LXC
 %if %{with_lxc}
@@ -148,19 +97,10 @@
 
 # Enable sanlock library for lock management with QEMU
 # Sanlock is available only on arches where kvm is available for RHEL
-%if 0%{?fedora}
-    %define with_sanlock 0%{!?_without_sanlock:1}
-%endif
-%if 0%{?rhel}
-    %ifarch %{arches_qemu_kvm}
-        %define with_sanlock 0%{!?_without_sanlock:1}
-    %endif
-%endif
+%define with_sanlock 0%{!?_without_sanlock:1}
 
 # Enable libssh2 transport for new enough distros
-%if 0%{?fedora}
-    %define with_libssh2 0%{!?_without_libssh2:1}
-%endif
+%define with_libssh2 0%{!?_without_libssh2:1}
 
 # Enable wireshark plugins for all distros
 %define with_wireshark 0%{!?_without_wireshark:1}
@@ -181,10 +121,7 @@
     %define with_dmidecode 0%{!?_without_dmidecode:1}
 %endif
 
-%define with_modular_daemons 0
-%if 0%{?fedora} >= 35 || 0%{?rhel} >= 9
-    %define with_modular_daemons 1
-%endif
+%define with_modular_daemons 1
 
 # Force QEMU to run as non-root
 %define qemu_user  qemu
@@ -198,11 +135,7 @@
 # RHEL releases provide stable tool chains and so it is safe to turn
 # compiler warning into errors without being worried about frequent
 # changes in reported warnings
-%if 0%{?rhel}
-    %define enable_werror -Dwerror=true
-%else
-    %define enable_werror -Dwerror=false -Dgit_werror=disabled
-%endif
+%define enable_werror -Dwerror=false -Dgit_werror=disabled
 
 %define tls_priority "@LIBVIRT,SYSTEM"
 
@@ -227,7 +160,7 @@
 
 Summary: Library providing a simple virtualization API
 Name: libvirt
-Version: @VERSION@
+Version: 8.2.0
 Release: 1%{?dist}
 License: LGPLv2+
 URL: https://libvirt.org/
@@ -236,6 +169,8 @@ URL: https://libvirt.org/
     %define mainturl stable_updates/
 %endif
 Source: https://libvirt.org/sources/%{?mainturl}libvirt-%{version}.tar.xz
+
+# Add patch here
 
 Requires: libvirt-daemon = %{version}-%{release}
 Requires: libvirt-daemon-config-network = %{version}-%{release}
@@ -504,7 +439,8 @@ Requires: libvirt-libs = %{version}-%{release}
 # needed for device enumeration
 Requires: systemd >= 185
 # For managing persistent mediated devices
-Requires: mdevctl
+# openEuler do not provide mdevctl yet
+# Requires: mdevctl
 
 %description daemon-driver-nodedev
 The nodedev driver plugin for the libvirtd daemon, providing
@@ -805,7 +741,8 @@ Requires: libvirt-daemon-driver-nodedev = %{version}-%{release}
 Requires: libvirt-daemon-driver-nwfilter = %{version}-%{release}
 Requires: libvirt-daemon-driver-secret = %{version}-%{release}
 Requires: libvirt-daemon-driver-storage = %{version}-%{release}
-Requires: qemu-kvm
+# In openEuler, qemu-kvm included in package qemu
+Requires: qemu
 
 %description daemon-kvm
 Server side daemon and driver required to manage the virtualization
@@ -948,19 +885,9 @@ Libvirt plugin for NSS for translating domain names into IP addresses.
 
 %prep
 
-%autosetup -S git_am
+%autosetup
 
 %build
-%if 0%{?fedora} >= %{min_fedora} || 0%{?rhel} >= %{min_rhel}
-    %define supported_platform 1
-%else
-    %define supported_platform 0
-%endif
-
-%if ! %{supported_platform}
-echo "This RPM requires either Fedora >= %{min_fedora} or RHEL >= %{min_rhel}"
-exit 1
-%endif
 
 %if %{with_qemu}
     %define arg_qemu -Ddriver_qemu=enabled
@@ -1102,6 +1029,12 @@ exit 1
     %define arg_remote_mode -Dremote_default_mode=legacy
 %endif
 
+%if %{with_bash_completion}
+    %define arg_bash_completion -Dbash_completion=enabled
+%else
+    %define arg_bash_completion -Dbash_completion=disabled
+%endif
+
 %define when  %(date +"%%F-%%T")
 %define where %(hostname)
 %define who   %{?packager}%{!?packager:Unknown}
@@ -1169,6 +1102,7 @@ export SOURCE_DATE_EPOCH=$(stat --printf='%Y' %{_specdir}/%{name}.spec)
            %{?arg_wireshark} \
            %{?arg_libssh} \
            %{?arg_libssh2} \
+           %{?arg_bash_completion} \
            -Dpm_utils=disabled \
            -Dnss=enabled \
            %{arg_packager} \
@@ -2124,3 +2058,5 @@ exit 0
 
 
 %changelog
+* Tue Jun 21 2022 wengyu1 <wengyu@isrc.iscas.ac.cn> - 8.2.0-1
+- Update to version 8.2.0
