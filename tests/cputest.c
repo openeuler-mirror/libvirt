@@ -1075,6 +1075,13 @@ mymain(void)
     DO_TEST_BASELINE(VIR_ARCH_PPC64, "same-model", 0, 0);
     DO_TEST_BASELINE(VIR_ARCH_PPC64, "legacy", 0, -1);
 
+    DO_TEST_BASELINE(VIR_ARCH_AARCH64, "incompatible-vendors", 0, -1);
+    DO_TEST_BASELINE(VIR_ARCH_AARCH64, "no-vendor", 0, 0);
+    DO_TEST_BASELINE(VIR_ARCH_AARCH64, "no-feature", 0, 0);
+    DO_TEST_BASELINE(VIR_ARCH_AARCH64, "one-feature", 0, 0);
+    DO_TEST_BASELINE(VIR_ARCH_AARCH64, "no-compatible-feature", 0, 0);
+    DO_TEST_BASELINE(VIR_ARCH_AARCH64, "one-compatible-feature", 0, 0);
+
     /* CPU features */
     DO_TEST_HASFEATURE(VIR_ARCH_X86_64, "host", "vmx", YES);
     DO_TEST_HASFEATURE(VIR_ARCH_X86_64, "host", "lm", YES);

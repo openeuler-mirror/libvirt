@@ -1,0 +1,7 @@
+<cpuTest>
+<cpu>
+  <arch>aarch64</arch>
+  <model>cortex-a57</model>
+  <vendor>ARM</vendor>
+</cpu>
+</cpuTest>
