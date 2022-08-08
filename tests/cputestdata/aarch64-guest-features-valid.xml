@@ -1,0 +1,7 @@
+<cpu>
+  <model>cortex-a57</model>
+  <vendor>ARM</vendor>
+  <feature policy='require' name='asimd'/>
+  <feature policy='require' name='aes'/>
+  <feature policy='require' name='crc32'/>
+</cpu>
