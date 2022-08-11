@@ -4697,7 +4697,8 @@ qemuPrepareNVRAM(virQEMUDriverConfigPtr cfg,
     bool created = false;
     const char *master_nvram_path;
     ssize_t r;
-
+    g_autofree char *tmp_dst_path = NULL;
+    
     if (!loader || !loader->nvram || virFileExists(loader->nvram))
         return 0;
 
@@ -4726,7 +4727,9 @@ qemuPrepareNVRAM(virQEMUDriverConfigPtr cfg,
                              master_nvram_path);
         goto cleanup;
     }
-    if ((dstFD = virFileOpenAs(loader->nvram,
+    
+    tmp_dst_path = g_strdup_printf("%s.tmp", loader->nvram);
+    if ((dstFD = virFileOpenAs(tmp_dst_path,                           
                                O_WRONLY | O_CREAT | O_EXCL,
                                S_IRUSR | S_IWUSR,
                                cfg->user, cfg->group, 0)) < 0) {
@@ -4750,7 +4753,7 @@ qemuPrepareNVRAM(virQEMUDriverConfigPtr cfg,
         if (safewrite(dstFD, buf, r) < 0) {
             virReportSystemError(errno,
                                  _("Unable to write to file '%s'"),
-                                 loader->nvram);
+                                 tmp_dst_path);
             goto cleanup;
         }
     } while (r);
@@ -4761,9 +4764,24 @@ qemuPrepareNVRAM(virQEMUDriverConfigPtr cfg,
                              master_nvram_path);
         goto cleanup;
     }
+
+    if (g_fsync(dstFD) < 0) {
+        virReportSystemError(errno,
+                             _("cannot sync file '%s'"),
+                             tmp_dst_path);
+        goto cleanup;
+    }
+
     if (VIR_CLOSE(dstFD) < 0) {
         virReportSystemError(errno,
                              _("Unable to close file '%s'"),
+                             tmp_dst_path);
+        goto cleanup;
+    }
+
+    if (rename(tmp_dst_path, loader->nvram) < 0) {
+        virReportSystemError(errno,
+                             _("Unable to replace '%s'"),
                              loader->nvram);
         goto cleanup;
     }
@@ -4774,7 +4792,7 @@ qemuPrepareNVRAM(virQEMUDriverConfigPtr cfg,
      * copy the file content. Roll back. */
     if (ret < 0) {
         if (created)
-            unlink(loader->nvram);
+            unlink(tmp_dst_path);
     }
 
     VIR_FORCE_CLOSE(srcFD);
