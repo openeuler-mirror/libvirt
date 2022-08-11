@@ -1,0 +1,52 @@
+# vim: filetype=automake
+
+STRATOVIRT_DRIVER_SOURCES = \
+	stratovirt/stratovirt_driver.c \
+	stratovirt/stratovirt_driver.h \
+	stratovirt/stratovirt_conf.c \
+	stratovirt/stratovirt_conf.h \
+	stratovirt/stratovirt_domain.c \
+	stratovirt/stratovirt_domain.h \
+	stratovirt/stratovirt_process.h \
+	stratovirt/stratovirt_process.c \
+	$(NULL)
+
+DRIVER_SOURCE_FILES += $(addprefix $(srcdir)/,$(STRATOVIRT_DRIVER_SOURCES))
+STATEFUL_SOURCE_FILES = $(addprefix $(srcdir)/,$(STRATOVIRT_DRIVER_SOURCES))
+EXTRA_DIST += $(STRATOVIRT_DRIVER_SOURCES)
+
+if WITH_STRATOVIRT
+noinst_LTLIBRARIES += libvirt_driver_stratovirt_impl.la
+libvirt_driver_stratovirt_la_SOURCES =
+libvirt_driver_stratovirt_la_LIBADD = \
+	libvirt_driver_stratovirt_impl.la \
+	libvirt.la \
+	libvirt_driver_qemu.la\
+	$(GLIB_LIBS) \
+	$(NULL)
+
+mod_LTLIBRARIES += libvirt_driver_stratovirt.la
+libvirt_driver_stratovirt_la_LDFLAGS = $(AM_LDFLAGS_MOD_NOUNDEF)
+
+libvirt_driver_stratovirt_impl_la_CFLAGS = \
+	$(SELINUX_CFLAGS) \
+	$(XDR_CFLAGS) \
+	-I$(srcdir)/conf \
+	-I$(srcdir)/stratovirt \
+	-I$(srcdir)/access \
+	-I$(builddir)/access \
+	-I$(srcdir)/hypervisor \
+	-I$(srcdir)/secret \
+	-I$(srcdir)/qemu \
+	$(AM_CFLAGS) \
+	$(NULL)
+
+libvirt_driver_stratovirt_impl_la_SOURCES = $(STRATOVIRT_DRIVER_SOURCES)
+libvirt_driver_stratovirt_impl_la_LDFLAGS = $(AM_LDFLAGS)
+libvirt_driver_stratovirt_impl_la_LIBADD = \
+	$(DLOPEN_LIBS) \
+	$(SELINUX_LIBS) \
+	$(LIBXML_LIBS) \
+	$(NULL)
+
+endif WITH_STRATOVIRT

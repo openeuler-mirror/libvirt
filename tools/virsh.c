@@ -501,6 +501,9 @@ virshShowVersion(vshControl *ctl G_GNUC_UNUSED)
 #ifdef WITH_QEMU
     vshPrint(ctl, " QEMU/KVM");
 #endif
+#ifdef WITH_STRATOVIRT
+    vshPrint(ctl, " StratoVirt");
+#endif
 #ifdef WITH_LXC
     vshPrint(ctl, " LXC");
 #endif

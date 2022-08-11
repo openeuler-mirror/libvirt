@@ -127,6 +127,7 @@ include node_device/Makefile.inc.am
 include secret/Makefile.inc.am
 include storage/Makefile.inc.am
 include remote/Makefile.inc.am
+include stratovirt/Makefile.inc.am
 
 
 SECDRIVER_CFLAGS =
