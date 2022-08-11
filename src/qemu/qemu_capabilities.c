@@ -573,6 +573,9 @@ VIR_ENUM_IMPL(virQEMUCaps,
 	          "migration-param.downtime",
 	          "migration-param.xbzrle-cache-size",
 
+              /* 390 */
+              "vhost-user-blk",
+
               "object.qapified",
     );
 
@@ -1296,6 +1299,7 @@ struct virQEMUCapsStringFlags virQEMUCapsObjectTypes[] = {
     { "rng-builtin", QEMU_CAPS_OBJECT_RNG_BUILTIN },
     { "tpm-spapr", QEMU_CAPS_DEVICE_TPM_SPAPR },
     { "vhost-user-fs-device", QEMU_CAPS_DEVICE_VHOST_USER_FS },
+    { "vhost-user-blk", QEMU_CAPS_DEVICE_VHOST_USER_BLK },
 };
 
 static struct virQEMUCapsStringFlags virQEMUCapsDevicePropsVirtioBalloon[] = {
