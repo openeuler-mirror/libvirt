@@ -61,6 +61,7 @@
 #include "qemu_backup.h"
 #include "qemu_dbus.h"
 #include "qemu_snapshot.h"
+#include "qemu_hotpatch.h"
 
 #include "cpu/cpu.h"
 #include "cpu/cpu_x86.h"
@@ -3673,6 +3674,7 @@ qemuProcessRecoverJob(virQEMUDriver *driver,
         priv->job.current->started = now;
         break;
 
+    case VIR_ASYNC_JOB_HOTPATCH:
     case VIR_ASYNC_JOB_NONE:
     case VIR_ASYNC_JOB_LAST:
         break;

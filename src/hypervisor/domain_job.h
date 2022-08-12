@@ -65,6 +65,7 @@ typedef enum {
     VIR_ASYNC_JOB_SNAPSHOT,
     VIR_ASYNC_JOB_START,
     VIR_ASYNC_JOB_BACKUP,
+    VIR_ASYNC_JOB_HOTPATCH,
 
     VIR_ASYNC_JOB_LAST
 } virDomainAsyncJob;

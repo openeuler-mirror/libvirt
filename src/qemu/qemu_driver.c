@@ -32,6 +32,7 @@
 #include <signal.h>
 #include <sys/ioctl.h>
 
+#include "domain_job.h"
 #include "qemu_driver.h"
 #include "qemu_agent.h"
 #include "qemu_alias.h"
@@ -12754,6 +12755,9 @@ static int qemuDomainAbortJob(virDomainPtr dom)
         ret = 0;
         break;
 
+    case VIR_ASYNC_JOB_HOTPATCH:
+        break;
+
     case VIR_ASYNC_JOB_LAST:
     default:
         virReportEnumRangeError(virDomainAsyncJob, priv->job.asyncJob);
@@ -20804,6 +20808,7 @@ qemuDomainHotpatchManage(virDomainPtr domain,
                          unsigned int flags)
 {
     virDomainObj *vm;
+    virQEMUDriver *driver = domain->conn->privateData;
     char *ret = NULL;
     size_t len;
 
@@ -20811,6 +20816,12 @@ qemuDomainHotpatchManage(virDomainPtr domain,
 
     if (!(vm = qemuDomainObjFromDomain(domain)))
         goto cleanup;
+
+    if (qemuDomainObjBeginAsyncJob(driver, vm, VIR_ASYNC_JOB_HOTPATCH,
+                                   VIR_DOMAIN_JOB_OPERATION_HOTPATCH, 0) < 0)
+        goto cleanup;
+
+    qemuDomainObjSetAsyncJobMask(vm, VIR_JOB_DEFAULT_MASK);
 
     switch (action) {
     case VIR_DOMAIN_HOTPATCH_APPLY:
@@ -20831,12 +20842,15 @@ qemuDomainHotpatchManage(virDomainPtr domain,
     }
 
     if (!ret)
-        goto cleanup;
+        goto endjob;
 
     /* Wipeout redundant empty line */
     len = strlen(ret);
     if (len > 0)
         ret[len - 1] = '\0';
+
+ endjob:
+    qemuDomainObjEndAsyncJob(vm);
 
  cleanup:
     virDomainObjEndAPI(&vm);

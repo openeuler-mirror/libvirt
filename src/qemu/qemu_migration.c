@@ -25,6 +25,7 @@
 #include <fcntl.h>
 #include <poll.h>
 
+#include "domain_job.h"
 #include "qemu_migration.h"
 #include "qemu_migration_cookie.h"
 #include "qemu_migration_params.h"
@@ -1724,6 +1725,8 @@ qemuMigrationJobName(virDomainObj *vm)
         return _("start job");
     case VIR_ASYNC_JOB_BACKUP:
         return _("backup job");
+    case VIR_ASYNC_JOB_HOTPATCH:
+        return _("hotpatch job");
     case VIR_ASYNC_JOB_LAST:
     default:
         return _("job");

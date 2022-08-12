@@ -18,6 +18,7 @@
 
 #include <config.h>
 
+#include "domain_job.h"
 #include "qemu_domain.h"
 #include "qemu_migration.h"
 #include "qemu_domainjob.h"
@@ -88,6 +89,7 @@ virDomainAsyncJobPhaseToString(virDomainAsyncJob job,
     case VIR_ASYNC_JOB_START:
     case VIR_ASYNC_JOB_NONE:
     case VIR_ASYNC_JOB_BACKUP:
+    case VIR_ASYNC_JOB_HOTPATCH:
         G_GNUC_FALLTHROUGH;
     case VIR_ASYNC_JOB_LAST:
         break;
@@ -114,6 +116,7 @@ virDomainAsyncJobPhaseFromString(virDomainAsyncJob job,
     case VIR_ASYNC_JOB_START:
     case VIR_ASYNC_JOB_NONE:
     case VIR_ASYNC_JOB_BACKUP:
+    case VIR_ASYNC_JOB_HOTPATCH:
         G_GNUC_FALLTHROUGH;
     case VIR_ASYNC_JOB_LAST:
         break;
