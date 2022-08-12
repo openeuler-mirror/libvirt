@@ -156,8 +156,21 @@ virDomainObjPtr stratovirtDomainObjFromDomain(virDomainPtr domain)
     return vm;
 }
 
+void
+stratovirtDomainUpdateCurrentMemorySize(virDomainObjPtr vm)
+{
+    if (!virDomainObjIsActive(vm))
+        return;
+
+    /* if no balloning is available, the current size equals to the current
+     * full memory size */
+    if (!virDomainDefHasMemballoon(vm->def))
+        vm->def->mem.cur_balloon = virDomainDefGetMemoryTotal(vm->def);
+}
+
 virStratoVirtDomain stratovirtDom = {
     .stratovirtDomainNamespaceAvailable = qemuDomainNamespaceAvailable,
     .stratovirtDomainRemoveInactive = qemuDomainRemoveInactive,
     .stratovirtDomainObjEndJob = qemuDomainObjEndJob,
+    .stratovirtDomainObjBeginJob = qemuDomainObjBeginJob,
 };

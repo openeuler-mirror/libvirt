@@ -45,6 +45,7 @@ typedef enum {
 typedef struct _stratovirtProcessEvent stratovirtProcessEvent;
 typedef stratovirtProcessEvent *stratovirtProcessEventPtr;
 typedef qemuDomainNamespace stratovirtDomainNamespace;
+typedef qemuDomainJob stratovirtDomainJob;
 
 void stratovirtProcessEventFree(stratovirtProcessEventPtr event);
 
@@ -62,6 +63,7 @@ typedef qemuDomainObjPrivate stratovirtDomainObjPrivate;
 typedef stratovirtDomainObjPrivate *stratovirtDomainObjPrivatePtr;
 
 virDomainObjPtr stratovirtDomainObjFromDomain(virDomainPtr domain);
+void stratovirtDomainUpdateCurrentMemorySize(virDomainObjPtr vm);
 
 typedef struct StratoVirtDomain {
     bool (*stratovirtDomainNamespaceAvailable)(stratovirtDomainNamespace ns G_GNUC_UNUSED);
@@ -69,6 +71,9 @@ typedef struct StratoVirtDomain {
                                            virDomainObjPtr vm);
     void (*stratovirtDomainObjEndJob)(virStratoVirtDriverPtr driver,
                                       virDomainObjPtr obj);
+    int (*stratovirtDomainObjBeginJob)(virStratoVirtDriverPtr driver,
+                                       virDomainObjPtr obj,
+                                       stratovirtDomainJob job);
 } virStratoVirtDomain;
 
 extern virStratoVirtDomain stratovirtDom;

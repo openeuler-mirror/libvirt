@@ -35,4 +35,6 @@ virStratoVirtProcess stratovirtPro = {
     .stratovirtProcessEndJob = qemuProcessEndJob,
     .stratovirtProcessBeginStopJob = qemuProcessBeginStopJob,
     .stratovirtProcessStop = qemuProcessStop,
+    .stratovirtProcessStopCPUs = qemuProcessStopCPUs,
+    .stratovirtProcessStartCPUs = qemuProcessStartCPUs,
 };

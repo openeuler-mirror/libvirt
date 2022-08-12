@@ -56,6 +56,14 @@ typedef struct StratoVirtProcess {
                                   virDomainShutoffReason reason,
                                   stratovirtDomainAsyncJob asyncjob,
                                   unsigned int flags);
+    int (*stratovirtProcessStopCPUs)(virStratoVirtDriverPtr driver,
+                                     virDomainObjPtr vm,
+                                     virDomainPausedReason reason,
+                                     stratovirtDomainAsyncJob asyncJob);
+    int (*stratovirtProcessStartCPUs)(virStratoVirtDriverPtr driver,
+                                      virDomainObjPtr vm,
+                                      virDomainRunningReason reason,
+                                      stratovirtDomainAsyncJob asyncJob);
 } virStratoVirtProcess;
 
 extern virStratoVirtProcess stratovirtPro;

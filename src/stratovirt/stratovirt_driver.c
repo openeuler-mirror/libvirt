@@ -45,9 +45,13 @@
 VIR_LOG_INIT("stratovirt.stratovirt_driver");
 
 #define STRATOVIRT_ASYNC_JOB_NONE 0
+#define STRATOVIRT_ASYNC_JOB_MIGRATION_OUT 1
 #define STRATOVIRT_ASYNC_JOB_MIGRATION_IN 2
+#define STRATOVIRT_ASYNC_JOB_SNAPSHOT 5
 #define STRATOVIRT_ASYNC_JOB_START 6
 #define STRATOVIRT_JOB_DESTROY 2
+#define STRATOVIRT_JOB_SUSPEND 3
+#define STRATOVIRT_JOB_MODIFY 4
 #define VIR_STRATOVIRT_PROCESS_START_COLD 1
 #define VIR_STRATOVIRT_PROCESS_STOP_MIGRATED 1
 
@@ -295,6 +299,114 @@ static virDomainPtr stratovirtDomainCreateXML(virConnectPtr conn,
     return dom;
 }
 
+static int stratovirtDomainSuspend(virDomainPtr dom)
+{
+    virStratoVirtDriverPtr driver = dom->conn->privateData;
+    virDomainObjPtr vm;
+    int ret = -1;
+    stratovirtDomainObjPrivatePtr priv;
+    virDomainPausedReason reason;
+    int state;
+    g_autoptr(virStratoVirtDriverConfig) cfg = virStratoVirtDriverGetConfig(driver);
+
+    if (!(vm = stratovirtDomainObjFromDomain(dom)))
+        return -1;
+
+    if (virDomainSuspendEnsureACL(dom->conn, vm->def) < 0)
+        goto cleanup;
+
+    priv = vm->privateData;
+
+    if (stratovirtDom.stratovirtDomainObjBeginJob(driver, vm, STRATOVIRT_JOB_SUSPEND) < 0)
+        goto cleanup;
+
+    if (virDomainObjCheckActive(vm) < 0)
+        goto endjob;
+
+    if (priv->job.asyncJob == STRATOVIRT_ASYNC_JOB_MIGRATION_OUT)
+        reason = VIR_DOMAIN_PAUSED_MIGRATION;
+    else if (priv->job.asyncJob == STRATOVIRT_ASYNC_JOB_SNAPSHOT)
+        reason = VIR_DOMAIN_PAUSED_SNAPSHOT;
+    else
+        reason = VIR_DOMAIN_PAUSED_USER;
+
+    state = virDomainObjGetState(vm, NULL);
+    if (state == VIR_DOMAIN_PMSUSPENDED) {
+        virReportError(VIR_ERR_OPERATION_INVALID,
+                       "%s", _("domain is pmsuspended"));
+        goto endjob;
+    } else if (state != VIR_DOMAIN_PAUSED) {
+        if (stratovirtPro.stratovirtProcessStopCPUs(driver, vm, reason, STRATOVIRT_ASYNC_JOB_NONE) < 0)
+            goto endjob;
+    }
+    if (virDomainObjSave(vm, driver->xmlopt, cfg->stateDir) < 0)
+        goto endjob;
+
+    ret = 0;
+
+endjob:
+    stratovirtDom.stratovirtDomainObjEndJob(driver, vm);
+
+cleanup:
+    virDomainObjEndAPI(&vm);
+
+    return ret;
+}
+
+static int stratovirtDomainResume(virDomainPtr dom)
+{
+    virStratoVirtDriverPtr driver = dom->conn->privateData;
+    virDomainObjPtr vm;
+    int ret = -1;
+    int state;
+    int reason;
+    g_autoptr(virStratoVirtDriverConfig) cfg = virStratoVirtDriverGetConfig(driver);
+
+    if (!(vm = stratovirtDomainObjFromDomain(dom)))
+        return -1;
+
+    if (virDomainResumeEnsureACL(dom->conn, vm->def) < 0)
+        goto cleanup;
+
+    if (stratovirtDom.stratovirtDomainObjBeginJob(driver, vm, STRATOVIRT_JOB_MODIFY) < 0)
+        goto cleanup;
+
+    if (virDomainObjCheckActive(vm) < 0)
+        goto endjob;
+
+    state = virDomainObjGetState(vm, &reason);
+    if (state == VIR_DOMAIN_PMSUSPENDED) {
+        virReportError(VIR_ERR_OPERATION_INVALID,
+                       "%s", _("domain is pmsuspended"));
+        goto endjob;
+    } else if (state == VIR_DOMAIN_RUNNING) {
+        virReportError(VIR_ERR_OPERATION_INVALID,
+                       "%s", _("domain is already running"));
+        goto endjob;
+    } else if ((state == VIR_DOMAIN_CRASHED &&
+                reason == VIR_DOMAIN_CRASHED_PANICKED) ||
+                state == VIR_DOMAIN_PAUSED) {
+        if (stratovirtPro.stratovirtProcessStartCPUs(driver, vm,
+                                                     VIR_DOMAIN_RUNNING_UNPAUSED,
+                                                     STRATOVIRT_ASYNC_JOB_NONE) < 0) {
+            if (virGetLastErrorCode() == VIR_ERR_OK)
+                virReportError(VIR_ERR_OPERATION_FAILED,
+                               "%s", _("resume operation failed"));
+            goto endjob;
+        }
+    }
+    if (virDomainObjSave(vm, driver->xmlopt, cfg->stateDir) < 0)
+        goto endjob;
+    ret = 0;
+
+ endjob:
+    stratovirtDom.stratovirtDomainObjEndJob(driver, vm);
+
+ cleanup:
+    virDomainObjEndAPI(&vm);
+    return ret;
+}
+
 static int
 stratovirtDomainDestroyFlags(virDomainPtr dom,
                              unsigned int flags)
@@ -362,6 +474,85 @@ stratovirtDomainDestroyFlags(virDomainPtr dom,
 static int stratovirtDomainDestroy(virDomainPtr dom)
 {
     return stratovirtDomainDestroyFlags(dom, 0);
+}
+
+static int stratovirtDomainOpenConsole(virDomainPtr dom,
+                                       const char *dev_name G_GNUC_UNUSED,
+                                       virStreamPtr st,
+                                       unsigned int flags)
+{
+    virDomainObjPtr vm = NULL;
+    int ret = -1;
+    virDomainChrDefPtr chr = NULL;
+    stratovirtDomainObjPrivatePtr priv;
+
+    virCheckFlags(VIR_DOMAIN_CONSOLE_SAFE | VIR_DOMAIN_CONSOLE_FORCE, -1);
+
+    if (!(vm = stratovirtDomainObjFromDomain(dom)))
+        goto cleanup;
+
+    if (virDomainOpenConsoleEnsureACL(dom->conn, vm->def) < 0)
+        goto cleanup;
+
+    if (virDomainObjCheckActive(vm) < 0)
+        goto cleanup;
+
+    priv = vm->privateData;
+
+    if (vm->def->nconsoles)
+        chr = vm->def->consoles[0];
+    else if (vm->def->nserials)
+        chr = vm->def->serials[0];
+
+    if (!chr) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                       _("cannot find character device"));
+	goto cleanup;
+    }
+
+    if (chr->source->type != VIR_DOMAIN_CHR_TYPE_PTY) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("character device %s is not using a PTY"),
+		       NULLSTR(chr->info.alias));
+	goto cleanup;
+    }
+
+    ret = virChrdevOpen(priv->devs, chr->source, st,
+                        (flags & VIR_DOMAIN_CONSOLE_FORCE) != 0);
+
+    if (ret == 1) {
+        virReportError(VIR_ERR_OPERATION_FAILED, "%s",
+                       _("Active console session exists for this domain"));
+	ret = -1;
+    }
+
+cleanup:
+    virDomainObjEndAPI(&vm);
+    return ret;
+}
+
+static int stratovirtDomainGetState(virDomainPtr dom,
+                                    int *state,
+				    int *reason,
+				    unsigned int flags)
+{
+    virDomainObjPtr vm;
+    int ret = -1;
+
+    virCheckFlags(0, -1);
+
+    if (!(vm = stratovirtDomainObjFromDomain(dom)))
+        goto cleanup;
+
+    if (virDomainGetStateEnsureACL(dom->conn, vm->def) < 0)
+        goto cleanup;
+
+    *state = virDomainObjGetState(vm, reason);
+    ret = 0;
+
+cleanup:
+    virDomainObjEndAPI(&vm);
+    return ret;
 }
 
 static virDomainPtr stratovirtDomainLookupByID(virConnectPtr conn,
@@ -785,11 +976,15 @@ static virHypervisorDriver stratovirtHypervisorDriver = {
     .connectListAllDomains = stratovirtConnectListAllDomains, /* 2.2.0 */
     .connectGetCapabilities = stratovirtConnectGetCapabilities, /* 2.2.0 */
     .domainCreateXML = stratovirtDomainCreateXML, /* 2.2.0 */
+    .domainSuspend =stratovirtDomainSuspend, /* 2.2.0 */
+    .domainResume = stratovirtDomainResume, /* 2.2.0 */
+    .domainGetState = stratovirtDomainGetState, /* 2.2.0 */
     .domainLookupByID = stratovirtDomainLookupByID, /* 2.2.0 */
     .domainLookupByUUID = stratovirtDomainLookupByUUID, /* 2.2.0 */
     .domainLookupByName = stratovirtDomainLookupByName, /* 2.2.0 */
     .domainDestroy = stratovirtDomainDestroy, /* 2.2.0 */
     .domainDestroyFlags = stratovirtDomainDestroyFlags, /* 2.2.0 */
+    .domainOpenConsole = stratovirtDomainOpenConsole, /* 2.2.0 */
 };
 
 static virConnectDriver stratovirtConnectDriver = {
