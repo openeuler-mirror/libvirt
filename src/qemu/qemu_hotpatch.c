@@ -37,12 +37,25 @@
 
 VIR_LOG_INIT("qemu_hotpatch");
 
+static int
+qemuDomainHotpatchCheckPid(pid_t pid)
+{
+    if (pid <= 0) {
+        virReportError(VIR_ERR_INVALID_ARG,
+                       "%s", _("Invalid pid"));
+        return -1;
+    }
+
+    return 0;
+}
+
 char *
 qemuDomainHotpatchQuery(virDomainObj *vm)
 {
     g_autoptr(virCommand) cmd = NULL;
     g_autofree char *binary = NULL;
     char *output = NULL;
+    pid_t pid = vm->pid;
     int ret = -1;
 
     if (!(binary = virFindFileInPath(LIBCARE_CTL))) {
@@ -51,12 +64,15 @@ qemuDomainHotpatchQuery(virDomainObj *vm)
         return NULL;
     }
 
+    if (qemuDomainHotpatchCheckPid(pid) < 0)
+        return NULL;
+
     cmd = virCommandNewArgList(binary, "info", "-p", NULL);
-    virCommandAddArgFormat(cmd, "%d", vm->pid);
+    virCommandAddArgFormat(cmd, "%d", pid);
     virCommandSetOutputBuffer(cmd, &output);
 
     VIR_DEBUG("Querying hotpatch for domain %s. (%s info -p %d)",
-              vm->def->name, binary, vm->pid);
+              vm->def->name, binary, pid);
 
     if (virCommandRun(cmd, &ret) < 0)
         goto error;
@@ -80,6 +96,7 @@ qemuDomainHotpatchApply(virDomainObj *vm,
     g_autoptr(virCommand) cmd = NULL;
     g_autofree char *binary = NULL;
     char *output = NULL;
+    pid_t pid = vm->pid;
     int ret = -1;
 
     if (!patch || !virFileExists(patch)) {
@@ -94,13 +111,16 @@ qemuDomainHotpatchApply(virDomainObj *vm,
         return NULL;
     }
 
+    if (qemuDomainHotpatchCheckPid(pid) < 0)
+        return NULL;
+
     cmd = virCommandNewArgList(binary, "patch", "-p", NULL);
-    virCommandAddArgFormat(cmd, "%d", vm->pid);
+    virCommandAddArgFormat(cmd, "%d", pid);
     virCommandAddArgList(cmd, patch, NULL);
     virCommandSetOutputBuffer(cmd, &output);
 
     VIR_DEBUG("Applying hotpatch for domain %s. (%s patch -p %d %s)",
-              vm->def->name, binary, vm->pid, patch);
+              vm->def->name, binary, pid, patch);
 
     if (virCommandRun(cmd, &ret) < 0)
         goto error;
@@ -144,6 +164,7 @@ qemuDomainHotpatchUnapply(virDomainObj *vm,
     g_autoptr(virCommand) cmd = NULL;
     g_autofree char *binary = NULL;
     char *output = NULL;
+    pid_t pid = vm->pid;
     int ret = -1;
 
     if (!id || !qemuDomainHotpatchIsPatchidValid(id)) {
@@ -158,13 +179,16 @@ qemuDomainHotpatchUnapply(virDomainObj *vm,
         return NULL;
     }
 
+    if (qemuDomainHotpatchCheckPid(pid) < 0)
+        return NULL;
+
     cmd = virCommandNewArgList(binary, "unpatch", "-p", NULL);
-    virCommandAddArgFormat(cmd, "%d", vm->pid);
+    virCommandAddArgFormat(cmd, "%d", pid);
     virCommandAddArgList(cmd, "-i", id, NULL);
     virCommandSetOutputBuffer(cmd, &output);
 
     VIR_DEBUG("Unapplying hotpatch for domain %s. (%s unpatch -p %d -i %s)",
-              vm->def->name, binary, vm->pid, id);
+              vm->def->name, binary, pid, id);
 
     if (virCommandRun(cmd, &ret) < 0)
         goto error;
