@@ -53,6 +53,7 @@ permitted = {
     "connectURIProbe": True,
     "localOnly": True,
     "domainQemuAttach": True,
+    "domainHotpatchManage": True,
 }
 
 # XXX this vzDomainMigrateConfirm3Params looks

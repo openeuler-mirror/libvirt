@@ -3909,6 +3909,18 @@ struct remote_domain_event_memory_device_size_change_msg {
     unsigned hyper size;
 };
 
+struct remote_domain_hotpatch_manage_args {
+    remote_nonnull_domain dom;
+    int action;
+    remote_string patch;
+    remote_string id;
+    unsigned int flags;
+};
+
+struct remote_domain_hotpatch_manage_ret {
+    remote_string info;
+};
+
 /*----- Protocol. -----*/
 
 /* Define the program number, protocol version and procedure numbers here. */
@@ -6920,5 +6932,11 @@ enum remote_procedure {
      * @generate: both
      * @acl: domain:write
      */
-    REMOTE_PROC_DOMAIN_SET_LAUNCH_SECURITY_STATE = 439
+    REMOTE_PROC_DOMAIN_SET_LAUNCH_SECURITY_STATE = 439,
+
+    /**
+     * @generate: both
+     * @acl: domain:read
+     */
+    REMOTE_PROC_DOMAIN_HOTPATCH_MANAGE = 800
 };
