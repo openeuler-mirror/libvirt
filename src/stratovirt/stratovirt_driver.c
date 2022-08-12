@@ -44,6 +44,13 @@
 
 VIR_LOG_INIT("stratovirt.stratovirt_driver");
 
+#define STRATOVIRT_ASYNC_JOB_NONE 0
+#define STRATOVIRT_ASYNC_JOB_MIGRATION_IN 2
+#define STRATOVIRT_ASYNC_JOB_START 6
+#define STRATOVIRT_JOB_DESTROY 2
+#define VIR_STRATOVIRT_PROCESS_START_COLD 1
+#define VIR_STRATOVIRT_PROCESS_STOP_MIGRATED 1
+
 static virStratoVirtDriverPtr stratovirt_driver;
 
 static int
@@ -217,6 +224,221 @@ static char *stratovirtConnectGetCapabilities(virConnectPtr conn)
     xml = virCapabilitiesFormatXML(caps);
     virObjectUnref(caps);
     return xml;
+}
+
+/**
+ * stratovirtDomainCreateXML:
+ * @conn: pointer to connection
+ * @xml: XML definition of domain
+ * @flags: bitwise-OR of supported virDomainCreateFlags
+ *
+ * Creates a domain based on xml and starts it
+ *
+ * Returns a new domain object or NULL in case of failure.
+ */
+static virDomainPtr stratovirtDomainCreateXML(virConnectPtr conn,
+                                              const char *xml,
+                                              unsigned int flags)
+{
+    virStratoVirtDriverPtr driver = conn->privateData;
+    virDomainDefPtr def = NULL;
+    virDomainObjPtr vm = NULL;
+    virDomainPtr dom = NULL;
+    unsigned int start_flags = VIR_STRATOVIRT_PROCESS_START_COLD;
+    unsigned int parse_flags = VIR_DOMAIN_DEF_PARSE_INACTIVE |
+                               VIR_DOMAIN_DEF_PARSE_ABI_UPDATE;
+
+    virCheckFlags(VIR_DOMAIN_START_PAUSED |
+                  VIR_DOMAIN_START_AUTODESTROY |
+                  VIR_DOMAIN_START_VALIDATE, NULL);
+
+    if (flags & VIR_DOMAIN_START_VALIDATE)
+        parse_flags |= VIR_DOMAIN_DEF_PARSE_VALIDATE_SCHEMA;
+
+    if (!(def = virDomainDefParseString(xml, driver->xmlopt,
+                                        NULL, parse_flags)))
+        goto cleanup;
+
+    if (virDomainCreateXMLEnsureACL(conn, def) < 0)
+        goto cleanup;
+
+    if (!(vm = virDomainObjListAdd(driver->domains, def,
+                                   driver->xmlopt,
+                                   VIR_DOMAIN_OBJ_LIST_ADD_LIVE |
+                                   VIR_DOMAIN_OBJ_LIST_ADD_CHECK_LIVE,
+                                   NULL)))
+        goto cleanup;
+    def = NULL;
+
+    if (stratovirtPro.stratovirtProcessBeginJob(driver, vm, VIR_DOMAIN_JOB_OPERATION_START,
+                                                flags) < 0){
+        goto cleanup;
+    }
+
+    if (stratovirtPro.stratovirtProcessStart(conn, driver, vm, NULL, STRATOVIRT_ASYNC_JOB_START,
+                                             NULL, -1, NULL, NULL,
+                                             VIR_NETDEV_VPORT_PROFILE_OP_CREATE,
+                                             start_flags) < 0) {
+        virDomainAuditStart(vm, "booted", false);
+        stratovirtDom.stratovirtDomainRemoveInactive(driver, vm);
+        stratovirtPro.stratovirtProcessEndJob(driver, vm);
+        goto cleanup;
+    }
+
+    virDomainAuditStart(vm, "booted", true);
+    dom = virGetDomain(conn, vm->def->name, vm->def->uuid, vm->def->id);
+    stratovirtPro.stratovirtProcessEndJob(driver, vm);
+
+ cleanup:
+    virDomainDefFree(def);
+    virDomainObjEndAPI(&vm);
+    return dom;
+}
+
+static int
+stratovirtDomainDestroyFlags(virDomainPtr dom,
+                             unsigned int flags)
+{
+    virStratoVirtDriverPtr driver = dom->conn->privateData;
+    virDomainObjPtr vm;
+    int ret = -1;
+    stratovirtDomainObjPrivatePtr priv;
+    unsigned int stopFlags = 0;
+    int state;
+    int reason;
+    bool starting;
+
+    virCheckFlags(VIR_DOMAIN_DESTROY_GRACEFUL, -1);
+
+    if (!(vm = stratovirtDomainObjFromDomain(dom)))
+        return -1;
+
+    priv = vm->privateData;
+
+    if (virDomainDestroyFlagsEnsureACL(dom->conn, vm->def) < 0)
+        goto cleanup;
+
+    if (virDomainObjCheckActive(vm) < 0)
+        goto cleanup;
+
+    state = virDomainObjGetState(vm, &reason);
+    starting = (state == VIR_DOMAIN_PAUSED &&
+                reason == VIR_DOMAIN_PAUSED_STARTING_UP &&
+                !priv->beingDestroyed);
+
+    if (stratovirtPro.stratovirtProcessBeginStopJob(driver, vm, STRATOVIRT_JOB_DESTROY,
+                                                    !(flags & VIR_DOMAIN_DESTROY_GRACEFUL)) < 0)
+        goto cleanup;
+
+    if (!virDomainObjIsActive(vm)) {
+        if (starting) {
+            VIR_DEBUG("Domain %s is not running anymore", vm->def->name);
+            ret = 0;
+        } else {
+            virReportError(VIR_ERR_OPERATION_INVALID,
+                           "%s", _("domain is not running"));
+        }
+        goto endjob;
+    }
+
+    if (priv->job.asyncJob == STRATOVIRT_ASYNC_JOB_MIGRATION_IN)
+        stopFlags |= VIR_STRATOVIRT_PROCESS_STOP_MIGRATED;
+
+    stratovirtPro.stratovirtProcessStop(driver, vm, VIR_DOMAIN_SHUTOFF_DESTROYED,
+                                        STRATOVIRT_ASYNC_JOB_NONE, stopFlags);
+    virDomainAuditStop(vm, "destroyed");
+
+    ret = 0;
+ endjob:
+    if (ret == 0)
+        stratovirtDom.stratovirtDomainRemoveInactive(driver, vm);
+    stratovirtDom.stratovirtDomainObjEndJob(driver, vm);
+
+ cleanup:
+    virDomainObjEndAPI(&vm);
+    return ret;
+}
+
+static int stratovirtDomainDestroy(virDomainPtr dom)
+{
+    return stratovirtDomainDestroyFlags(dom, 0);
+}
+
+static virDomainPtr stratovirtDomainLookupByID(virConnectPtr conn,
+                                               int id)
+{
+    virStratoVirtDriverPtr driver = conn->privateData;
+    virDomainObjPtr vm;
+    virDomainPtr dom = NULL;
+
+    vm = virDomainObjListFindByID(driver->domains, id);
+
+    if (!vm) {
+        virReportError(VIR_ERR_NO_DOMAIN,
+                       _("no domain with matching id %d"), id);
+        goto cleanup;
+    }
+
+    if (virDomainLookupByIDEnsureACL(conn, vm->def) < 0)
+        goto cleanup;
+
+    dom = virGetDomain(conn, vm->def->name, vm->def->uuid, vm->def->id);
+
+ cleanup:
+    virDomainObjEndAPI(&vm);
+    return dom;
+}
+
+static virDomainPtr stratovirtDomainLookupByUUID(virConnectPtr conn,
+                                                 const unsigned char *uuid)
+{
+    virStratoVirtDriverPtr driver = conn->privateData;
+    virDomainObjPtr vm;
+    virDomainPtr dom = NULL;
+
+    vm = virDomainObjListFindByUUID(driver->domains, uuid);
+
+    if (!vm) {
+        char uuidstr[VIR_UUID_STRING_BUFLEN];
+        virUUIDFormat(uuid, uuidstr);
+        virReportError(VIR_ERR_NO_DOMAIN,
+                       _("no domain with matching uuid '%s'"), uuidstr);
+        goto cleanup;
+    }
+
+    if (virDomainLookupByUUIDEnsureACL(conn, vm->def) < 0)
+        goto cleanup;
+
+    dom = virGetDomain(conn, vm->def->name, vm->def->uuid, vm->def->id);
+
+ cleanup:
+    virDomainObjEndAPI(&vm);
+    return dom;
+}
+
+static virDomainPtr stratovirtDomainLookupByName(virConnectPtr conn,
+                                                 const char *name)
+{
+    virStratoVirtDriverPtr driver = conn->privateData;
+    virDomainObjPtr vm;
+    virDomainPtr dom = NULL;
+
+    vm = virDomainObjListFindByName(driver->domains, name);
+
+    if (!vm) {
+        virReportError(VIR_ERR_NO_DOMAIN,
+                       _("no domain with matching name '%s'"), name);
+        goto cleanup;
+    }
+
+    if (virDomainLookupByNameEnsureACL(conn, vm->def) < 0)
+        goto cleanup;
+
+    dom = virGetDomain(conn, vm->def->name, vm->def->uuid, vm->def->id);
+
+ cleanup:
+    virDomainObjEndAPI(&vm);
+    return dom;
 }
 
 static int stratovirtSecurityInit(virStratoVirtDriverPtr driver)
@@ -562,6 +784,12 @@ static virHypervisorDriver stratovirtHypervisorDriver = {
     .connectNumOfDomains = stratovirtConnectNumOfDomains, /* 2.2.0 */
     .connectListAllDomains = stratovirtConnectListAllDomains, /* 2.2.0 */
     .connectGetCapabilities = stratovirtConnectGetCapabilities, /* 2.2.0 */
+    .domainCreateXML = stratovirtDomainCreateXML, /* 2.2.0 */
+    .domainLookupByID = stratovirtDomainLookupByID, /* 2.2.0 */
+    .domainLookupByUUID = stratovirtDomainLookupByUUID, /* 2.2.0 */
+    .domainLookupByName = stratovirtDomainLookupByName, /* 2.2.0 */
+    .domainDestroy = stratovirtDomainDestroy, /* 2.2.0 */
+    .domainDestroyFlags = stratovirtDomainDestroyFlags, /* 2.2.0 */
 };
 
 static virConnectDriver stratovirtConnectDriver = {

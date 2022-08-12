@@ -25,8 +25,37 @@
 #include "stratovirt_domain.h"
 #include "qemu_process.h"
 
+typedef qemuDomainAsyncJob stratovirtDomainAsyncJob;
+typedef qemuDomainJob stratovirtDomainJob;
+
 typedef struct StratoVirtProcess {
     void (*stratovirtProcessReconnectAll)(virStratoVirtDriverPtr driver);
+    int (*stratovirtProcessBeginJob)(virStratoVirtDriverPtr driver,
+                                     virDomainObjPtr vm,
+                                     virDomainJobOperation operation,
+                                     unsigned long apiFlags);
+    int (*stratovirtProcessStart)(virConnectPtr conn,
+                                  virStratoVirtDriverPtr driver,
+                                  virDomainObjPtr vm,
+                                  virCPUDefPtr updatedCPU,
+                                  stratovirtDomainAsyncJob asyncJob,
+                                  const char *migrateFrom,
+                                  int migrateFd,
+                                  const char *migratePath,
+                                  virDomainMomentObjPtr snapshot,
+                                  virNetDevVPortProfileOp vmop,
+                                  unsigned int flags);
+    void (*stratovirtProcessEndJob)(virStratoVirtDriverPtr driver,
+                                    virDomainObjPtr vm);
+    int (*stratovirtProcessBeginStopJob)(virStratoVirtDriverPtr driver,
+                                         virDomainObjPtr vm,
+                                         stratovirtDomainJob job,
+                                         bool forcekill);
+    void (*stratovirtProcessStop)(virStratoVirtDriverPtr driver,
+                                  virDomainObjPtr vm,
+                                  virDomainShutoffReason reason,
+                                  stratovirtDomainAsyncJob asyncjob,
+                                  unsigned int flags);
 } virStratoVirtProcess;
 
 extern virStratoVirtProcess stratovirtPro;

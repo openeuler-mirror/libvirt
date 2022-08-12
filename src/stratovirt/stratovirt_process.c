@@ -30,4 +30,9 @@ VIR_LOG_INIT("stratovirt.stratovirt_process");
 
 virStratoVirtProcess stratovirtPro = {
     .stratovirtProcessReconnectAll = qemuProcessReconnectAll,
+    .stratovirtProcessBeginJob = qemuProcessBeginJob,
+    .stratovirtProcessStart = qemuProcessStart,
+    .stratovirtProcessEndJob = qemuProcessEndJob,
+    .stratovirtProcessBeginStopJob = qemuProcessBeginStopJob,
+    .stratovirtProcessStop = qemuProcessStop,
 };

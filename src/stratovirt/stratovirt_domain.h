@@ -58,8 +58,17 @@ struct _stratovirtProcessEvent {
 
 extern virDomainDefParserConfig virStratoVirtDriverDomainDefParserConfig;
 
+typedef qemuDomainObjPrivate stratovirtDomainObjPrivate;
+typedef stratovirtDomainObjPrivate *stratovirtDomainObjPrivatePtr;
+
+virDomainObjPtr stratovirtDomainObjFromDomain(virDomainPtr domain);
+
 typedef struct StratoVirtDomain {
     bool (*stratovirtDomainNamespaceAvailable)(stratovirtDomainNamespace ns G_GNUC_UNUSED);
+    void (*stratovirtDomainRemoveInactive)(virStratoVirtDriverPtr driver,
+                                           virDomainObjPtr vm);
+    void (*stratovirtDomainObjEndJob)(virStratoVirtDriverPtr driver,
+                                      virDomainObjPtr obj);
 } virStratoVirtDomain;
 
 extern virStratoVirtDomain stratovirtDom;

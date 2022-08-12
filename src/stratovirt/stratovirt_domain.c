@@ -138,6 +138,26 @@ void stratovirtProcessEventFree(stratovirtProcessEventPtr event)
     VIR_FREE(event);
 }
 
+virDomainObjPtr stratovirtDomainObjFromDomain(virDomainPtr domain)
+{
+    virDomainObjPtr vm;
+    virStratoVirtDriverPtr driver = domain->conn->privateData;
+    char uuidstr[VIR_UUID_STRING_BUFLEN];
+
+    vm = virDomainObjListFindByUUID(driver->domains, domain->uuid);
+    if (!vm) {
+        virUUIDFormat(domain->uuid, uuidstr);
+        virReportError(VIR_ERR_NO_DOMAIN,
+                       _("no domain with matching uuid '%s' (%s)"),
+                       uuidstr, domain->name);
+        return NULL;
+    }
+
+    return vm;
+}
+
 virStratoVirtDomain stratovirtDom = {
     .stratovirtDomainNamespaceAvailable = qemuDomainNamespaceAvailable,
+    .stratovirtDomainRemoveInactive = qemuDomainRemoveInactive,
+    .stratovirtDomainObjEndJob = qemuDomainObjEndJob,
 };
