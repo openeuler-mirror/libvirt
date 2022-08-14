@@ -77,7 +77,7 @@ virNetSASLContextPtr saslCtxt = NULL;
 virNetServerProgramPtr remoteProgram = NULL;
 virNetServerProgramPtr qemuProgram = NULL;
 
-volatile bool driversInitialized = false;
+volatile gint driversInitialized = 0;
 
 static void daemonErrorHandler(void *opaque G_GNUC_UNUSED,
                                virErrorPtr err G_GNUC_UNUSED)
@@ -469,7 +469,7 @@ static void daemonReloadHandler(virNetDaemonPtr dmn G_GNUC_UNUSED,
 {
     virThread thr;
 
-    if (!driversInitialized) {
+    if (!g_atomic_int_compare_and_exchange(&driversInitialized, 1, 0)) {
         VIR_WARN("Drivers are not initialized, reload ignored");
         return;
     }
@@ -480,6 +480,9 @@ static void daemonReloadHandler(virNetDaemonPtr dmn G_GNUC_UNUSED,
          * Not much we can do on error here except log it.
          */
         VIR_ERROR(_("Failed to create thread to handle daemon restart"));
+        /* Drivers were initialized at the beginning, otherwise we wouldn't
+         * even get here. */
+        g_atomic_int_set(&driversInitialized, 1);
     }
 }
 
@@ -606,7 +609,7 @@ static void daemonRunStateInit(void *opaque)
         goto cleanup;
     }
 
-    driversInitialized = true;
+    g_atomic_int_set(&driversInitialized, 1);
 
 #ifdef WITH_DBUS
     /* Tie the non-privileged daemons to the session/shutdown lifecycle */
@@ -1206,10 +1209,9 @@ int main(int argc, char **argv) {
 
     virNetlinkEventServiceStopAll();
 
-    if (driversInitialized) {
+    if (g_atomic_int_compare_and_exchange(&driversInitialized, 1, 0)) {
         /* NB: Possible issue with timing window between driversInitialized
          * setting if virNetlinkEventServerStart fails */
-        driversInitialized = false;
         virStateCleanup();
     }
 
