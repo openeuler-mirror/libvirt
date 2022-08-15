@@ -1041,6 +1041,14 @@ virQEMUDriverConfigLoadCapsFiltersEntry(virQEMUDriverConfig *cfg,
 }
 
 
+static int
+virQEMUDriverConfigLoadHotpatchPathEntry(virQEMUDriverConfig *cfg,
+                                         virConf *conf)
+{
+    return virConfGetValueString(conf, "hotpatch_path", &cfg->hotpatchPath);
+}
+
+
 int virQEMUDriverConfigLoadFile(virQEMUDriverConfig *cfg,
                                 const char *filename,
                                 bool privileged)
@@ -1110,6 +1118,9 @@ int virQEMUDriverConfigLoadFile(virQEMUDriverConfig *cfg,
         return -1;
 
     if (virQEMUDriverConfigLoadCapsFiltersEntry(cfg, conf) < 0)
+        return -1;
+
+    if (virQEMUDriverConfigLoadHotpatchPathEntry(cfg, conf) < 0)
         return -1;
 
     return 0;

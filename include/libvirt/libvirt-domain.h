@@ -5283,6 +5283,7 @@ typedef enum {
     VIR_DOMAIN_HOTPATCH_APPLY,    /* Apply hotpatch */
     VIR_DOMAIN_HOTPATCH_UNAPPLY,  /* Unapply hotpatch */
     VIR_DOMAIN_HOTPATCH_QUERY,    /* Query hotpatch */
+    VIR_DOMAIN_HOTPATCH_AUTOLOAD, /* Autoload hotpatch */
 
 # ifdef VIR_ENUM_SENTINELS
     VIR_DOMAIN_HOTPATCH_LAST
