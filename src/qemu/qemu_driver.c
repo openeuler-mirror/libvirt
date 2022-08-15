@@ -54,6 +54,7 @@
 #include "qemu_saveimage.h"
 #include "qemu_snapshot.h"
 #include "qemu_validate.h"
+#include "qemu_hotpatch.h"
 
 #include "virerror.h"
 #include "virlog.h"
@@ -20795,6 +20796,54 @@ qemuDomainStartDirtyRateCalc(virDomainPtr dom,
 }
 
 
+static char *
+qemuDomainHotpatchManage(virDomainPtr domain,
+                         int action,
+                         const char *patch,
+                         const char *id,
+                         unsigned int flags)
+{
+    virDomainObj *vm;
+    char *ret = NULL;
+    size_t len;
+
+    virCheckFlags(0, NULL);
+
+    if (!(vm = qemuDomainObjFromDomain(domain)))
+        goto cleanup;
+
+    switch (action) {
+    case VIR_DOMAIN_HOTPATCH_APPLY:
+        ret = qemuDomainHotpatchApply(vm, patch);
+        break;
+
+    case VIR_DOMAIN_HOTPATCH_UNAPPLY:
+        ret = qemuDomainHotpatchUnapply(vm, id);
+        break;
+
+    case VIR_DOMAIN_HOTPATCH_QUERY:
+        ret = qemuDomainHotpatchQuery(vm);
+        break;
+
+    default:
+        virReportError(VIR_ERR_OPERATION_INVALID, "%s",
+                       _("Unknow hotpatch action"));
+    }
+
+    if (!ret)
+        goto cleanup;
+
+    /* Wipeout redundant empty line */
+    len = strlen(ret);
+    if (len > 0)
+        ret[len - 1] = '\0';
+
+ cleanup:
+    virDomainObjEndAPI(&vm);
+    return ret;
+}
+
+
 static virHypervisorDriver qemuHypervisorDriver = {
     .name = QEMU_DRIVER_NAME,
     .connectURIProbe = qemuConnectURIProbe,
@@ -21040,6 +21089,7 @@ static virHypervisorDriver qemuHypervisorDriver = {
     .domainGetMessages = qemuDomainGetMessages, /* 7.1.0 */
     .domainStartDirtyRateCalc = qemuDomainStartDirtyRateCalc, /* 7.2.0 */
     .domainSetLaunchSecurityState = qemuDomainSetLaunchSecurityState, /* 8.0.0 */
+    .domainHotpatchManage = qemuDomainHotpatchManage, /* 8.2.0 */
 };
 
 
