@@ -64,7 +64,7 @@ ip6tables \
 ip6tables \
 -A FJ-vnet0 \
 -p all \
---destination ::10.1.2.3/128 \
+--destination ::ffff:10.1.2.3/128 \
 -m dscp \
 --dscp 33 \
 -m state \
@@ -75,7 +75,7 @@ ip6tables \
 -p all \
 -m mac \
 --mac-source 01:02:03:04:05:06 \
---source ::10.1.2.3/128 \
+--source ::ffff:10.1.2.3/128 \
 -m dscp \
 --dscp 33 \
 -m state \
@@ -84,7 +84,7 @@ ip6tables \
 ip6tables \
 -A HJ-vnet0 \
 -p all \
---destination ::10.1.2.3/128 \
+--destination ::ffff:10.1.2.3/128 \
 -m dscp \
 --dscp 33 \
 -m state \
