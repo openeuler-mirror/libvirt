@@ -8296,6 +8296,8 @@ qemuDomainDiskChangeSupported(virDomainDiskDef *disk,
     CHECK_EQ(cachemode, "cache", true);
     CHECK_EQ(error_policy, "error_policy", true);
     CHECK_EQ(rerror_policy, "rerror_policy", true);
+    CHECK_EQ(retry_interval, "retry_interval", true);
+    CHECK_EQ(retry_timeout, "retry_timeout", true);
     CHECK_EQ(iomode, "io", true);
     CHECK_EQ(ioeventfd, "ioeventfd", true);
     CHECK_EQ(event_idx, "event_idx", true);

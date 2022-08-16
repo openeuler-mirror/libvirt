@@ -2070,6 +2070,16 @@ qemuBuildDriveStr(virDomainDiskDef *disk,
             virBufferAsprintf(&opt, ",werror=%s", wpolicy);
         if (rpolicy)
             virBufferAsprintf(&opt, ",rerror=%s", rpolicy);
+
+        if ((disk->error_policy == VIR_DOMAIN_DISK_ERROR_POLICY_RETRY ||
+             disk->rerror_policy == VIR_DOMAIN_DISK_ERROR_POLICY_RETRY) &&
+            disk->retry_interval >= 0)
+            virBufferAsprintf(&opt, ",retry_interval=%d", disk->retry_interval);
+
+        if ((disk->error_policy == VIR_DOMAIN_DISK_ERROR_POLICY_RETRY ||
+             disk->rerror_policy == VIR_DOMAIN_DISK_ERROR_POLICY_RETRY) &&
+            disk->retry_timeout >= 0)
+            virBufferAsprintf(&opt, ",retry_timeout=%d", disk->retry_timeout);
     }
 
     if (disk->src->readonly)

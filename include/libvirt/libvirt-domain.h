@@ -3806,6 +3806,7 @@ typedef enum {
     VIR_DOMAIN_EVENT_IO_ERROR_NONE = 0,  /* No action, IO error ignored */
     VIR_DOMAIN_EVENT_IO_ERROR_PAUSE,     /* Guest CPUs are paused */
     VIR_DOMAIN_EVENT_IO_ERROR_REPORT,    /* IO error reported to guest OS */
+    VIR_DOMAIN_EVENT_IO_ERROR_RETRY,     /* Failed IO retried */
 
 # ifdef VIR_ENUM_SENTINELS
     VIR_DOMAIN_EVENT_IO_ERROR_LAST
