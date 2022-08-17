@@ -4972,6 +4972,13 @@ virQEMUCapsInitProcessCaps(virQEMUCapsPtr qemuCaps)
         virQEMUCapsGet(qemuCaps, QEMU_CAPS_SAVEVM_MONITOR_NODES))
         virQEMUCapsSet(qemuCaps, QEMU_CAPS_BLOCKDEV);
 
+    /* The 'scsi' passthrough feature of virtio-blk-pci was disabled by default
+     * after QEMU-5.0. So set QEMU_CAPS_VIRTIO_BLK_SCSI_DEFAULT_DISABLED to stop
+     * formatting the 'scsi' property. */
+    if (qemuCaps->version > 5000000) {
+        virQEMUCapsSet(qemuCaps, QEMU_CAPS_VIRTIO_BLK_SCSI_DEFAULT_DISABLED);
+    }
+
     virQEMUCapsInitProcessCapsInterlock(qemuCaps);
 }
 
