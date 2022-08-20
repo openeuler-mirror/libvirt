@@ -22,6 +22,7 @@
 %define with_lxc           0%{!?_without_lxc:1}
 %define with_libxl         0%{!?_without_libxl:1}
 %define with_vbox          0%{!?_without_vbox:1}
+%define with_stratovirt    0%{!?_without_stratovirt:1}
 
 %define with_qemu_tcg      %{with_qemu}
 
@@ -238,6 +239,9 @@ Requires: libvirt-daemon-driver-lxc = %{version}-%{release}
 %endif
 %if %{with_qemu}
 Requires: libvirt-daemon-driver-qemu = %{version}-%{release}
+%endif
+%if %{with_stratovirt}
+Requires: libvirt-daemon-driver-stratovirt = %{version}-%{release}
 %endif
 # We had UML driver, but we've removed it.
 Obsoletes: libvirt-daemon-driver-uml <= 5.0.0
@@ -747,6 +751,19 @@ an implementation of the hypervisor driver APIs using
 QEMU
 %endif
 
+%if %{with_stratovirt}
+%package daemon-driver-stratovirt
+Summary: StratoVirt driver plugin for the libvirtd daemon
+Requires: libvirt-daemon = %{version}-%{release}
+Requires: libvirt-libs = %{version}-%{release}
+Requires: stratovirt
+Requires: systemd-container
+
+%description daemon-driver-stratovirt
+The stratovirt driver plugin for the libvirtd daemon, providing
+an implementation of the hypervisor driver APIs using
+StratoVirt
+%endif
 
 %if %{with_lxc}
 %package daemon-driver-lxc
@@ -1006,6 +1023,12 @@ exit 1
     %define arg_qemu --without-qemu
 %endif
 
+%if %{with_stratovirt}
+    %define arg_stratovirt --with-stratovirt
+%else
+    %define arg_stratovirt --without-stratovirt
+%endif
+
 %if %{with_openvz}
     %define arg_openvz --with-openvz
 %else
@@ -1151,6 +1174,7 @@ cd %{_vpath_builddir}
            %{?arg_lxc} \
            %{?arg_vbox} \
            %{?arg_libxl} \
+           %{?arg_stratovirt} \
            --with-sasl \
            --with-polkit \
            --with-libvirtd \
@@ -1749,6 +1773,11 @@ exit 0
 %dir %attr(0711, root, root) %{_localstatedir}/log/swtpm/libvirt/qemu/
 %{_bindir}/virt-qemu-run
 %{_mandir}/man1/virt-qemu-run.1*
+%endif
+
+%if %{with_stratovirt}
+%files daemon-driver-stratovirt
+%{_libdir}/%{name}/connection-driver/libvirt_driver_stratovirt.so
 %endif
 
 %if %{with_lxc}

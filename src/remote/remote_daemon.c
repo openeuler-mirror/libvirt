@@ -169,6 +169,10 @@ static int daemonInitialize(void)
     if (virDriverLoadModule("qemu", "qemuRegister", false) < 0)
         return -1;
 # endif
+# ifdef WITH_STRATOVIRT
+    if (virDriverLoadModule("stratovirt", "stratovirtRegister", false) < 0)
+        return -1;
+# endif
 # ifdef WITH_LXC
     if (virDriverLoadModule("lxc", "lxcRegister", false) < 0)
         return -1;
