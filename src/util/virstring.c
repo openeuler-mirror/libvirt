@@ -1066,3 +1066,56 @@ virStringParseVersion(unsigned long *version,
 
     return 0;
 }
+
+
+/**
+ * virStringStrvToGSList:
+ * @strings: a NULL-terminated array of strings
+ *
+ * Build linkedlist from @strings
+ */
+GSList *virStringStrvToGSList(char **strings)
+{
+    size_t count = 0;
+    size_t i = 0;
+    GSList *ret = NULL;
+
+    if (!strings)
+        return NULL;
+
+    count = g_strv_length(strings);
+
+    for (i = 0; i < count; i++)
+        ret = g_slist_append(ret, g_strdup(strings[i]));
+
+    return ret;
+}
+
+
+/**
+ * virStringGSListToStrv:
+ * @head: a GSList linkedlist
+ *
+ * Build string array from @head
+ */
+char **virStringGSListToStrv(GSList *head)
+{
+    size_t alloc = 0;
+    size_t index = 0;
+    size_t count = 0;
+    char **ret = NULL;
+    GSList *next = NULL;
+
+    if (head == NULL)
+        return NULL;
+
+    count = g_slist_length(head);
+    VIR_RESIZE_N(ret, alloc, 0, count + 1);
+
+    for (next = head; next; next = next->next) {
+        ret[index] = g_strdup(next->data);
+        index++;
+    }
+
+    return ret;
+}

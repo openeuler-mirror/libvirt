@@ -25,6 +25,7 @@
 #include <fcntl.h>
 #include <poll.h>
 
+#include "domain_job.h"
 #include "qemu_migration.h"
 #include "qemu_migration_cookie.h"
 #include "qemu_migration_params.h"
@@ -1203,6 +1204,11 @@ qemuMigrationSrcNBDStorageCopy(virQEMUDriver *driver,
         if (rv < 0)
             return -1;
 
+        if (!virDomainObjIsActive(vm)) {
+            VIR_ERROR(_("domain is no longer running, migrate will end"));
+            return -1;
+        }
+
         if (priv->job.abortJob) {
             priv->job.current->status = VIR_DOMAIN_JOB_STATUS_CANCELED;
             virReportError(VIR_ERR_OPERATION_ABORTED, _("%s: %s"),
@@ -1719,6 +1725,8 @@ qemuMigrationJobName(virDomainObj *vm)
         return _("start job");
     case VIR_ASYNC_JOB_BACKUP:
         return _("backup job");
+    case VIR_ASYNC_JOB_HOTPATCH:
+        return _("hotpatch job");
     case VIR_ASYNC_JOB_LAST:
     default:
         return _("job");

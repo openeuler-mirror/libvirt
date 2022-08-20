@@ -139,3 +139,7 @@ int virStringParseYesNo(const char *str,
 int virStringParseVersion(unsigned long *version,
                           const char *str,
                           bool allowMissing);
+
+GSList *virStringStrvToGSList(char **strings);
+
+char **virStringGSListToStrv(GSList *head);

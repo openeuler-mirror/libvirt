@@ -32,6 +32,7 @@
 #include <signal.h>
 #include <sys/ioctl.h>
 
+#include "domain_job.h"
 #include "qemu_driver.h"
 #include "qemu_agent.h"
 #include "qemu_alias.h"
@@ -54,6 +55,7 @@
 #include "qemu_saveimage.h"
 #include "qemu_snapshot.h"
 #include "qemu_validate.h"
+#include "qemu_hotpatch.h"
 
 #include "virerror.h"
 #include "virlog.h"
@@ -4451,11 +4453,15 @@ qemuDomainPinVcpuLive(virDomainObj *vm,
         goto cleanup;
 
     event = virDomainEventTunableNewFromObj(vm, eventParams, eventNparams);
+    eventParams = NULL;
+    eventNparams = 0;
 
     ret = 0;
 
  cleanup:
     virObjectEventStateQueue(driver->domainEventState, event);
+    if (eventParams)
+        virTypedParamsFree(eventParams, eventNparams);
     return ret;
 }
 
@@ -4660,6 +4666,8 @@ qemuDomainPinEmulator(virDomainPtr dom,
             goto endjob;
 
         event = virDomainEventTunableNewFromDom(dom, eventParams, eventNparams);
+        eventParams = NULL;
+        eventNparams = 0;
     }
 
     if (persistentDef) {
@@ -4676,6 +4684,8 @@ qemuDomainPinEmulator(virDomainPtr dom,
     qemuDomainObjEndJob(vm);
 
  cleanup:
+    if (eventParams)
+        virTypedParamsFree(eventParams, eventNparams);
     virObjectEventStateQueue(driver->domainEventState, event);
     virDomainObjEndAPI(&vm);
     return ret;
@@ -5061,6 +5071,8 @@ qemuDomainPinIOThread(virDomainPtr dom,
             goto endjob;
 
         event = virDomainEventTunableNewFromDom(dom, eventParams, eventNparams);
+        eventParams = NULL;
+        eventNparams = 0;
     }
 
     if (persistentDef) {
@@ -5086,6 +5098,8 @@ qemuDomainPinIOThread(virDomainPtr dom,
     qemuDomainObjEndJob(vm);
 
  cleanup:
+    if (eventParams)
+        virTypedParamsFree(eventParams, eventNparams);
     virObjectEventStateQueue(driver->domainEventState, event);
     virDomainObjEndAPI(&vm);
     return ret;
@@ -12739,6 +12753,9 @@ static int qemuDomainAbortJob(virDomainPtr dom)
     case VIR_ASYNC_JOB_BACKUP:
         qemuBackupJobCancelBlockjobs(vm, priv->backup, true, VIR_ASYNC_JOB_NONE);
         ret = 0;
+        break;
+
+    case VIR_ASYNC_JOB_HOTPATCH:
         break;
 
     case VIR_ASYNC_JOB_LAST:
@@ -20783,6 +20800,72 @@ qemuDomainStartDirtyRateCalc(virDomainPtr dom,
 }
 
 
+static char *
+qemuDomainHotpatchManage(virDomainPtr domain,
+                         int action,
+                         const char *patch,
+                         const char *id,
+                         unsigned int flags)
+{
+    virDomainObj *vm;
+    virQEMUDriver *driver = domain->conn->privateData;
+    char *ret = NULL;
+    size_t len;
+    g_autoptr(virQEMUDriverConfig) cfg = virQEMUDriverGetConfig(driver);
+
+    virCheckFlags(0, NULL);
+
+    if (!(vm = qemuDomainObjFromDomain(domain)))
+        goto cleanup;
+
+    if (qemuDomainObjBeginAsyncJob(driver, vm, VIR_ASYNC_JOB_HOTPATCH,
+                                   VIR_DOMAIN_JOB_OPERATION_HOTPATCH, 0) < 0)
+        goto cleanup;
+
+    if (virDomainObjCheckActive(vm) < 0)
+        goto endjob;
+
+    qemuDomainObjSetAsyncJobMask(vm, VIR_JOB_DEFAULT_MASK);
+
+    switch (action) {
+    case VIR_DOMAIN_HOTPATCH_APPLY:
+        ret = qemuDomainHotpatchApply(vm, patch);
+        break;
+
+    case VIR_DOMAIN_HOTPATCH_UNAPPLY:
+        ret = qemuDomainHotpatchUnapply(vm, id);
+        break;
+
+    case VIR_DOMAIN_HOTPATCH_QUERY:
+        ret = qemuDomainHotpatchQuery(vm);
+        break;
+
+    case VIR_DOMAIN_HOTPATCH_AUTOLOAD:
+        ret = qemuDomainHotpatchAutoload(vm, cfg->hotpatchPath);
+        break;
+
+    default:
+        virReportError(VIR_ERR_OPERATION_INVALID, "%s",
+                       _("Unknow hotpatch action"));
+    }
+
+    if (!ret)
+        goto endjob;
+
+    /* Wipeout redundant empty line */
+    len = strlen(ret);
+    if (len > 0)
+        ret[len - 1] = '\0';
+
+ endjob:
+    qemuDomainObjEndAsyncJob(vm);
+
+ cleanup:
+    virDomainObjEndAPI(&vm);
+    return ret;
+}
+
+
 static virHypervisorDriver qemuHypervisorDriver = {
     .name = QEMU_DRIVER_NAME,
     .connectURIProbe = qemuConnectURIProbe,
@@ -21028,6 +21111,7 @@ static virHypervisorDriver qemuHypervisorDriver = {
     .domainGetMessages = qemuDomainGetMessages, /* 7.1.0 */
     .domainStartDirtyRateCalc = qemuDomainStartDirtyRateCalc, /* 7.2.0 */
     .domainSetLaunchSecurityState = qemuDomainSetLaunchSecurityState, /* 8.0.0 */
+    .domainHotpatchManage = qemuDomainHotpatchManage, /* 8.2.0 */
 };
 
 

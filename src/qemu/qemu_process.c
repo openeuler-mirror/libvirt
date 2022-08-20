@@ -61,6 +61,7 @@
 #include "qemu_backup.h"
 #include "qemu_dbus.h"
 #include "qemu_snapshot.h"
+#include "qemu_hotpatch.h"
 
 #include "cpu/cpu.h"
 #include "cpu/cpu_x86.h"
@@ -3673,6 +3674,7 @@ qemuProcessRecoverJob(virQEMUDriver *driver,
         priv->job.current->started = now;
         break;
 
+    case VIR_ASYNC_JOB_HOTPATCH:
     case VIR_ASYNC_JOB_NONE:
     case VIR_ASYNC_JOB_LAST:
         break;
@@ -7374,6 +7376,7 @@ qemuProcessLaunch(virConnectPtr conn,
     g_autoptr(virQEMUDriverConfig) cfg = NULL;
     size_t nnicindexes = 0;
     g_autofree int *nicindexes = NULL;
+    g_autofree char *autoLoadStatus = NULL;
     unsigned long long maxMemLock = 0;
 
     VIR_DEBUG("conn=%p driver=%p vm=%p name=%s if=%d asyncJob=%d "
@@ -7699,6 +7702,10 @@ qemuProcessLaunch(virConnectPtr conn,
     VIR_DEBUG("Setting handling of lifecycle actions");
     if (qemuProcessSetupLifecycleActions(vm, asyncJob) < 0)
         goto cleanup;
+
+    /* Autoload hotpatch */
+    if ((autoLoadStatus = qemuDomainHotpatchAutoload(vm, cfg->hotpatchPath)) == NULL)
+        VIR_WARN("Failed to autoload the hotpatch for %s.", vm->def->name);
 
     ret = 0;
 

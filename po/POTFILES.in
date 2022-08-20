@@ -167,6 +167,7 @@
 @SRCDIR@src/qemu/qemu_fd.c
 @SRCDIR@src/qemu/qemu_firmware.c
 @SRCDIR@src/qemu/qemu_hostdev.c
+@SRCDIR@src/qemu/qemu_hotpatch.c
 @SRCDIR@src/qemu/qemu_hotplug.c
 @SRCDIR@src/qemu/qemu_interface.c
 @SRCDIR@src/qemu/qemu_interop_config.c

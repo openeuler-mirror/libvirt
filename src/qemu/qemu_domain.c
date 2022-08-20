@@ -3931,6 +3931,10 @@ qemuDomainDefAddDefaultDevices(virQEMUDriver *driver,
             addPCIRoot = true;
         break;
 
+    case VIR_ARCH_SW_64:
+        addPCIeRoot = true;
+        break;
+
     case VIR_ARCH_ARMV7B:
     case VIR_ARCH_CRIS:
     case VIR_ARCH_ITANIUM:
@@ -8296,6 +8300,8 @@ qemuDomainDiskChangeSupported(virDomainDiskDef *disk,
     CHECK_EQ(cachemode, "cache", true);
     CHECK_EQ(error_policy, "error_policy", true);
     CHECK_EQ(rerror_policy, "rerror_policy", true);
+    CHECK_EQ(retry_interval, "retry_interval", true);
+    CHECK_EQ(retry_timeout, "retry_timeout", true);
     CHECK_EQ(iomode, "io", true);
     CHECK_EQ(ioeventfd, "ioeventfd", true);
     CHECK_EQ(event_idx, "event_idx", true);
@@ -8914,6 +8920,7 @@ qemuDomainMachineHasBuiltinIDE(const char *machine,
     return qemuDomainMachineIsI440FX(machine, arch) ||
         STREQ(machine, "malta") ||
         STREQ(machine, "sun4u") ||
+        STREQ(machine, "core3") ||
         STREQ(machine, "g3beige");
 }
 

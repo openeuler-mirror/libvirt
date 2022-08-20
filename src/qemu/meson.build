@@ -19,6 +19,7 @@ qemu_driver_sources = [
   'qemu_firmware.c',
   'qemu_hostdev.c',
   'qemu_hotplug.c',
+  'qemu_hotpatch.c',
   'qemu_interface.c',
   'qemu_interop_config.c',
   'qemu_migration.c',

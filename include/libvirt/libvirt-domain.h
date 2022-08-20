@@ -3391,6 +3391,7 @@ typedef enum {
     VIR_DOMAIN_JOB_OPERATION_SNAPSHOT_REVERT = 7,
     VIR_DOMAIN_JOB_OPERATION_DUMP = 8,
     VIR_DOMAIN_JOB_OPERATION_BACKUP = 9,
+    VIR_DOMAIN_JOB_OPERATION_HOTPATCH = 10,
 
 # ifdef VIR_ENUM_SENTINELS
     VIR_DOMAIN_JOB_OPERATION_LAST
@@ -3806,6 +3807,7 @@ typedef enum {
     VIR_DOMAIN_EVENT_IO_ERROR_NONE = 0,  /* No action, IO error ignored */
     VIR_DOMAIN_EVENT_IO_ERROR_PAUSE,     /* Guest CPUs are paused */
     VIR_DOMAIN_EVENT_IO_ERROR_REPORT,    /* IO error reported to guest OS */
+    VIR_DOMAIN_EVENT_IO_ERROR_RETRY,     /* Failed IO retried */
 
 # ifdef VIR_ENUM_SENTINELS
     VIR_DOMAIN_EVENT_IO_ERROR_LAST
@@ -5275,5 +5277,23 @@ typedef enum {
 int virDomainStartDirtyRateCalc(virDomainPtr domain,
                                 int seconds,
                                 unsigned int flags);
+
+typedef enum {
+    VIR_DOMAIN_HOTPATCH_NONE = 0, /* No action */
+    VIR_DOMAIN_HOTPATCH_APPLY,    /* Apply hotpatch */
+    VIR_DOMAIN_HOTPATCH_UNAPPLY,  /* Unapply hotpatch */
+    VIR_DOMAIN_HOTPATCH_QUERY,    /* Query hotpatch */
+    VIR_DOMAIN_HOTPATCH_AUTOLOAD, /* Autoload hotpatch */
+
+# ifdef VIR_ENUM_SENTINELS
+    VIR_DOMAIN_HOTPATCH_LAST
+# endif
+} virDomainHotpatchAction;
+
+char *virDomainHotpatchManage(virDomainPtr domain,
+                              int action,
+                              const char *patch,
+                              const char *id,
+                              unsigned int flags);
 
 #endif /* LIBVIRT_DOMAIN_H */

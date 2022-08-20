@@ -1425,6 +1425,13 @@ typedef int
                                   int seconds,
                                   unsigned int flags);
 
+typedef char *
+(*virDrvDomainHotpatchManage)(virDomainPtr domain,
+                              int action,
+                              const char *patch,
+                              const char *id,
+                              unsigned int flags);
+
 typedef struct _virHypervisorDriver virHypervisorDriver;
 
 /**
@@ -1693,4 +1700,5 @@ struct _virHypervisorDriver {
     virDrvDomainAuthorizedSSHKeysSet domainAuthorizedSSHKeysSet;
     virDrvDomainGetMessages domainGetMessages;
     virDrvDomainStartDirtyRateCalc domainStartDirtyRateCalc;
+    virDrvDomainHotpatchManage domainHotpatchManage;
 };

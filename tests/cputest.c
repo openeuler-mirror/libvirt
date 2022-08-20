@@ -1025,6 +1025,12 @@ mymain(void)
     DO_TEST_COMPARE(VIR_ARCH_PPC64, "host", "guest-compat-bad", VIR_CPU_COMPARE_ERROR);
     DO_TEST_COMPARE(VIR_ARCH_PPC64, "host", "guest-compat-incompatible", VIR_CPU_COMPARE_INCOMPATIBLE);
 
+    DO_TEST_COMPARE(VIR_ARCH_AARCH64, "host", "guest-strict", VIR_CPU_COMPARE_IDENTICAL);
+    DO_TEST_COMPARE(VIR_ARCH_AARCH64, "host", "guest-legacy", VIR_CPU_COMPARE_IDENTICAL);
+    DO_TEST_COMPARE(VIR_ARCH_AARCH64, "host", "guest-compat-none", VIR_CPU_COMPARE_IDENTICAL);
+    DO_TEST_COMPARE(VIR_ARCH_AARCH64, "host", "guest-compat-valid", VIR_CPU_COMPARE_IDENTICAL);
+    DO_TEST_COMPARE(VIR_ARCH_AARCH64, "host", "guest-features-valid", VIR_CPU_COMPARE_IDENTICAL);
+
     /* guest updates for migration
      * automatically compares host CPU with the result */
     DO_TEST_UPDATE(VIR_ARCH_X86_64, "host", "min", VIR_CPU_COMPARE_IDENTICAL);
@@ -1068,6 +1074,13 @@ mymain(void)
     DO_TEST_BASELINE(VIR_ARCH_PPC64, "incompatible-models", 0, -1);
     DO_TEST_BASELINE(VIR_ARCH_PPC64, "same-model", 0, 0);
     DO_TEST_BASELINE(VIR_ARCH_PPC64, "legacy", 0, -1);
+
+    DO_TEST_BASELINE(VIR_ARCH_AARCH64, "incompatible-vendors", 0, -1);
+    DO_TEST_BASELINE(VIR_ARCH_AARCH64, "no-vendor", 0, 0);
+    DO_TEST_BASELINE(VIR_ARCH_AARCH64, "no-feature", 0, 0);
+    DO_TEST_BASELINE(VIR_ARCH_AARCH64, "one-feature", 0, 0);
+    DO_TEST_BASELINE(VIR_ARCH_AARCH64, "no-compatible-feature", 0, 0);
+    DO_TEST_BASELINE(VIR_ARCH_AARCH64, "one-compatible-feature", 0, 0);
 
     /* CPU features */
     DO_TEST_HASFEATURE(VIR_ARCH_X86_64, "host", "vmx", YES);

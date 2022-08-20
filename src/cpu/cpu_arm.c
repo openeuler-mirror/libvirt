@@ -345,7 +345,6 @@ virCPUarmModelFind(virCPUarmMap *map,
     return NULL;
 }
 
-#if defined(__aarch64__)
 static virCPUarmModel *
 virCPUarmModelFindByPVR(virCPUarmMap *map,
                         unsigned long pvr)
@@ -359,7 +358,6 @@ virCPUarmModelFindByPVR(virCPUarmMap *map,
 
     return NULL;
 }
-#endif
 
 static int
 virCPUarmModelParse(xmlXPathContextPtr ctxt,
@@ -481,26 +479,6 @@ virCPUarmUpdate(virCPUDef *guest,
     guest->match = VIR_CPU_MATCH_EXACT;
 
     return 0;
-}
-
-
-static virCPUDef *
-virCPUarmBaseline(virCPUDef **cpus,
-                  unsigned int ncpus G_GNUC_UNUSED,
-                  virDomainCapsCPUModels *models G_GNUC_UNUSED,
-                  const char **features G_GNUC_UNUSED,
-                  bool migratable G_GNUC_UNUSED)
-{
-    virCPUDef *cpu = NULL;
-
-    cpu = virCPUDefNew();
-
-    cpu->model = g_strdup(cpus[0]->model);
-
-    cpu->type = VIR_CPU_TYPE_GUEST;
-    cpu->match = VIR_CPU_MATCH_EXACT;
-
-    return cpu;
 }
 
 static virCPUCompareResult
@@ -631,6 +609,7 @@ virCPUarmCpuDataFromRegs(virCPUarmData *data)
 
     return 0;
 }
+#endif
 
 static int
 virCPUarmDecode(virCPUDef *cpu,
@@ -685,6 +664,7 @@ virCPUarmDecode(virCPUDef *cpu,
     return 0;
 }
 
+#if defined(__aarch64__) && (defined(WITH_GETAUXVAL) || defined(WITH_ELF_AUX_INFO))
 static int
 virCPUarmGetHost(virCPUDef *cpu,
                  virDomainCapsCPUModels *models)
@@ -703,6 +683,192 @@ virCPUarmGetHost(virCPUDef *cpu,
     return virCPUarmDecode(cpu, &cpuData->data.arm, models);
 }
 #endif
+
+static void
+virCPUarmDataIntersect(virCPUarmData *data1,
+                       const virCPUarmData *data2)
+{
+    GSList *features = NULL;
+    GSList *next = NULL;
+    GSList *tmp = NULL;
+    size_t count1 = 0;
+    size_t count2 = 0;
+
+    if (!data1 || !data2)
+        return;
+
+    data1->pvr = MIN(data1->pvr, data2->pvr);
+
+    if (data1->features == NULL || data2->features == NULL) {
+        VIR_FREE(data1->features);
+        return;
+    }
+
+    if (!(count1 = g_strv_length(data1->features)) ||
+        !(count2 = g_strv_length(data2->features))) {
+        VIR_FREE(data1->features);
+        return;
+    }
+
+    features = virStringStrvToGSList(data1->features);
+    for (next = features; next;) {
+        tmp = next;
+        next = next->next;
+        if (!g_strv_contains((const char**)data2->features, tmp->data))
+            features = g_slist_delete_link(features, tmp);
+    }
+
+    VIR_FREE(data1->features);
+    if (features)
+        data1->features = virStringGSListToStrv(features);
+
+    g_slist_free(features);
+    return;
+}
+
+static void
+virCPUarmDataCopy(virCPUarmData *dst, const virCPUarmData *src)
+{
+    dst->features = g_strdupv(src->features);
+    dst->vendor_id = src->vendor_id;
+    dst->pvr = src->pvr;
+}
+
+static virCPUarmModel *
+virCPUarmModelCopy(virCPUarmModel *model)
+{
+    g_autoptr(virCPUarmModel) copy = NULL;
+
+    copy = g_new0(virCPUarmModel, 1);
+
+    virCPUarmDataCopy(&copy->data, &model->data);
+    copy->name = g_strdup(model->name);
+    copy->vendor = model->vendor;
+
+    return g_steal_pointer(&copy);
+}
+
+static virCPUarmModel *
+virCPUarmModelFromCPU(const virCPUDef *cpu,
+                      virCPUarmMap *map)
+{
+    g_autoptr(virCPUarmModel) model = NULL;
+    virCPUarmVendor *vendor = NULL;
+    char **features = NULL;
+    size_t i;
+
+    if (!cpu->model) {
+        virReportError(VIR_ERR_INVALID_ARG, "%s",
+                       _("no CPU model specified"));
+        return NULL;
+    }
+
+    if (!(model = virCPUarmModelFind(map, cpu->model))) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Unknown CPU model %s"), cpu->model);
+        return NULL;
+    }
+
+    if (!(model = virCPUarmModelCopy(model)))
+        return NULL;
+
+    if (cpu->vendor) {
+        if (!(vendor = virCPUarmVendorFindByName(map, cpu->vendor))) {
+            virReportError(VIR_ERR_INTERNAL_ERROR,
+                           _("Unknown CPU vendor %s"), cpu->vendor);
+            return NULL;
+        }
+        model->data.vendor_id = vendor->value;
+    }
+
+    if (cpu->nfeatures) {
+        VIR_REALLOC_N(features, cpu->nfeatures + 1);
+
+        features[cpu->nfeatures] = NULL;
+        for (i = 0; i < cpu->nfeatures; i++)
+            features[i] = g_strdup(cpu->features[i].name);
+        VIR_FREE(model->data.features);
+        model->data.features = g_strdupv(features);
+    }
+
+    g_strfreev(features);
+    return g_steal_pointer(&model);
+}
+
+static virCPUDef *
+virCPUarmBaseline(virCPUDef **cpus,
+                  unsigned int ncpus,
+                  virDomainCapsCPUModels *models,
+                  const char **features G_GNUC_UNUSED,
+                  bool migratable G_GNUC_UNUSED)
+{
+    virCPUarmMap *map = NULL;
+    g_autoptr(virCPUDef) cpu = NULL;
+    g_autoptr(virCPUarmModel) model = NULL;
+    g_autoptr(virCPUarmModel) baseModel = NULL;
+    virCPUarmVendor *vendor = NULL;
+    bool outputVendor = true;
+    size_t i;
+
+    cpu = virCPUDefNew();
+
+    cpu->model = g_strdup(cpus[0]->model);
+
+    cpu->arch = cpus[0]->arch;
+    cpu->type = VIR_CPU_TYPE_GUEST;
+    cpu->match = VIR_CPU_MATCH_EXACT;
+    cpu->fallback = VIR_CPU_FALLBACK_FORBID;
+
+    if (!(map = virCPUarmGetMap()))
+        return NULL;
+
+    if (!(baseModel = virCPUarmModelFromCPU(cpus[0], map)))
+        return NULL;
+
+    if (!cpus[0]->vendor) {
+        outputVendor = false;
+    } else if (!(vendor = virCPUarmVendorFindByName(map, cpus[0]->vendor))) {
+        virReportError(VIR_ERR_OPERATION_FAILED,
+                       _("Unknown CPU vendor %s"), cpus[0]->vendor);
+        return NULL;
+    }
+
+    for (i = 0; i < ncpus; i++) {
+        const char *vn = NULL;
+        if (!(model = virCPUarmModelFromCPU(cpus[i], map)))
+            return NULL;
+
+        if (cpus[i]->vendor) {
+            vn = cpus[i]->vendor;
+        } else {
+            outputVendor = false;
+        }
+
+        if (vn) {
+            if (!vendor) {
+                if (!(vendor = virCPUarmVendorFindByName(map, vn))) {
+                    virReportError(VIR_ERR_OPERATION_FAILED,
+                                   _("Unknown CPU vendor %s"), vn);
+                    return NULL;
+                }
+            } else if (STRNEQ(vendor->name, vn)) {
+                virReportError(VIR_ERR_OPERATION_FAILED,
+                               "%s", _("CPU vendors do not match"));
+                return NULL;
+            }
+
+            virCPUarmDataIntersect(&baseModel->data, &model->data);
+        }
+    }
+
+    if (virCPUarmDecode(cpu, &baseModel->data, models) < 0)
+        return NULL;
+
+    if (!outputVendor)
+        g_free(cpu->vendor);
+
+    return g_steal_pointer(&cpu);
+}
 
 
 struct cpuArchDriver cpuDriverArm = {

@@ -2070,6 +2070,16 @@ qemuBuildDriveStr(virDomainDiskDef *disk,
             virBufferAsprintf(&opt, ",werror=%s", wpolicy);
         if (rpolicy)
             virBufferAsprintf(&opt, ",rerror=%s", rpolicy);
+
+        if ((disk->error_policy == VIR_DOMAIN_DISK_ERROR_POLICY_RETRY ||
+             disk->rerror_policy == VIR_DOMAIN_DISK_ERROR_POLICY_RETRY) &&
+            disk->retry_interval >= 0)
+            virBufferAsprintf(&opt, ",retry_interval=%d", disk->retry_interval);
+
+        if ((disk->error_policy == VIR_DOMAIN_DISK_ERROR_POLICY_RETRY ||
+             disk->rerror_policy == VIR_DOMAIN_DISK_ERROR_POLICY_RETRY) &&
+            disk->retry_timeout >= 0)
+            virBufferAsprintf(&opt, ",retry_timeout=%d", disk->retry_timeout);
     }
 
     if (disk->src->readonly)
@@ -6564,7 +6574,7 @@ qemuBuildCpuModelArgStr(virQEMUDriver *driver,
         break;
     }
 
-    if ((ARCH_IS_S390(def->os.arch) || ARCH_IS_ARM(def->os.arch)) &&
+    if (ARCH_IS_S390(def->os.arch) &&
         cpu->features &&
         !virQEMUCapsGet(qemuCaps, QEMU_CAPS_QUERY_CPU_MODEL_EXPANSION)) {
         virReportError(VIR_ERR_INTERNAL_ERROR,

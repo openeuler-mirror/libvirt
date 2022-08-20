@@ -783,6 +783,8 @@ virArch virQEMUCapsArchFromString(const char *arch)
         return VIR_ARCH_ARMV7L;
     if (STREQ(arch, "or32"))
         return VIR_ARCH_OR32;
+    if (STREQ(arch, "sw64"))
+        return VIR_ARCH_SW_64;
 
     return virArchFromString(arch);
 }
@@ -796,6 +798,8 @@ const char *virQEMUCapsArchToString(virArch arch)
         return "arm";
     if (arch == VIR_ARCH_OR32)
         return "or32";
+    if (arch == VIR_ARCH_SW_64)
+        return "sw64";
 
     return virArchToString(arch);
 }
@@ -2128,6 +2132,11 @@ bool virQEMUCapsHasPCIMultiBus(const virDomainDef *def)
     if (ARCH_IS_X86(def->os.arch))
         return true;
 
+    /* sw_64 support PCI-multibus on all machine types
+     * since forever */
+    if (ARCH_IS_SW64(def->os.arch))
+        return true;
+
     /* PPC supports multibus on all machine types which have pci since qemu-2.0.0 */
     if (def->os.arch == VIR_ARCH_PPC ||
         ARCH_IS_PPC64(def->os.arch)) {
@@ -2773,6 +2782,8 @@ static const char *preferredMachines[] =
 
     "sim", /* VIR_ARCH_XTENSA */
     "sim", /* VIR_ARCH_XTENSAEB */
+
+    "core3", /* VIR_ARCH_SW_64 */
 };
 G_STATIC_ASSERT(G_N_ELEMENTS(preferredMachines) == VIR_ARCH_LAST);
 
@@ -5195,6 +5206,10 @@ virQEMUCapsInitQMPBasicArch(virQEMUCaps *qemuCaps)
         virQEMUCapsSet(qemuCaps, QEMU_CAPS_AES_KEY_WRAP);
         virQEMUCapsSet(qemuCaps, QEMU_CAPS_DEA_KEY_WRAP);
         virQEMUCapsSet(qemuCaps, QEMU_CAPS_LOADPARM);
+        break;
+
+    case VIR_ARCH_SW_64:
+        virQEMUCapsSet(qemuCaps, QEMU_CAPS_NO_ACPI);
         break;
 
     case VIR_ARCH_ALPHA:
