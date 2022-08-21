@@ -668,6 +668,9 @@ const char *virQEMUCapsGetMachineDefaultCPU(virQEMUCapsPtr qemuCaps,
 bool virQEMUCapsGetMachineNumaMemSupported(virQEMUCapsPtr qemuCaps,
                                            virDomainVirtType virtType,
                                            const char *name);
+const char *virQEMUCapsGetMachineDefaultRAMid(virQEMUCapsPtr qemuCaps,
+                                              virDomainVirtType virtType,
+                                              const char *name);
 
 void virQEMUCapsFilterByMachineType(virQEMUCapsPtr qemuCaps,
                                     virDomainVirtType virtType,

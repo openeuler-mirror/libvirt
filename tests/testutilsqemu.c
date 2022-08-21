@@ -100,6 +100,17 @@ static const char *const *kvm_machines[VIR_ARCH_LAST] = {
 };
 
 
+static const char *qemu_default_ram_id[VIR_ARCH_LAST] = {
+    [VIR_ARCH_I686] = "pc.ram",
+    [VIR_ARCH_X86_64] = "pc.ram",
+    [VIR_ARCH_AARCH64] = "mach-virt.ram",
+    [VIR_ARCH_ARMV7L] = "vexpress.highmem",
+    [VIR_ARCH_PPC64] = "ppc_spapr.ram",
+    [VIR_ARCH_PPC] = "ppc_spapr.ram",
+    [VIR_ARCH_S390X] = "s390.ram"
+};
+
+
 char *
 virFindFileInPath(const char *file)
 {
@@ -335,7 +346,16 @@ int qemuTestCapsCacheInsert(virFileCachePtr cache,
         }
 
         if (!virQEMUCapsHasMachines(tmpCaps)) {
+            const char *defaultRAMid = NULL;
+
+            /* default-ram-id appeared in QEMU 5.2.0. Reflect
+             * this in our capabilities, i.e. set it for new
+             * enough versions only. */
+            if (virQEMUCapsGetVersion(tmpCaps) >= 5002000)
+                defaultRAMid = qemu_default_ram_id[i];
+
             virQEMUCapsSetArch(tmpCaps, i);
+
             for (j = 0; qemu_machines[i][j] != NULL; j++) {
                 virQEMUCapsAddMachine(tmpCaps,
                                       VIR_DOMAIN_VIRT_QEMU,
@@ -345,7 +365,8 @@ int qemuTestCapsCacheInsert(virFileCachePtr cache,
                                       0,
                                       false,
                                       false,
-                                      true);
+                                      true,
+                                      defaultRAMid);
             }
             for (j = 0; kvm_machines[i][j] != NULL; j++) {
                 virQEMUCapsAddMachine(tmpCaps,
@@ -356,7 +377,8 @@ int qemuTestCapsCacheInsert(virFileCachePtr cache,
                                       0,
                                       false,
                                       false,
-                                      true);
+                                      true,
+                                      defaultRAMid);
                 virQEMUCapsSet(tmpCaps, QEMU_CAPS_KVM);
             }
         }
