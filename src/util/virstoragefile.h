@@ -262,9 +262,6 @@ struct _virStorageSourceSlice {
 };
 
 
-typedef struct _virStorageDriverData virStorageDriverData;
-typedef virStorageDriverData *virStorageDriverDataPtr;
-
 typedef struct _virStorageSource virStorageSource;
 typedef virStorageSource *virStorageSourcePtr;
 
@@ -338,7 +335,7 @@ struct _virStorageSource {
     virStorageSourcePtr externalDataStore;
 
     /* metadata for storage driver access to remote and local volumes */
-    virStorageDriverDataPtr drv;
+    void *drv;
 
     /* metadata about storage image which need separate fields */
     /* Relative name by which this image was opened from its parent, or NULL
