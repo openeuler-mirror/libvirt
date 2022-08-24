@@ -997,7 +997,8 @@ mymain(void)
             QEMU_CAPS_ICH9_AHCI,
             QEMU_CAPS_MACHINE_SMM_OPT,
             QEMU_CAPS_VIRTIO_SCSI);
-
+    DO_TEST_CAPS_LATEST("bios-nvram-template");
+    
     /* Make sure all combinations of ACPI and UEFI behave as expected */
     DO_TEST("q35-acpi-uefi", NONE);
     DO_TEST_PARSE_ERROR("q35-noacpi-uefi", NONE);
