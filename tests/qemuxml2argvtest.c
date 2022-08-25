@@ -990,6 +990,7 @@ mymain(void)
             QEMU_CAPS_DEVICE_ISA_SERIAL,
             QEMU_CAPS_SGA);
     DO_TEST("bios-nvram", NONE);
+    DO_TEST_PARSE_ERROR("bios-nvram-no-path", NONE);
     DO_TEST("bios-nvram-secure",
             QEMU_CAPS_DEVICE_DMI_TO_PCI_BRIDGE,
             QEMU_CAPS_DEVICE_PCI_BRIDGE,
