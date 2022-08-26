@@ -177,6 +177,7 @@
 @SRCDIR@/src/stratovirt/stratovirt_conf.c
 @SRCDIR@/src/stratovirt/stratovirt_domain.c
 @SRCDIR@/src/stratovirt/stratovirt_process.c
+@SRCDIR@/src/stratovirt/stratovirt_monitor.c
 @SRCDIR@/src/remote/remote_daemon.c
 @SRCDIR@/src/remote/remote_daemon_config.c
 @SRCDIR@/src/remote/remote_daemon_dispatch.c

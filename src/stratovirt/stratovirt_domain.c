@@ -173,4 +173,8 @@ virStratoVirtDomain stratovirtDom = {
     .stratovirtDomainRemoveInactive = qemuDomainRemoveInactive,
     .stratovirtDomainObjEndJob = qemuDomainObjEndJob,
     .stratovirtDomainObjBeginJob = qemuDomainObjBeginJob,
+    .stratovirtDomainObjEnterMonitor = qemuDomainObjEnterMonitor,
+    .stratovirtDomainObjExitMonitor = qemuDomainObjExitMonitor,
+    .stratovirtDomainSnapshotDiscardAllMetadata = qemuDomainSnapshotDiscardAllMetadata,
+    .stratovirtDomainCheckpointDiscardAllMetadata = qemuCheckpointDiscardAllMetadata,
 };

@@ -74,6 +74,14 @@ typedef struct StratoVirtDomain {
     int (*stratovirtDomainObjBeginJob)(virStratoVirtDriverPtr driver,
                                        virDomainObjPtr obj,
                                        stratovirtDomainJob job);
+    void (*stratovirtDomainObjEnterMonitor)(virStratoVirtDriverPtr driver,
+                                            virDomainObjPtr obj);
+    int (*stratovirtDomainObjExitMonitor)(virStratoVirtDriverPtr driver,
+                                          virDomainObjPtr obj);
+    int (*stratovirtDomainSnapshotDiscardAllMetadata)(virStratoVirtDriverPtr driver,
+                                                     virDomainObjPtr vm);
+    int (*stratovirtDomainCheckpointDiscardAllMetadata)(virStratoVirtDriverPtr driver,
+                                                       virDomainObjPtr vm);
 } virStratoVirtDomain;
 
 extern virStratoVirtDomain stratovirtDom;

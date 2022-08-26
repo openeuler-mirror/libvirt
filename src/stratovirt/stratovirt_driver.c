@@ -26,6 +26,7 @@
 #include "stratovirt_conf.h"
 #include "stratovirt_domain.h"
 #include "stratovirt_process.h"
+#include "stratovirt_monitor.h"
 
 #include "virerror.h"
 #include "virlog.h"
@@ -53,6 +54,8 @@ VIR_LOG_INIT("stratovirt.stratovirt_driver");
 #define STRATOVIRT_JOB_SUSPEND 3
 #define STRATOVIRT_JOB_MODIFY 4
 #define VIR_STRATOVIRT_PROCESS_START_COLD 1
+#define VIR_STRATOVIRT_PROCESS_START_PAUSED 2
+#define VIR_STRATOVIRT_PROCESS_START_AUTODESTROY 4
 #define VIR_STRATOVIRT_PROCESS_STOP_MIGRATED 1
 
 static virStratoVirtDriverPtr stratovirt_driver;
@@ -405,6 +408,273 @@ static int stratovirtDomainResume(virDomainPtr dom)
  cleanup:
     virDomainObjEndAPI(&vm);
     return ret;
+}
+
+
+static int stratovirtDomainShutdownFlags(virDomainPtr dom,
+                                         unsigned int flags)
+{
+    virStratoVirtDriverPtr driver = dom->conn->privateData;
+    virDomainObjPtr vm;
+    stratovirtDomainObjPrivatePtr priv;
+    int ret = -1;
+
+    virCheckFlags(VIR_DOMAIN_SHUTDOWN_DEFAULT, -1);
+
+    if (!(vm = stratovirtDomainObjFromDomain(dom)))
+        goto cleanup;
+
+    priv = vm->privateData;
+
+    if (virDomainShutdownFlagsEnsureACL(dom->conn, vm->def, flags) < 0)
+        goto cleanup;
+
+    if (stratovirtDom.stratovirtDomainObjBeginJob(driver, vm, STRATOVIRT_JOB_MODIFY) < 0)
+        goto cleanup;
+
+    if (virDomainObjCheckActive(vm) < 0)
+        goto endjob;
+
+    if (virDomainObjGetState(vm, NULL) != VIR_DOMAIN_RUNNING &&
+        virDomainObjGetState(vm, NULL) != VIR_DOMAIN_PAUSED) {
+        virReportError(VIR_ERR_OPERATION_INVALID, "%s",
+                       _("only can shutdown running/paused domain"));
+        goto endjob;
+    }
+
+    stratovirtDom.stratovirtDomainObjEnterMonitor(driver, vm);
+    ret = stratovirtMon.stratovirtMonitorSystemPowerdown(priv->mon);
+    if (stratovirtDom.stratovirtDomainObjExitMonitor(driver, vm) < 0)
+        ret = -1;
+
+endjob:
+    stratovirtDom.stratovirtDomainObjEndJob(driver, vm);
+
+cleanup:
+    virDomainObjEndAPI(&vm);
+    return ret;
+}
+
+static int stratovirtDomainShutdown(virDomainPtr dom)
+{
+    return stratovirtDomainShutdownFlags(dom, 0);
+}
+
+static virDomainPtr
+stratovirtDomainDefineXMLFlags(virConnectPtr conn,
+                               const char *xml,
+                               unsigned int flags)
+{
+    virStratoVirtDriverPtr driver = conn->privateData;
+    virDomainDefPtr def = NULL;
+    virDomainDefPtr oldDef = NULL;
+    virDomainObjPtr vm = NULL;
+    virDomainPtr dom = NULL;
+    g_autoptr(virStratoVirtDriverConfig) cfg = virStratoVirtDriverGetConfig(driver);
+    unsigned int parse_flags = VIR_DOMAIN_DEF_PARSE_INACTIVE |
+                               VIR_DOMAIN_DEF_PARSE_ABI_UPDATE;
+
+    virCheckFlags(VIR_DOMAIN_DEFINE_VALIDATE, NULL);
+
+    if (flags & VIR_DOMAIN_START_VALIDATE)
+        parse_flags |= VIR_DOMAIN_DEF_PARSE_VALIDATE_SCHEMA;
+
+    if (!(def = virDomainDefParseString(xml, driver->xmlopt,
+                                        NULL, parse_flags)))
+        goto cleanup;
+
+    if (virXMLCheckIllegalChars("names", def->name, "\n") < 0)
+        goto cleanup;
+
+    if (virDomainDefineXMLFlagsEnsureACL(conn, def) < 0)
+        goto cleanup;
+
+    if (!(vm = virDomainObjListAdd(driver->domains, def,
+                                   driver->xmlopt,
+                                   0, &oldDef)))
+        goto cleanup;
+    def = NULL;
+
+    vm->persistent = 1;
+
+    if (virDomainDefSave(vm->newDef ? vm->newDef : vm->def,
+                         driver->xmlopt, cfg->configDir) < 0) {
+        if (oldDef) {
+            /* restore the old backup */
+            if (virDomainObjIsActive(vm))
+                vm->newDef = oldDef;
+            else
+                vm->def = oldDef;
+            oldDef = NULL;
+        } else {
+            vm->persistent = 0;
+            stratovirtDom.stratovirtDomainRemoveInactive(driver, vm);
+        }
+        goto cleanup;
+    }
+
+    dom = virGetDomain(conn, vm->def->name, vm->def->uuid, vm->def->id);
+
+cleanup:
+    virDomainDefFree(def);
+    virDomainDefFree(oldDef);
+    virDomainObjEndAPI(&vm);
+    return dom;
+}
+
+static virDomainPtr
+stratovirtDomainDefineXML(virConnectPtr conn,
+                          const char *xml)
+{
+    return stratovirtDomainDefineXMLFlags(conn, xml, 0);
+}
+
+static int stratovirtDomainCreateWithFlags(virDomainPtr dom,
+                                           unsigned int flags)
+{
+    virStratoVirtDriverPtr driver = dom->conn->privateData;
+    virDomainObjPtr vm;
+    unsigned int start_flags = VIR_STRATOVIRT_PROCESS_START_COLD;
+    int ret = -1;
+
+    virCheckFlags(VIR_DOMAIN_START_PAUSED |
+                  VIR_DOMAIN_START_AUTODESTROY, -1);
+
+    if (flags & VIR_DOMAIN_START_PAUSED)
+        start_flags |= VIR_STRATOVIRT_PROCESS_START_PAUSED;
+    if (flags & VIR_DOMAIN_START_AUTODESTROY)
+        start_flags |= VIR_STRATOVIRT_PROCESS_START_AUTODESTROY;
+
+    if (!(vm = stratovirtDomainObjFromDomain(dom)))
+        goto cleanup;
+
+    if (virDomainCreateWithFlagsEnsureACL(dom->conn, vm->def) < 0)
+        goto cleanup;
+
+    if (stratovirtPro.stratovirtProcessBeginJob(driver, vm, VIR_DOMAIN_JOB_OPERATION_START,
+                                                flags) < 0)
+        goto cleanup;
+
+    if (virDomainObjIsActive(vm)) {
+        virReportError(VIR_ERR_OPERATION_INVALID, "%s",
+                       _("domain is already running"));
+        goto endjob;
+    }
+
+    if (stratovirtPro.stratovirtProcessStart(dom->conn, driver, vm, NULL,
+                                             STRATOVIRT_ASYNC_JOB_START,
+                                             NULL, -1, NULL, NULL,
+                                             VIR_NETDEV_VPORT_PROFILE_OP_CREATE, start_flags) < 0)
+        goto endjob;
+
+    dom->id = vm->def->id;
+    ret = 0;
+
+endjob:
+    stratovirtPro.stratovirtProcessEndJob(driver, vm);
+
+cleanup:
+    virDomainObjEndAPI(&vm);
+    return ret;
+}
+
+static int stratovirtDomainCreate(virDomainPtr dom)
+{
+    return stratovirtDomainCreateWithFlags(dom, 0);
+}
+
+static int stratovirtDomainIsActive(virDomainPtr dom)
+{
+    virDomainObjPtr obj;
+    int ret = -1;
+
+    if (!(obj = stratovirtDomainObjFromDomain(dom)))
+        goto cleanup;
+
+    if (virDomainIsActiveEnsureACL(dom->conn, obj->def) < 0)
+        goto cleanup;
+
+    ret = virDomainObjIsActive(obj);
+
+ cleanup:
+    virDomainObjEndAPI(&obj);
+    return ret;
+}
+
+static int
+stratovirtDomainUndefineFlags(virDomainPtr dom,
+                              unsigned int flags)
+{
+    virStratoVirtDriverPtr driver  = dom->conn->privateData;
+    virDomainObjPtr vm;
+    int ret = -1;
+    int nsnapshots;
+    int ncheckpoints;
+    g_autoptr(virStratoVirtDriverConfig) cfg = virStratoVirtDriverGetConfig(driver);
+
+    virCheckFlags(VIR_DOMAIN_UNDEFINE_SNAPSHOTS_METADATA |
+                  VIR_DOMAIN_UNDEFINE_CHECKPOINTS_METADATA ,-1);
+
+    if (!(vm = stratovirtDomainObjFromDomain(dom)))
+        goto cleanup;
+
+    if (virDomainUndefineFlagsEnsureACL(dom->conn, vm->def) < 0)
+        goto cleanup;
+
+    if (!vm->persistent) {
+        virReportError(VIR_ERR_OPERATION_INVALID, "%s",
+                       _("Cannot undefine transient domain"));
+        goto cleanup;
+    }
+
+    if (stratovirtDom.stratovirtDomainObjBeginJob(driver, vm, STRATOVIRT_JOB_MODIFY) < 0)
+        goto cleanup;
+
+    if (!virDomainObjIsActive(vm) &&
+        (nsnapshots = virDomainSnapshotObjListNum(vm->snapshots, NULL, 0))) {
+        if (!(flags & VIR_DOMAIN_UNDEFINE_SNAPSHOTS_METADATA)) {
+            virReportError(VIR_ERR_OPERATION_INVALID,
+                           _("cannot delete inactive domain with %d snapshots"),
+                           nsnapshots);
+            goto endjob;
+        }
+        if (stratovirtDom.stratovirtDomainSnapshotDiscardAllMetadata(driver, vm) < 0)
+            goto endjob;
+    }
+
+    if (!virDomainObjIsActive(vm) &&
+        (ncheckpoints = virDomainListCheckpoints(vm->checkpoints, NULL, dom,
+                                                 NULL, flags)) > 0) {
+        if (!(flags & VIR_DOMAIN_UNDEFINE_CHECKPOINTS_METADATA)) {
+            virReportError(VIR_ERR_OPERATION_INVALID,
+                           _("cannot delete inactive domain with %d checkpoints"),
+	                   ncheckpoints);
+            goto endjob;
+        }
+        if (stratovirtDom.stratovirtDomainCheckpointDiscardAllMetadata(driver, vm) < 0)
+            goto endjob;
+    }
+
+    if (virDomainDeleteConfig(cfg->configDir, cfg->autostartDir, vm) < 0)
+        goto cleanup;
+
+    vm->persistent = 0;
+    if (!virDomainObjIsActive(vm))
+        stratovirtDom.stratovirtDomainRemoveInactive(driver, vm);
+    ret = 0;
+
+endjob:
+    stratovirtDom.stratovirtDomainObjEndJob(driver, vm);
+
+cleanup:
+    virDomainObjEndAPI(&vm);
+    return ret;
+}
+
+static int
+stratovirtDomainUndefine(virDomainPtr dom)
+{
+    return  stratovirtDomainUndefineFlags(dom, 0);
 }
 
 static int
@@ -946,6 +1216,13 @@ stratovirtStateInitialize(bool privileged,
                                        NULL, NULL) < 0)
         goto error;
 
+    if (virDomainObjListLoadAllConfigs(stratovirt_driver->domains,
+                                       cfg->configDir,
+                                       cfg->autostartDir, false,
+                                       stratovirt_driver->xmlopt,
+                                       NULL, NULL) < 0)
+        goto error;
+
     stratovirt_driver->workerPool = virThreadPoolNewFull(0, 1, 0, stratovirtProcessEventHandler,
                                                          "stratovirt-event", stratovirt_driver);
     if (!stratovirt_driver->workerPool)
@@ -985,6 +1262,15 @@ static virHypervisorDriver stratovirtHypervisorDriver = {
     .domainDestroy = stratovirtDomainDestroy, /* 2.2.0 */
     .domainDestroyFlags = stratovirtDomainDestroyFlags, /* 2.2.0 */
     .domainOpenConsole = stratovirtDomainOpenConsole, /* 2.2.0 */
+    .domainShutdown = stratovirtDomainShutdown, /* 2.2.0 */
+    .domainShutdownFlags = stratovirtDomainShutdownFlags, /* 2.2.0 */
+    .domainCreate = stratovirtDomainCreate, /* 2.2.0 */
+    .domainCreateWithFlags = stratovirtDomainCreateWithFlags, /* 2.2.0 */
+    .domainDefineXML = stratovirtDomainDefineXML, /* 2.2.0 */
+    .domainDefineXMLFlags = stratovirtDomainDefineXMLFlags, /* 2.2.0 */
+    .domainUndefine = stratovirtDomainUndefine, /* 2.2.0 */
+    .domainUndefineFlags = stratovirtDomainUndefineFlags, /* 2.2.0 */
+    .domainIsActive = stratovirtDomainIsActive, /* 2.2.0 */
 };
 
 static virConnectDriver stratovirtConnectDriver = {
