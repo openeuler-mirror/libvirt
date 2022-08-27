@@ -32,6 +32,8 @@
 
 VIR_LOG_INIT("stratovirt.stratovirt_conf");
 
+#define VIR_FROM_THIS VIR_FROM_STRATOVIRT
+
 #define STRATOVIRT_REMOTE_PORT_MIN 5900
 #define STRATOVIRT_REMOTE_PORT_MAX 65535
 
@@ -64,7 +66,7 @@ static virCapsPtr virStratoVirtCapsInit(void)
         goto error;
 
     if (virCapabilitiesInitCaches(caps) < 0)
-        goto error;
+        VIR_WARN("Failed to get host CPU cache info");
 
     guest = virCapabilitiesAddGuest(caps, VIR_DOMAIN_OSTYPE_HVM,
                                     caps->host.arch, NULL, NULL, 0, NULL);
@@ -151,8 +153,9 @@ virStratoVirtDriverConfigPtr virStratoVirtDriverConfigNew(bool privileged)
 
         cfg->channelTargetDir = g_strdup_printf("%s/channel/target", cfg->libDir);
 
-        cfg->memoryBackingDir = g_strdup_printf("%s/ram", cfg->libDir);
+        cfg->nvramDir = g_strdup_printf("%s/nvram", cfg->libDir);
 
+        cfg->memoryBackingDir = g_strdup_printf("%s/ram", cfg->libDir);
     } else {
         g_autofree char *rundir = NULL;
         g_autofree char *cachedir = NULL;
@@ -175,10 +178,13 @@ virStratoVirtDriverConfigPtr virStratoVirtDriverConfigNew(bool privileged)
         cfg->autoDumpPath = g_strdup_printf("%s/stratovirt/dump", cfg->configBaseDir);
         cfg->channelTargetDir = g_strdup_printf("%s/stratovirt/channel/target",
                                                 cfg->configBaseDir);
+        cfg->nvramDir = g_strdup_printf("%s/nvram", cfg->configBaseDir);
         cfg->memoryBackingDir = g_strdup_printf("%s/stratovirt/ram", cfg->configBaseDir);
     }
 
     cfg->configDir = g_strdup_printf("%s/stratovirt", cfg->configBaseDir);
+    cfg->autostartDir = g_strdup_printf("%s/stratovirt/autostart", cfg->configBaseDir);
+    cfg->dbusStateDir = g_strdup_printf("%s/dubs", cfg->stateDir);
 
     cfg->remotePortMin = STRATOVIRT_REMOTE_PORT_MIN;
     cfg->remotePortMax = STRATOVIRT_REMOTE_PORT_MAX;
@@ -222,14 +228,17 @@ static void virStratoVirtDriverConfigDispose(void *obj)
     VIR_FREE(cfg->uri);
     VIR_FREE(cfg->configBaseDir);
     VIR_FREE(cfg->configDir);
+    VIR_FREE(cfg->autostartDir);
     VIR_FREE(cfg->logDir);
     VIR_FREE(cfg->stateDir);
+    VIR_FREE(cfg->dbusStateDir);
     VIR_FREE(cfg->libDir);
     VIR_FREE(cfg->cacheDir);
     VIR_FREE(cfg->saveDir);
     VIR_FREE(cfg->snapshotDir);
     VIR_FREE(cfg->checkpointDir);
     VIR_FREE(cfg->channelTargetDir);
+    VIR_FREE(cfg->nvramDir);
 
     while (cfg->nhugetlbfs) {
         cfg->nhugetlbfs--;

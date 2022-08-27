@@ -25,6 +25,7 @@
 #include "stratovirt_conf.h"
 
 #include "qemu_hotplug.h"
+#include "qemu_checkpoint.h"
 
 typedef enum {
     STRATOVIRT_PROCESS_EVENT_WATCHDOG = 0,

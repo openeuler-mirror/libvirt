@@ -261,6 +261,10 @@ static virDomainPtr stratovirtDomainCreateXML(virConnectPtr conn,
 
     if (flags & VIR_DOMAIN_START_VALIDATE)
         parse_flags |= VIR_DOMAIN_DEF_PARSE_VALIDATE_SCHEMA;
+    if (flags & VIR_DOMAIN_START_PAUSED)
+        start_flags |= VIR_STRATOVIRT_PROCESS_START_PAUSED;
+    if (flags & VIR_DOMAIN_START_AUTODESTROY)
+        start_flags |= VIR_STRATOVIRT_PROCESS_START_AUTODESTROY;
 
     if (!(def = virDomainDefParseString(xml, driver->xmlopt,
                                         NULL, parse_flags)))
@@ -610,10 +614,20 @@ stratovirtDomainUndefineFlags(virDomainPtr dom,
     int ret = -1;
     int nsnapshots;
     int ncheckpoints;
+    g_autofree char *nvram_path = NULL;
     g_autoptr(virStratoVirtDriverConfig) cfg = virStratoVirtDriverGetConfig(driver);
 
     virCheckFlags(VIR_DOMAIN_UNDEFINE_SNAPSHOTS_METADATA |
-                  VIR_DOMAIN_UNDEFINE_CHECKPOINTS_METADATA ,-1);
+                  VIR_DOMAIN_UNDEFINE_CHECKPOINTS_METADATA |
+                  VIR_DOMAIN_UNDEFINE_NVRAM |
+                  VIR_DOMAIN_UNDEFINE_KEEP_NVRAM, -1);
+
+    if ((flags & VIR_DOMAIN_UNDEFINE_NVRAM) &&
+        (flags & VIR_DOMAIN_UNDEFINE_KEEP_NVRAM)) {
+        virReportError(VIR_ERR_OPERATION_INVALID, "%s",
+                       _("cannot both keep and delete nvram"));
+        return -1;
+    }
 
     if (!(vm = stratovirtDomainObjFromDomain(dom)))
         goto cleanup;
@@ -653,6 +667,29 @@ stratovirtDomainUndefineFlags(virDomainPtr dom,
         }
         if (stratovirtDom.stratovirtDomainCheckpointDiscardAllMetadata(driver, vm) < 0)
             goto endjob;
+    }
+
+    if (vm->def->os.firmware == VIR_DOMAIN_OS_DEF_FIRMWARE_EFI) {
+        nvram_path = g_strdup_printf("%s/%s_VARS.fd", cfg->nvramDir, vm->def->name);
+    } else {
+        if (vm->def->os.loader)
+            nvram_path = g_strdup(vm->def->os.loader->nvram);
+    }
+
+
+    if (nvram_path && virFileExists(nvram_path)) {
+        if (flags & VIR_DOMAIN_UNDEFINE_NVRAM) {
+            if (unlink(nvram_path) < 0) {
+                virReportSystemError(errno,
+                                     _("failed to remove nvram %s"),
+                                     nvram_path);
+                goto endjob;
+            }
+        } else if (!(flags & VIR_DOMAIN_UNDEFINE_KEEP_NVRAM)) {
+            virReportError(VIR_ERR_OPERATION_INVALID, "%s",
+                           _("cannot undefine domain with nvram"));
+            goto endjob;
+        }
     }
 
     if (virDomainDeleteConfig(cfg->configDir, cfg->autostartDir, vm) < 0)
@@ -1019,7 +1056,6 @@ stratovirtStateInitialize(bool privileged,
                           virStateInhibitCallback callback,
                           void *opaque)
 {
-    g_autofree char *driverConf = NULL;
     virStratoVirtDriverConfigPtr cfg;
     uid_t run_uid = -1;
     gid_t run_gid = -1;
@@ -1065,9 +1101,6 @@ stratovirtStateInitialize(bool privileged,
     if (!(stratovirt_driver->config = cfg = virStratoVirtDriverConfigNew(privileged)))
         goto error;
 
-    if (!(driverConf = g_strdup_printf("%s/stratovirt.conf", cfg->configBaseDir)))
-        goto error;
-
     if (virFileMakePath(cfg->stateDir) < 0) {
         virReportSystemError(errno, _("Failed to create state dir %s"),
                              cfg->stateDir);
@@ -1108,9 +1141,21 @@ stratovirtStateInitialize(bool privileged,
                              cfg->channelTargetDir);
         goto error;
     }
+    if (virFileMakePath(cfg->nvramDir) < 0) {
+        virReportSystemError(errno, _("Failed to create nvram dir %s"),
+                             cfg->nvramDir);
+        goto error;
+    }
     if (virFileMakePath(cfg->memoryBackingDir) < 0) {
         virReportSystemError(errno, _("Failed to create memory backing dir %s"),
                              cfg->memoryBackingDir);
+        goto error;
+    }
+
+    if (virDirCreate(cfg->dbusStateDir, 0770, cfg->user, cfg->group,
+                     VIR_DIR_CREATE_ALLOW_EXIST) < 0) {
+        virReportSystemError(errno, _("Failed to create dbus state dir %s"),
+                            cfg->dbusStateDir);
         goto error;
     }
 
