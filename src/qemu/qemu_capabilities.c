@@ -574,6 +574,7 @@ VIR_ENUM_IMPL(virQEMUCaps,
 	          "migration-param.xbzrle-cache-size",
 
               /* 390 */
+              "virtio-blk-pci.scsi.default.disabled",
               "vhost-user-blk",
 
               "object.qapified",
