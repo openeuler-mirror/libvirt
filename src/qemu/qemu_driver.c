@@ -10930,7 +10930,7 @@ qemuDomainBlocksStatsGather(virQEMUDriverPtr driver,
             goto cleanup;
         }
 
-        if (blockdev) {
+        if (blockdev && QEMU_DOMAIN_DISK_PRIVATE(disk)->qomName) {
             entryname = QEMU_DOMAIN_DISK_PRIVATE(disk)->qomName;
         } else {
             if (!disk->info.alias) {
@@ -10986,7 +10986,7 @@ qemuDomainBlocksStatsGather(virQEMUDriverPtr driver,
             disk = vm->def->disks[i];
             entryname = disk->info.alias;
 
-            if (blockdev)
+            if (blockdev && QEMU_DOMAIN_DISK_PRIVATE(disk)->qomName)
                 entryname = QEMU_DOMAIN_DISK_PRIVATE(disk)->qomName;
 
             if (!entryname)
@@ -19373,7 +19373,8 @@ qemuDomainSetBlockIoTune(virDomainPtr dom,
         if (!(disk = qemuDomainDiskByName(def, path)))
             goto endjob;
 
-        if (virQEMUCapsGet(priv->qemuCaps, QEMU_CAPS_BLOCKDEV)) {
+        if (virQEMUCapsGet(priv->qemuCaps, QEMU_CAPS_BLOCKDEV) &&
+            QEMU_DOMAIN_DISK_PRIVATE(disk)->qomName) {
             qdevid = QEMU_DOMAIN_DISK_PRIVATE(disk)->qomName;
         } else {
             if (!(drivealias = qemuAliasDiskDriveFromDisk(disk)))
@@ -19563,7 +19564,8 @@ qemuDomainGetBlockIoTune(virDomainPtr dom,
         if (!(disk = qemuDomainDiskByName(def, path)))
             goto endjob;
 
-        if (virQEMUCapsGet(priv->qemuCaps, QEMU_CAPS_BLOCKDEV)) {
+        if (virQEMUCapsGet(priv->qemuCaps, QEMU_CAPS_BLOCKDEV) &&
+            QEMU_DOMAIN_DISK_PRIVATE(disk)->qomName) {
             qdevid = QEMU_DOMAIN_DISK_PRIVATE(disk)->qomName;
         } else {
             if (!(drivealias = qemuAliasDiskDriveFromDisk(disk)))
@@ -19698,7 +19700,7 @@ qemuDomainGetDiskErrors(virDomainPtr dom,
         qemuDomainDiskPrivatePtr diskPriv = QEMU_DOMAIN_DISK_PRIVATE(disk);
         const char *entryname = disk->info.alias;
 
-        if (blockdev)
+        if (blockdev && diskPriv->qomName)
             entryname = diskPriv->qomName;
 
         if ((info = virHashLookup(table, entryname)) &&
@@ -21516,7 +21518,9 @@ qemuDomainGetStatsBlockExportDisk(virDomainDiskDefPtr disk,
     for (n = disk->src; virStorageSourceIsBacking(n); n = n->backingStore) {
         g_autofree char *alias = NULL;
 
-        if (blockdev) {
+        /* for 'sd' disks we won't be displaying stats for the backing chain
+         * as we don't update the stats correctly */
+        if (blockdev && QEMU_DOMAIN_DISK_PRIVATE(disk)->qomName) {
             frontendalias = QEMU_DOMAIN_DISK_PRIVATE(disk)->qomName;
             backendalias = n->nodeformat;
             backendstoragealias = n->nodestorage;
