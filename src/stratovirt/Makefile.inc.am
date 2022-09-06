@@ -9,6 +9,8 @@ STRATOVIRT_DRIVER_SOURCES = \
 	stratovirt/stratovirt_domain.h \
 	stratovirt/stratovirt_process.h \
 	stratovirt/stratovirt_process.c \
+	stratovirt/stratovirt_monitor.c \
+	stratovirt/stratovirt_monitor.h \
 	$(NULL)
 
 DRIVER_SOURCE_FILES += $(addprefix $(srcdir)/,$(STRATOVIRT_DRIVER_SOURCES))

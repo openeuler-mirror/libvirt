@@ -45,16 +45,26 @@ static int virStratoVirtDomainPostParseBasic(virDomainDefPtr def,
     return 0;
 }
 
+static void stratovirtDomainNVRAMPathGenerate(virStratoVirtDriverConfigPtr cfg,
+                                              virDomainDefPtr def)
+{
+    if (virDomainDefHasOldStyleROUEFI(def) && !def->os.loader->nvram)
+        def->os.loader->nvram = g_strdup_printf("%s/%s_VARS.fd", cfg->nvramDir, def->name);
+}
+
 static int virStratoVirtDomainPostParse(virDomainDefPtr def,
                                         unsigned int parseFlags G_GNUC_UNUSED,
                                         void * opaque,
                                         void *parseOpaue G_GNUC_UNUSED)
 {
     virStratoVirtDriverPtr driver = opaque;
+    g_autoptr(virStratoVirtDriverConfig) cfg = virStratoVirtDriverGetConfig(driver);
     g_autoptr(virCaps) caps = virStratoVirtDriverGetCapabilities(driver, false);
 
     if (!caps)
         return -1;
+
+    stratovirtDomainNVRAMPathGenerate(cfg, def);
 
     if (!virCapabilitiesDomainSupported(caps, def->os.type,
                                         def->os.arch,
@@ -173,4 +183,8 @@ virStratoVirtDomain stratovirtDom = {
     .stratovirtDomainRemoveInactive = qemuDomainRemoveInactive,
     .stratovirtDomainObjEndJob = qemuDomainObjEndJob,
     .stratovirtDomainObjBeginJob = qemuDomainObjBeginJob,
+    .stratovirtDomainObjEnterMonitor = qemuDomainObjEnterMonitor,
+    .stratovirtDomainObjExitMonitor = qemuDomainObjExitMonitor,
+    .stratovirtDomainSnapshotDiscardAllMetadata = qemuDomainSnapshotDiscardAllMetadata,
+    .stratovirtDomainCheckpointDiscardAllMetadata = qemuCheckpointDiscardAllMetadata,
 };
