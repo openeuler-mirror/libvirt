@@ -106,6 +106,11 @@ virStratoVirtDriverGetCapabilities(virStratoVirtDriverPtr driver, bool refresh)
     return ret;
 }
 
+#ifndef DEFAULT_LOADER_NVRAM
+# define DEFAULT_LOADER_NVRAM \
+    "/usr/share/edk2/ovmf/OVMF_CODE.fd:/usr/share/edk2/ovmf/OVMF_VARS.fd:"
+#endif
+
 virStratoVirtDriverConfigPtr virStratoVirtDriverConfigNew(bool privileged)
 {
     virStratoVirtDriverConfigPtr cfg = NULL;
@@ -217,6 +222,11 @@ virStratoVirtDriverConfigPtr virStratoVirtDriverConfigNew(bool privileged)
         virBitmapSetBit(cfg->namespaces, 0) < 0)
         return NULL;
 
+    if (virFirmwareParseList(DEFAULT_LOADER_NVRAM,
+                             &cfg->firmwares,
+                             &cfg->nfirmwares) < 0)
+        return NULL;
+
     return g_steal_pointer(&cfg);
 }
 
@@ -246,6 +256,9 @@ static void virStratoVirtDriverConfigDispose(void *obj)
     }
     VIR_FREE(cfg->hugetlbfs);
     VIR_FREE(cfg->autoDumpPath);
+
+    virFirmwareFreeList(cfg->firmwares, cfg->nfirmwares);
+
     VIR_FREE(cfg->memoryBackingDir);
 }
 
