@@ -993,15 +993,66 @@ static int stratovirtSecurityInit(virStratoVirtDriverPtr driver)
     return -1;
 }
 
-static void stratovirtProcessEventHandler(void *data, void *opaque G_GNUC_UNUSED)
+static void processMonitorEOFEvent(virStratoVirtDriverPtr driver,
+                                   virDomainObjPtr vm)
+{
+    int stopReason = VIR_DOMAIN_SHUTOFF_SHUTDOWN;
+    const char *auditReason = "shutdown";
+    unsigned int stopFlags = 0;
+
+    if (stratovirtPro.stratovirtProcessBeginStopJob(driver, vm, STRATOVIRT_JOB_DESTROY, true) < 0)
+        return;
+
+    if (!virDomainObjIsActive(vm)) {
+        VIR_DEBUG("Domain %p '%s' is not active, ignoring EOF", vm, vm->def->name);
+        goto endjob;
+    }
+
+    if (virDomainObjGetState(vm, NULL) != VIR_DOMAIN_SHUTDOWN) {
+        VIR_DEBUG("Monitor connection to '%s' closed without SHUTDOWN event; "
+                  "assuming the domain crashed", vm->def->name);
+        stopReason = VIR_DOMAIN_SHUTOFF_CRASHED;
+        auditReason = "failed";
+    }
+
+    stratovirtPro.stratovirtProcessStop(driver, vm, stopReason,
+                                        STRATOVIRT_ASYNC_JOB_NONE,
+                                        stopFlags);
+    virDomainAuditStop(vm, auditReason);
+
+endjob:
+    stratovirtDom.stratovirtDomainRemoveInactive(driver, vm);
+    stratovirtDom.stratovirtDomainObjEndJob(driver, vm);
+}
+
+static void stratovirtProcessEventHandler(void *data, void *opaque)
 {
     stratovirtProcessEventPtr processEvent = data;
     virDomainObjPtr vm = processEvent->vm;
+    virStratoVirtDriverPtr driver = opaque;
 
     VIR_DEBUG("vm=%p, event=%d", vm, processEvent->eventType);
 
     virObjectLock(vm);
 
+    switch (processEvent->eventType) {
+    case STRATOVIRT_PROCESS_EVENT_MONITOR_EOF:
+        processMonitorEOFEvent(driver, vm);
+        break;
+    case STRATOVIRT_PROCESS_EVENT_WATCHDOG:
+    case STRATOVIRT_PROCESS_EVENT_GUESTPANIC:
+    case STRATOVIRT_PROCESS_EVENT_DEVICE_DELETED:
+    case STRATOVIRT_PROCESS_EVENT_NIC_RX_FILTER_CHANGED:
+    case STRATOVIRT_PROCESS_EVENT_SERIAL_CHANGED:
+    case STRATOVIRT_PROCESS_EVENT_BLOCK_JOB:
+    case STRATOVIRT_PROCESS_EVENT_JOB_STATUS_CHANGE:
+    case STRATOVIRT_PROCESS_EVENT_PR_DISCONNECT:
+    case STRATOVIRT_PROCESS_EVENT_RDMA_GID_STATUS_CHANGED:
+    case STRATOVIRT_PROCESS_EVENT_GUEST_CRASHLOADED:
+    case STRATOVIRT_PROCESS_EVENT_LAST:
+    default:
+        break;
+    }
     virDomainObjEndAPI(&vm);
     stratovirtProcessEventFree(processEvent);
 }
