@@ -108,7 +108,7 @@ virStratoVirtDriverGetCapabilities(virStratoVirtDriverPtr driver, bool refresh)
 
 #ifndef DEFAULT_LOADER_NVRAM
 # define DEFAULT_LOADER_NVRAM \
-    "/usr/share/edk2/ovmf/OVMF_CODE.fd:/usr/share/edk2/ovmf/OVMF_VARS.fd:"
+    "/usr/share/edk2/ovmf/OVMF_CODE.fd:/usr/share/edk2/ovmf/OVMF_VARS.fd"
 #endif
 
 virStratoVirtDriverConfigPtr virStratoVirtDriverConfigNew(bool privileged)
