@@ -23,6 +23,7 @@
 
 #include <sys/stat.h>
 
+#include "conf/virconftypes.h"
 #include "virbitmap.h"
 #include "virobject.h"
 #include "virseclabel.h"
@@ -52,6 +53,7 @@ typedef enum {
     VIR_STORAGE_TYPE_NETWORK,
     VIR_STORAGE_TYPE_VOLUME,
     VIR_STORAGE_TYPE_NVME,
+    VIR_STORAGE_TYPE_VHOST_USER,
 
     VIR_STORAGE_TYPE_LAST
 } virStorageType;
@@ -262,9 +264,6 @@ struct _virStorageSourceSlice {
 };
 
 
-typedef struct _virStorageDriverData virStorageDriverData;
-typedef virStorageDriverData *virStorageDriverDataPtr;
-
 typedef struct _virStorageSource virStorageSource;
 typedef virStorageSource *virStorageSourcePtr;
 
@@ -302,6 +301,8 @@ struct _virStorageSource {
 
     virStorageSourceNVMeDefPtr nvme; /* type == VIR_STORAGE_TYPE_NVME */
 
+    virDomainChrSourceDefPtr vhostuser; /* type == VIR_STORAGE_TYPE_VHOST_USER */
+
     virStorageSourceInitiatorDef initiator;
 
     virObjectPtr privateData;
@@ -338,7 +339,7 @@ struct _virStorageSource {
     virStorageSourcePtr externalDataStore;
 
     /* metadata for storage driver access to remote and local volumes */
-    virStorageDriverDataPtr drv;
+    void *drv;
 
     /* metadata about storage image which need separate fields */
     /* Relative name by which this image was opened from its parent, or NULL

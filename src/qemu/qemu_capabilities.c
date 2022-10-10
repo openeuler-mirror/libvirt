@@ -573,6 +573,10 @@ VIR_ENUM_IMPL(virQEMUCaps,
 	          "migration-param.downtime",
 	          "migration-param.xbzrle-cache-size",
 
+              /* 390 */
+              "virtio-blk-pci.scsi.default.disabled",
+              "vhost-user-blk",
+
               "object.qapified",
     );
 
@@ -587,6 +591,7 @@ struct _virQEMUCapsMachineType {
     bool qemuDefault;
     char *defaultCPU;
     bool numaMemSupported;
+    char *defaultRAMid;
 };
 
 typedef struct _virQEMUCapsHostCPUData virQEMUCapsHostCPUData;
@@ -1296,6 +1301,7 @@ struct virQEMUCapsStringFlags virQEMUCapsObjectTypes[] = {
     { "rng-builtin", QEMU_CAPS_OBJECT_RNG_BUILTIN },
     { "tpm-spapr", QEMU_CAPS_DEVICE_TPM_SPAPR },
     { "vhost-user-fs-device", QEMU_CAPS_DEVICE_VHOST_USER_FS },
+    { "vhost-user-blk", QEMU_CAPS_DEVICE_VHOST_USER_BLK },
 };
 
 static struct virQEMUCapsStringFlags virQEMUCapsDevicePropsVirtioBalloon[] = {
@@ -1819,6 +1825,7 @@ virQEMUCapsAccelCopyMachineTypes(virQEMUCapsAccelPtr dst,
         dst->machineTypes[i].hotplugCpus = src->machineTypes[i].hotplugCpus;
         dst->machineTypes[i].qemuDefault = src->machineTypes[i].qemuDefault;
         dst->machineTypes[i].numaMemSupported = src->machineTypes[i].numaMemSupported;
+        dst->machineTypes[i].defaultRAMid = g_strdup(src->machineTypes[i].defaultRAMid);
     }
 }
 
@@ -1894,6 +1901,7 @@ virQEMUCapsAccelClear(virQEMUCapsAccelPtr caps)
         VIR_FREE(caps->machineTypes[i].name);
         VIR_FREE(caps->machineTypes[i].alias);
         VIR_FREE(caps->machineTypes[i].defaultCPU);
+        VIR_FREE(caps->machineTypes[i].defaultRAMid);
     }
     VIR_FREE(caps->machineTypes);
 
@@ -2482,6 +2490,25 @@ virQEMUCapsGetMachineNumaMemSupported(virQEMUCapsPtr qemuCaps,
 }
 
 
+const char *
+virQEMUCapsGetMachineDefaultRAMid(virQEMUCapsPtr qemuCaps,
+                                  virDomainVirtType virtType,
+                                  const char *name)
+{
+    virQEMUCapsAccelPtr accel;
+    size_t i;
+
+    accel = virQEMUCapsGetAccel(qemuCaps, virtType);
+
+    for (i = 0; i < accel->nmachineTypes; i++) {
+        if (STREQ(accel->machineTypes[i].name, name))
+            return accel->machineTypes[i].defaultRAMid;
+    }
+
+    return NULL;
+}
+
+
 /**
  * virQEMUCapsSetGICCapabilities:
  * @qemuCaps: QEMU capabilities
@@ -2697,7 +2724,8 @@ virQEMUCapsAddMachine(virQEMUCapsPtr qemuCaps,
                       int maxCpus,
                       bool hotplugCpus,
                       bool isDefault,
-                      bool numaMemSupported)
+                      bool numaMemSupported,
+                      const char *defaultRAMid)
 {
     virQEMUCapsAccelPtr accel = virQEMUCapsGetAccel(qemuCaps, virtType);
     virQEMUCapsMachineTypePtr mach;
@@ -2718,6 +2746,8 @@ virQEMUCapsAddMachine(virQEMUCapsPtr qemuCaps,
     mach->qemuDefault = isDefault;
 
     mach->numaMemSupported = numaMemSupported;
+
+    mach->defaultRAMid = g_strdup(defaultRAMid);
 }
 
 /**
@@ -2764,7 +2794,8 @@ virQEMUCapsProbeQMPMachineTypes(virQEMUCapsPtr qemuCaps,
                               machines[i]->maxCpus,
                               machines[i]->hotplugCpus,
                               machines[i]->isDefault,
-                              machines[i]->numaMemSupported);
+                              machines[i]->numaMemSupported,
+                              machines[i]->defaultRAMid);
 
         if (preferredMachine &&
             (STREQ_NULLABLE(machines[i]->alias, preferredMachine) ||
@@ -3986,6 +4017,7 @@ virQEMUCapsLoadMachines(virQEMUCapsAccelPtr caps,
         VIR_FREE(str);
 
         caps->machineTypes[i].defaultCPU = virXMLPropString(nodes[i], "defaultCPU");
+        caps->machineTypes[i].defaultRAMid = virXMLPropString(nodes[i], "defaultRAMid");
     }
 
     return 0;
@@ -4443,6 +4475,8 @@ virQEMUCapsFormatMachines(virQEMUCapsAccelPtr caps,
                               caps->machineTypes[i].defaultCPU);
         if (caps->machineTypes[i].numaMemSupported)
             virBufferAddLit(buf, " numaMemSupported='yes'");
+        virBufferEscapeString(buf, " defaultRAMid='%s'",
+                              caps->machineTypes[i].defaultRAMid);
         virBufferAddLit(buf, "/>\n");
     }
 }
@@ -4966,6 +5000,13 @@ virQEMUCapsInitProcessCaps(virQEMUCapsPtr qemuCaps)
         virQEMUCapsGet(qemuCaps, QEMU_CAPS_SCSI_DISK_DEVICE_ID) &&
         virQEMUCapsGet(qemuCaps, QEMU_CAPS_SAVEVM_MONITOR_NODES))
         virQEMUCapsSet(qemuCaps, QEMU_CAPS_BLOCKDEV);
+
+    /* The 'scsi' passthrough feature of virtio-blk-pci was disabled by default
+     * after QEMU-5.0. So set QEMU_CAPS_VIRTIO_BLK_SCSI_DEFAULT_DISABLED to stop
+     * formatting the 'scsi' property. */
+    if (qemuCaps->version > 5000000) {
+        virQEMUCapsSet(qemuCaps, QEMU_CAPS_VIRTIO_BLK_SCSI_DEFAULT_DISABLED);
+    }
 
     virQEMUCapsInitProcessCapsInterlock(qemuCaps);
 }
@@ -6147,7 +6188,7 @@ virQEMUCapsStripMachineAliasesForVirtType(virQEMUCapsPtr qemuCaps,
         if (name) {
             virQEMUCapsAddMachine(qemuCaps, virtType, name, NULL, mach->defaultCPU,
                                   mach->maxCpus, mach->hotplugCpus, mach->qemuDefault,
-                                  mach->numaMemSupported);
+                                  mach->numaMemSupported, mach->defaultRAMid);
         }
     }
 }

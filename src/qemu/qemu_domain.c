@@ -16767,6 +16767,11 @@ qemuDomainPrepareDiskSource(virDomainDiskDefPtr disk,
                             qemuDomainObjPrivatePtr priv,
                             virQEMUDriverConfigPtr cfg)
 {
+    /* Nothing to prepare as it will use -chardev instead
+     * of -blockdev/-drive option. */
+    if (disk->src->type == VIR_STORAGE_TYPE_VHOST_USER)
+        return 0;
+
     qemuDomainPrepareDiskCachemode(disk);
 
     /* set default format for storage pool based disks */

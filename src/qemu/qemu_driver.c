@@ -10839,6 +10839,12 @@ qemuDomainBlockResize(virDomainPtr dom,
         goto endjob;
     }
 
+    if (virStorageSourceGetActualType(disk->src) == VIR_STORAGE_TYPE_VHOST_USER) {
+        virReportError(VIR_ERR_OPERATION_UNSUPPORTED, "%s",
+                       _("block resize is not supported for vhostuser disk"));
+        goto endjob;
+    }
+
     /* qcow2 and qed must be sized on 512 byte blocks/sectors,
      * so adjust size if necessary to round up.
      */
@@ -10930,7 +10936,13 @@ qemuDomainBlocksStatsGather(virQEMUDriverPtr driver,
             goto cleanup;
         }
 
-        if (blockdev) {
+        if (virStorageSourceGetActualType(disk->src) == VIR_STORAGE_TYPE_VHOST_USER) {
+            virReportError(VIR_ERR_OPERATION_UNSUPPORTED, "%s",
+                           _("block stats are not supported for vhostuser disk"));
+            goto cleanup;
+        }
+
+        if (blockdev && QEMU_DOMAIN_DISK_PRIVATE(disk)->qomName) {
             entryname = QEMU_DOMAIN_DISK_PRIVATE(disk)->qomName;
         } else {
             if (!disk->info.alias) {
@@ -10986,7 +10998,11 @@ qemuDomainBlocksStatsGather(virQEMUDriverPtr driver,
             disk = vm->def->disks[i];
             entryname = disk->info.alias;
 
-            if (blockdev)
+            /* No stats to report for vhost-user disk */
+            if (virStorageSourceGetActualType(disk->src) == VIR_STORAGE_TYPE_VHOST_USER)
+                continue;
+
+            if (blockdev && QEMU_DOMAIN_DISK_PRIVATE(disk)->qomName)
                 entryname = QEMU_DOMAIN_DISK_PRIVATE(disk)->qomName;
 
             if (!entryname)
@@ -11615,6 +11631,12 @@ qemuDomainBlockPeek(virDomainPtr dom,
     if (!(disk = qemuDomainDiskByName(vm->def, path)))
         goto cleanup;
 
+    if (virStorageSourceGetActualType(disk->src) == VIR_STORAGE_TYPE_VHOST_USER) {
+        virReportError(VIR_ERR_OPERATION_UNSUPPORTED, "%s",
+                       _("peeking is not supported for vhostuser disk"));
+        goto cleanup;
+    }
+
     if (disk->src->format != VIR_STORAGE_FILE_RAW) {
         virReportError(VIR_ERR_OPERATION_UNSUPPORTED,
                        _("peeking is only supported for disk with 'raw' format not '%s'"),
@@ -11969,6 +11991,12 @@ qemuDomainGetBlockInfo(virDomainPtr dom,
     if (!(disk = virDomainDiskByName(vm->def, path, false))) {
         virReportError(VIR_ERR_INVALID_ARG,
                        _("invalid path %s not assigned to domain"), path);
+        goto endjob;
+    }
+
+    if (virStorageSourceGetActualType(disk->src) == VIR_STORAGE_TYPE_VHOST_USER) {
+        virReportError(VIR_ERR_OPERATION_UNSUPPORTED, "%s",
+                       _("block info is not supported for vhostuser disk"));
         goto endjob;
     }
 
@@ -14668,6 +14696,7 @@ qemuDomainSnapshotPrepareDiskExternalInactive(virDomainSnapshotDiskDefPtr snapdi
     case VIR_STORAGE_TYPE_DIR:
     case VIR_STORAGE_TYPE_VOLUME:
     case VIR_STORAGE_TYPE_NVME:
+    case VIR_STORAGE_TYPE_VHOST_USER:
     case VIR_STORAGE_TYPE_NONE:
     case VIR_STORAGE_TYPE_LAST:
         virReportError(VIR_ERR_INTERNAL_ERROR,
@@ -14685,6 +14714,7 @@ qemuDomainSnapshotPrepareDiskExternalInactive(virDomainSnapshotDiskDefPtr snapdi
     case VIR_STORAGE_TYPE_DIR:
     case VIR_STORAGE_TYPE_VOLUME:
     case VIR_STORAGE_TYPE_NVME:
+    case VIR_STORAGE_TYPE_VHOST_USER:
     case VIR_STORAGE_TYPE_NONE:
     case VIR_STORAGE_TYPE_LAST:
         virReportError(VIR_ERR_INTERNAL_ERROR,
@@ -14753,6 +14783,7 @@ qemuDomainSnapshotPrepareDiskExternalActive(virDomainSnapshotDiskDefPtr snapdisk
     case VIR_STORAGE_TYPE_DIR:
     case VIR_STORAGE_TYPE_VOLUME:
     case VIR_STORAGE_TYPE_NVME:
+    case VIR_STORAGE_TYPE_VHOST_USER:
     case VIR_STORAGE_TYPE_NONE:
     case VIR_STORAGE_TYPE_LAST:
         virReportError(VIR_ERR_INTERNAL_ERROR,
@@ -14881,6 +14912,7 @@ qemuDomainSnapshotPrepareDiskInternal(virDomainDiskDefPtr disk,
     case VIR_STORAGE_TYPE_DIR:
     case VIR_STORAGE_TYPE_VOLUME:
     case VIR_STORAGE_TYPE_NVME:
+    case VIR_STORAGE_TYPE_VHOST_USER:
     case VIR_STORAGE_TYPE_NONE:
     case VIR_STORAGE_TYPE_LAST:
         virReportError(VIR_ERR_INTERNAL_ERROR,
@@ -19005,6 +19037,19 @@ typedef enum {
 } qemuBlockIoTuneSetFlags;
 
 
+static bool
+qemuDomainDiskBlockIoTuneIsSupported(virStorageSourcePtr src)
+{
+    if (virStorageSourceGetActualType(src) == VIR_STORAGE_TYPE_VHOST_USER) {
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                       _("a block I/O throttling is not supported for vhostuser disk"));
+        return false;
+    }
+
+    return true;
+}
+
+
 /* If the user didn't specify bytes limits, inherit previous values;
  * likewise if the user didn't specify iops limits.  */
 static int
@@ -19373,7 +19418,11 @@ qemuDomainSetBlockIoTune(virDomainPtr dom,
         if (!(disk = qemuDomainDiskByName(def, path)))
             goto endjob;
 
-        if (virQEMUCapsGet(priv->qemuCaps, QEMU_CAPS_BLOCKDEV)) {
+        if (!qemuDomainDiskBlockIoTuneIsSupported(disk->src))
+            goto endjob;
+
+        if (virQEMUCapsGet(priv->qemuCaps, QEMU_CAPS_BLOCKDEV) &&
+            QEMU_DOMAIN_DISK_PRIVATE(disk)->qomName) {
             qdevid = QEMU_DOMAIN_DISK_PRIVATE(disk)->qomName;
         } else {
             if (!(drivealias = qemuAliasDiskDriveFromDisk(disk)))
@@ -19461,6 +19510,9 @@ qemuDomainSetBlockIoTune(virDomainPtr dom,
                            path);
             goto endjob;
         }
+
+        if (!qemuDomainDiskBlockIoTuneIsSupported(conf_disk->src))
+            goto endjob;
 
         conf_cur_info = qemuDomainFindGroupBlockIoTune(persistentDef, conf_disk, &info);
 
@@ -19563,7 +19615,11 @@ qemuDomainGetBlockIoTune(virDomainPtr dom,
         if (!(disk = qemuDomainDiskByName(def, path)))
             goto endjob;
 
-        if (virQEMUCapsGet(priv->qemuCaps, QEMU_CAPS_BLOCKDEV)) {
+        if (!qemuDomainDiskBlockIoTuneIsSupported(disk->src))
+            goto endjob;
+
+        if (virQEMUCapsGet(priv->qemuCaps, QEMU_CAPS_BLOCKDEV) &&
+            QEMU_DOMAIN_DISK_PRIVATE(disk)->qomName) {
             qdevid = QEMU_DOMAIN_DISK_PRIVATE(disk)->qomName;
         } else {
             if (!(drivealias = qemuAliasDiskDriveFromDisk(disk)))
@@ -19584,6 +19640,10 @@ qemuDomainGetBlockIoTune(virDomainPtr dom,
                            path);
             goto endjob;
         }
+
+        if (!qemuDomainDiskBlockIoTuneIsSupported(disk->src))
+            goto endjob;
+
         reply = disk->blkdeviotune;
 
         /* Group name needs to be copied since qemuMonitorGetBlockIoThrottle
@@ -19698,7 +19758,7 @@ qemuDomainGetDiskErrors(virDomainPtr dom,
         qemuDomainDiskPrivatePtr diskPriv = QEMU_DOMAIN_DISK_PRIVATE(disk);
         const char *entryname = disk->info.alias;
 
-        if (blockdev)
+        if (blockdev && diskPriv->qomName)
             entryname = diskPriv->qomName;
 
         if ((info = virHashLookup(table, entryname)) &&
@@ -21513,10 +21573,24 @@ qemuDomainGetStatsBlockExportDisk(virDomainDiskDefPtr disk,
                                                    params);
     }
 
+    /* vhost-user disk doesn't support getting block stats */
+    if (virStorageSourceGetActualType(disk->src) == VIR_STORAGE_TYPE_VHOST_USER) {
+        if (qemuDomainGetStatsBlockExportHeader(disk, disk->src, *recordnr,
+                                                params) < 0) {
+            return -1;
+        }
+
+        (*recordnr)++;
+
+        return 0;
+    }
+
     for (n = disk->src; virStorageSourceIsBacking(n); n = n->backingStore) {
         g_autofree char *alias = NULL;
 
-        if (blockdev) {
+        /* for 'sd' disks we won't be displaying stats for the backing chain
+         * as we don't update the stats correctly */
+        if (blockdev && QEMU_DOMAIN_DISK_PRIVATE(disk)->qomName) {
             frontendalias = QEMU_DOMAIN_DISK_PRIVATE(disk)->qomName;
             backendalias = n->nodeformat;
             backendstoragealias = n->nodestorage;
@@ -22701,7 +22775,14 @@ qemuDomainSetBlockThreshold(virDomainPtr dom,
     if (!(src = qemuDomainGetStorageSourceByDevstr(dev, vm->def)))
         goto endjob;
 
-    if (!src->nodestorage &&
+    if (virStorageSourceGetActualType(src) == VIR_STORAGE_TYPE_VHOST_USER) {
+        virReportError(VIR_ERR_OPERATION_UNSUPPORTED, "%s",
+                       _("setting device threshold is not supported for vhostuser disk"));
+        goto endjob;
+    }
+
+    if (!virQEMUCapsGet(priv->qemuCaps, QEMU_CAPS_BLOCKDEV) &&
+        !src->nodestorage &&
         qemuBlockNodeNamesDetect(driver, vm, QEMU_ASYNC_JOB_NONE) < 0)
         goto endjob;
 

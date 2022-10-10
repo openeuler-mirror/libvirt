@@ -554,6 +554,10 @@ typedef enum { /* virQEMUCapsFlags grouping marker for syntax-check */
     QEMU_CAPS_MIGRATION_PARAM_DOWNTIME, /* downtime-limit field in migrate-set-parameters */
     QEMU_CAPS_MIGRATION_PARAM_XBZRLE_CACHE_SIZE, /* xbzrle-cache-size field in migrate-set-parameters */
 
+    /* 390 */
+    QEMU_CAPS_VIRTIO_BLK_SCSI_DEFAULT_DISABLED, /* virtio-blk-pci.scsi disabled by default */
+    QEMU_CAPS_DEVICE_VHOST_USER_BLK, /* -device vhost-user-blk */
+
     QEMU_CAPS_OBJECT_QAPIFIED, /* parameters for object-add are formally described */
 
     QEMU_CAPS_LAST /* this must always be the last item */
@@ -664,6 +668,9 @@ const char *virQEMUCapsGetMachineDefaultCPU(virQEMUCapsPtr qemuCaps,
 bool virQEMUCapsGetMachineNumaMemSupported(virQEMUCapsPtr qemuCaps,
                                            virDomainVirtType virtType,
                                            const char *name);
+const char *virQEMUCapsGetMachineDefaultRAMid(virQEMUCapsPtr qemuCaps,
+                                              virDomainVirtType virtType,
+                                              const char *name);
 
 void virQEMUCapsFilterByMachineType(virQEMUCapsPtr qemuCaps,
                                     virDomainVirtType virtType,

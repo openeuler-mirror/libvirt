@@ -27,6 +27,7 @@
 #include "viralloc.h"
 #include "virerror.h"
 #include "virlog.h"
+#include "virstoragefile.h"
 #include "virstoragefilebackend.h"
 #include "virstring.h"
 
@@ -46,7 +47,8 @@ struct _virStorageFileBackendGlusterPriv {
 static void
 virStorageFileBackendGlusterDeinit(virStorageSourcePtr src)
 {
-    virStorageFileBackendGlusterPrivPtr priv = src->drv->priv;
+    virStorageDriverDataPtr drv = src->drv;
+    virStorageFileBackendGlusterPrivPtr priv = drv->priv;
 
     VIR_DEBUG("deinitializing gluster storage file %p (gluster://%s:%u/%s%s)",
               src, src->hosts->name, src->hosts->port, src->volume, src->path);
@@ -56,7 +58,7 @@ virStorageFileBackendGlusterDeinit(virStorageSourcePtr src)
     VIR_FREE(priv->canonpath);
 
     VIR_FREE(priv);
-    src->drv->priv = NULL;
+    drv->priv = NULL;
 }
 
 static int
@@ -99,6 +101,7 @@ virStorageFileBackendGlusterInitServer(virStorageFileBackendGlusterPrivPtr priv,
 static int
 virStorageFileBackendGlusterInit(virStorageSourcePtr src)
 {
+    virStorageDriverDataPtr drv = src->drv;
     virStorageFileBackendGlusterPrivPtr priv = NULL;
     size_t i;
 
@@ -115,7 +118,7 @@ virStorageFileBackendGlusterInit(virStorageSourcePtr src)
     VIR_DEBUG("initializing gluster storage file %p "
               "(priv='%p' volume='%s' path='%s') as [%u:%u]",
               src, priv, src->volume, src->path,
-              (unsigned int)src->drv->uid, (unsigned int)src->drv->gid);
+              (unsigned int)drv->uid, (unsigned int)drv->gid);
 
     if (!(priv->vol = glfs_new(src->volume))) {
         virReportOOMError();
@@ -134,7 +137,7 @@ virStorageFileBackendGlusterInit(virStorageSourcePtr src)
         goto error;
     }
 
-    src->drv->priv = priv;
+    drv->priv = priv;
 
     return 0;
 
@@ -150,15 +153,12 @@ virStorageFileBackendGlusterInit(virStorageSourcePtr src)
 static int
 virStorageFileBackendGlusterCreate(virStorageSourcePtr src)
 {
-    virStorageFileBackendGlusterPrivPtr priv = src->drv->priv;
+    virStorageDriverDataPtr drv = src->drv;
+    virStorageFileBackendGlusterPrivPtr priv = drv->priv;
     glfs_fd_t *fd = NULL;
-    mode_t mode = S_IRUSR;
-
-    if (!src->readonly)
-        mode |= S_IWUSR;
 
     if (!(fd = glfs_creat(priv->vol, src->path,
-                          O_CREAT | O_TRUNC | O_WRONLY, mode)))
+                          O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR)))
         return -1;
 
     ignore_value(glfs_close(fd));
@@ -169,7 +169,8 @@ virStorageFileBackendGlusterCreate(virStorageSourcePtr src)
 static int
 virStorageFileBackendGlusterUnlink(virStorageSourcePtr src)
 {
-    virStorageFileBackendGlusterPrivPtr priv = src->drv->priv;
+    virStorageDriverDataPtr drv = src->drv;
+    virStorageFileBackendGlusterPrivPtr priv = drv->priv;
 
     return glfs_unlink(priv->vol, src->path);
 }
@@ -179,7 +180,8 @@ static int
 virStorageFileBackendGlusterStat(virStorageSourcePtr src,
                                  struct stat *st)
 {
-    virStorageFileBackendGlusterPrivPtr priv = src->drv->priv;
+    virStorageDriverDataPtr drv = src->drv;
+    virStorageFileBackendGlusterPrivPtr priv = drv->priv;
 
     return glfs_stat(priv->vol, src->path, st);
 }
@@ -191,7 +193,8 @@ virStorageFileBackendGlusterRead(virStorageSourcePtr src,
                                  size_t len,
                                  char **buf)
 {
-    virStorageFileBackendGlusterPrivPtr priv = src->drv->priv;
+    virStorageDriverDataPtr drv = src->drv;
+    virStorageFileBackendGlusterPrivPtr priv = drv->priv;
     glfs_fd_t *fd = NULL;
     ssize_t ret = -1;
     char *s;
@@ -247,7 +250,8 @@ static int
 virStorageFileBackendGlusterAccess(virStorageSourcePtr src,
                                    int mode)
 {
-    virStorageFileBackendGlusterPrivPtr priv = src->drv->priv;
+    virStorageDriverDataPtr drv = src->drv;
+    virStorageFileBackendGlusterPrivPtr priv = drv->priv;
 
     return glfs_access(priv->vol, src->path, mode);
 }
@@ -300,7 +304,8 @@ virStorageFileBackendGlusterReadlinkCallback(const char *path,
 static const char *
 virStorageFileBackendGlusterGetUniqueIdentifier(virStorageSourcePtr src)
 {
-    virStorageFileBackendGlusterPrivPtr priv = src->drv->priv;
+    virStorageDriverDataPtr drv = src->drv;
+    virStorageFileBackendGlusterPrivPtr priv = drv->priv;
     g_autofree char *filePath = NULL;
 
     if (priv->canonpath)
@@ -326,7 +331,8 @@ virStorageFileBackendGlusterChown(const virStorageSource *src,
                                   uid_t uid,
                                   gid_t gid)
 {
-    virStorageFileBackendGlusterPrivPtr priv = src->drv->priv;
+    virStorageDriverDataPtr drv = src->drv;
+    virStorageFileBackendGlusterPrivPtr priv = drv->priv;
 
     return glfs_chown(priv->vol, src->path, uid, gid);
 }
