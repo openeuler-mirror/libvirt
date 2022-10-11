@@ -26,7 +26,7 @@
 
 int qemuSecuritySetAllLabel(virQEMUDriverPtr driver,
                             virDomainObjPtr vm,
-                            const char *stdin_path,
+                            const char *incomingPath,
                             bool migrated);
 
 void qemuSecurityRestoreAllLabel(virQEMUDriverPtr driver,
@@ -100,10 +100,6 @@ int qemuSecurityDomainSetPathLabel(virQEMUDriverPtr driver,
                                    virDomainObjPtr vm,
                                    const char *path,
                                    bool allowSubtree);
-
-int qemuSecuritySetSavedStateLabel(virQEMUDriverPtr driver,
-                                   virDomainObjPtr vm,
-                                   const char *savefile);
 
 int qemuSecurityRestoreSavedStateLabel(virQEMUDriverPtr driver,
                                        virDomainObjPtr vm,

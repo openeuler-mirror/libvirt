@@ -1065,7 +1065,7 @@ virStorageBackendCreateQemuImgCmdFromVol(virStoragePoolObjPtr pool,
         .type = NULL,
         .inputType = NULL,
         .path = vol->target.path,
-        .allocation = vol->target.allocation,
+        .allocation = VIR_DIV_UP(vol->target.allocation, 1024),
         .encryption = !!vol->target.encryption,
         .preallocate = !!(flags & VIR_STORAGE_VOL_CREATE_PREALLOC_METADATA),
         .compat = vol->target.compat,
@@ -3363,13 +3363,11 @@ storageBackendProbeTarget(virStorageSourcePtr target,
         return -1;
 
     if (meta->backingStoreRaw) {
-        if (virStorageSourceNewFromBacking(meta, &target->backingStore) < 0)
-            return -1;
-
         /* XXX: Remote storage doesn't play nicely with volumes backed by
          * remote storage. To avoid trouble, just fake the backing store is RAW
          * and put the string from the metadata as the path of the target. */
-        if (!virStorageSourceIsLocalStorage(target->backingStore)) {
+        if (virStorageSourceNewFromBacking(meta, &target->backingStore) < 0 ||
+            !virStorageSourceIsLocalStorage(target->backingStore)) {
             virObjectUnref(target->backingStore);
 
             if (!(target->backingStore = virStorageSourceNew()))

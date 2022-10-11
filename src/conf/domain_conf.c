@@ -12357,14 +12357,6 @@ virDomainNetDefParseXML(virDomainXMLOptionPtr xmlopt,
         }
 
         def->data.direct.linkdev = g_steal_pointer(&dev);
-
-        if (ifname &&
-            flags & VIR_DOMAIN_DEF_PARSE_INACTIVE &&
-            (STRPREFIX(ifname, VIR_NET_GENERATED_MACVTAP_PREFIX) ||
-             STRPREFIX(ifname, VIR_NET_GENERATED_MACVLAN_PREFIX))) {
-            VIR_FREE(ifname);
-        }
-
         break;
 
     case VIR_DOMAIN_NET_TYPE_HOSTDEV:
@@ -12410,6 +12402,8 @@ virDomainNetDefParseXML(virDomainXMLOptionPtr xmlopt,
     if (def->managed_tap != VIR_TRISTATE_BOOL_NO && ifname &&
         (flags & VIR_DOMAIN_DEF_PARSE_INACTIVE) &&
         (STRPREFIX(ifname, VIR_NET_GENERATED_TAP_PREFIX) ||
+         STRPREFIX(ifname, VIR_NET_GENERATED_MACVTAP_PREFIX) ||
+         STRPREFIX(ifname, VIR_NET_GENERATED_MACVLAN_PREFIX) ||
          (prefix && STRPREFIX(ifname, prefix)))) {
         /* An auto-generated target name, blank it out */
         VIR_FREE(ifname);
@@ -13957,7 +13951,7 @@ virDomainTimerDefParseXML(xmlNodePtr node,
         }
     }
 
-    ret = virXPathULong("string(./@frequency)", ctxt, &def->frequency);
+    ret = virXPathULongLong("string(./@frequency)", ctxt, &def->frequency);
     if (ret == -1) {
         def->frequency = 0;
     } else if (ret < 0) {
@@ -21637,7 +21631,7 @@ virDomainDefParseXML(xmlDocPtr xml,
     if (n && VIR_ALLOC_N(def->videos, n) < 0)
         goto error;
     for (i = 0; i < n; i++) {
-        virDomainVideoDefPtr video;
+        g_autoptr(virDomainVideoDef) video = NULL;
         ssize_t insertAt = -1;
 
         if (!(video = virDomainVideoDefParseXML(xmlopt, nodes[i],
@@ -21646,7 +21640,6 @@ virDomainDefParseXML(xmlDocPtr xml,
 
         if (video->primary) {
             if (def->nvideos != 0 && def->videos[0]->primary) {
-                virDomainVideoDefFree(video);
                 virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
                                _("Only one primary video device is supported"));
                 goto error;
@@ -21658,7 +21651,6 @@ virDomainDefParseXML(xmlDocPtr xml,
                                        insertAt,
                                        def->nvideos,
                                        video) < 0) {
-            virDomainVideoDefFree(video);
             goto error;
         }
     }
@@ -22267,7 +22259,7 @@ virDomainTimerDefCheckABIStability(virDomainTimerDefPtr src,
     if (src->name == VIR_DOMAIN_TIMER_NAME_TSC) {
         if (src->frequency != dst->frequency) {
             virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
-                           _("Target TSC frequency %lu does not match source %lu"),
+                           _("Target TSC frequency %llu does not match source %llu"),
                            dst->frequency, src->frequency);
             return false;
         }
@@ -26263,6 +26255,8 @@ virDomainNetDefFormat(virBufferPtr buf,
         (def->managed_tap == VIR_TRISTATE_BOOL_NO ||
          !((flags & VIR_DOMAIN_DEF_FORMAT_INACTIVE) &&
            (STRPREFIX(def->ifname, VIR_NET_GENERATED_TAP_PREFIX) ||
+            STRPREFIX(def->ifname, VIR_NET_GENERATED_MACVTAP_PREFIX) ||
+            STRPREFIX(def->ifname, VIR_NET_GENERATED_MACVLAN_PREFIX) ||
             (prefix && STRPREFIX(def->ifname, prefix)))))) {
         /* Skip auto-generated target names for inactive config. */
         virBufferEscapeString(&attrBuf, " dev='%s'", def->ifname);
@@ -27361,7 +27355,7 @@ virDomainTimerDefFormat(virBufferPtr buf,
 
     if (def->name == VIR_DOMAIN_TIMER_NAME_TSC) {
         if (def->frequency > 0)
-            virBufferAsprintf(buf, " frequency='%lu'", def->frequency);
+            virBufferAsprintf(buf, " frequency='%llu'", def->frequency);
 
         if (def->mode != -1) {
             const char *mode
@@ -30080,6 +30074,12 @@ virDomainObjCopyPersistentDef(virDomainObjPtr dom,
     virDomainDefPtr cur;
 
     cur = virDomainObjGetPersistentDef(xmlopt, dom, parseOpaque);
+    if (!cur) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                       _("failed to get persistent definition object"));
+        return NULL;
+    }
+
     return virDomainDefCopy(cur, xmlopt, parseOpaque, false);
 }
 

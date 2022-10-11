@@ -78,7 +78,7 @@ vahDeinit(vahControl * ctl)
     if (ctl == NULL)
         return -1;
 
-    VIR_FREE(ctl->def);
+    virDomainDefFree(ctl->def);
     virObjectUnref(ctl->caps);
     virObjectUnref(ctl->xmlopt);
     VIR_FREE(ctl->files);

@@ -234,15 +234,11 @@ qemuConnectAgent(virQEMUDriverPtr driver, virDomainObjPtr vm)
      * deleted while the agent is active */
     virObjectRef(vm);
 
-    virObjectUnlock(vm);
-
     agent = qemuAgentOpen(vm,
                           config->source,
                           virEventThreadGetContext(priv->eventThread),
                           &agentCallbacks,
                           virQEMUCapsGet(priv->qemuCaps, QEMU_CAPS_VSERPORT_CHANGE));
-
-    virObjectLock(vm);
 
     if (agent == NULL)
         virObjectUnref(vm);
@@ -325,9 +321,6 @@ qemuProcessHandleMonitorEOF(qemuMonitorPtr mon,
     qemuDomainDestroyNamespace(driver, vm);
 
  cleanup:
-    /* Now we got EOF we're not expecting more I/O, so we
-     * can finally kill the event thread */
-    qemuDomainObjStopWorker(vm);
     virObjectUnlock(vm);
 }
 
@@ -7452,8 +7445,6 @@ void qemuProcessStop(virQEMUDriverPtr driver,
         qemuSecurityRestoreAllLabel(driver, vm,
                                     !!(flags & VIR_QEMU_PROCESS_STOP_MIGRATED));
 
-    qemuSecurityReleaseLabel(driver->securityManager, vm->def);
-
     for (i = 0; i < vm->def->ndisks; i++) {
         virDomainDeviceDef dev;
         virDomainDiskDefPtr disk = vm->def->disks[i];
@@ -7627,6 +7618,8 @@ void qemuProcessStop(virQEMUDriverPtr driver,
             qemuBlockRemoveImageMetadata(driver, vm, disk->dst, disk->src);
         }
     }
+
+    qemuSecurityReleaseLabel(driver->securityManager, vm->def);
 
     /* clear all private data entries which are no longer needed */
     qemuDomainObjPrivateDataClear(priv);

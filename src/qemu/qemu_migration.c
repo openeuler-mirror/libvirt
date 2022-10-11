@@ -539,10 +539,10 @@ qemuMigrationSrcNBDStorageCopyReady(virDomainObjPtr vm,
             return -1;
         }
 
-        virObjectUnref(job);
-
-        if (disk->mirrorState != VIR_DOMAIN_DISK_MIRROR_STATE_READY)
+        if (job->state != VIR_DOMAIN_BLOCK_JOB_READY)
             notReady++;
+
+        virObjectUnref(job);
     }
 
     if (notReady) {
@@ -2022,7 +2022,7 @@ qemuMigrationSrcCleanup(virDomainObjPtr vm,
     switch ((qemuMigrationJobPhase) priv->job.phase) {
     case QEMU_MIGRATION_PHASE_BEGIN3:
         /* just forget we were about to migrate */
-        qemuDomainObjDiscardAsyncJob(driver, vm);
+        qemuMigrationJobFinish(driver, vm);
         break;
 
     case QEMU_MIGRATION_PHASE_PERFORM3_DONE:
@@ -2032,7 +2032,7 @@ qemuMigrationSrcCleanup(virDomainObjPtr vm,
         qemuMigrationParamsReset(driver, vm, QEMU_ASYNC_JOB_MIGRATION_OUT,
                                  priv->job.migParams, priv->job.apiFlags);
         /* clear the job and let higher levels decide what to do */
-        qemuDomainObjDiscardAsyncJob(driver, vm);
+        qemuMigrationJobFinish(driver, vm);
         break;
 
     case QEMU_MIGRATION_PHASE_PERFORM3:
@@ -2896,7 +2896,7 @@ qemuMigrationDstPrepareDirect(virQEMUDriverPtr driver,
 
         *uri_out = g_strdup_printf(incFormat, "tcp", hostname, port);
     } else {
-        bool well_formed_uri;
+        bool well_formed_uri = false;
 
         if (!(uri = qemuMigrationAnyParseURI(uri_in, &well_formed_uri)))
             goto cleanup;
@@ -3637,7 +3637,7 @@ qemuMigrationSrcRun(virQEMUDriverPtr driver,
     }
 
     if (qemuMigrationSetDBusVMState(driver, vm) < 0)
-        goto exit_monitor;
+        goto error;
 
     /* Before EnterMonitor, since already qemuProcessStopCPUs does that */
     if (!(flags & VIR_MIGRATE_LIVE) &&

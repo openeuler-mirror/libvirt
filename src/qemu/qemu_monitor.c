@@ -842,6 +842,13 @@ qemuMonitorRegister(qemuMonitorPtr mon)
 }
 
 
+/**
+ * qemuMonitorUnregister:
+ * @mon: monitor object
+ *
+ * Unregister monitor from the event loop. The monitor object
+ * must be locked before calling this function.
+ */
 void
 qemuMonitorUnregister(qemuMonitorPtr mon)
 {
@@ -1024,7 +1031,27 @@ qemuMonitorInitBalloonObjectPath(qemuMonitorPtr mon,
 
     switch (balloon->info.type) {
     case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_PCI:
-        name = "virtio-balloon-pci";
+        switch ((virDomainMemballoonModel) balloon->model) {
+            case VIR_DOMAIN_MEMBALLOON_MODEL_VIRTIO:
+                name = "virtio-balloon-pci";
+                break;
+            case VIR_DOMAIN_MEMBALLOON_MODEL_VIRTIO_TRANSITIONAL:
+                name = "virtio-balloon-pci-transitional";
+                break;
+            case VIR_DOMAIN_MEMBALLOON_MODEL_VIRTIO_NON_TRANSITIONAL:
+                name = "virtio-balloon-pci-non-transitional";
+                break;
+            case VIR_DOMAIN_MEMBALLOON_MODEL_XEN:
+            case VIR_DOMAIN_MEMBALLOON_MODEL_NONE:
+                virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                        _("invalid model for virtio-balloon-pci"));
+                return;
+            case VIR_DOMAIN_MEMBALLOON_MODEL_LAST:
+            default:
+                virReportEnumRangeError(virDomainMemballoonModel,
+                                        balloon->model);
+                return;
+        }
         break;
     case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_CCW:
         name = "virtio-balloon-ccw";

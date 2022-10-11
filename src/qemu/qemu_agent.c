@@ -709,7 +709,10 @@ qemuAgentOpen(virDomainObjPtr vm,
         goto cleanup;
     }
 
+    virObjectUnlock(vm);
     agent->fd = qemuAgentOpenUnix(config->data.nix.path);
+    virObjectLock(vm);
+
     if (agent->fd == -1)
         goto cleanup;
 

@@ -4238,7 +4238,7 @@ doSave(void *opaque)
 
     sigemptyset(&sigmask);
     sigaddset(&sigmask, SIGINT);
-    if (pthread_sigmask(SIG_BLOCK, &sigmask, &oldsigmask) < 0)
+    if (pthread_sigmask(SIG_BLOCK, &sigmask, &oldsigmask) != 0)
         goto out_sig;
 #endif /* !WIN32 */
 
@@ -4768,7 +4768,7 @@ doManagedsave(void *opaque)
 
     sigemptyset(&sigmask);
     sigaddset(&sigmask, SIGINT);
-    if (pthread_sigmask(SIG_BLOCK, &sigmask, &oldsigmask) < 0)
+    if (pthread_sigmask(SIG_BLOCK, &sigmask, &oldsigmask) != 0)
         goto out_sig;
 #endif /* !WIN32 */
 
@@ -5450,7 +5450,7 @@ doDump(void *opaque)
 
     sigemptyset(&sigmask);
     sigaddset(&sigmask, SIGINT);
-    if (pthread_sigmask(SIG_BLOCK, &sigmask, &oldsigmask) < 0)
+    if (pthread_sigmask(SIG_BLOCK, &sigmask, &oldsigmask) != 0)
         goto out_sig;
 #endif /* !WIN32 */
 
@@ -10740,7 +10740,7 @@ doMigrate(void *opaque)
 
     sigemptyset(&sigmask);
     sigaddset(&sigmask, SIGINT);
-    if (pthread_sigmask(SIG_BLOCK, &sigmask, &oldsigmask) < 0)
+    if (pthread_sigmask(SIG_BLOCK, &sigmask, &oldsigmask) != 0)
         goto out_sig;
 #endif /* !WIN32 */
 
@@ -14227,7 +14227,7 @@ static bool
 cmdGuestAgentTimeout(vshControl *ctl, const vshCmd *cmd)
 {
     virDomainPtr dom = NULL;
-    int timeout;
+    int timeout = VIR_DOMAIN_AGENT_RESPONSE_TIMEOUT_BLOCK;
     const unsigned int flags = 0;
     bool ret = false;
 

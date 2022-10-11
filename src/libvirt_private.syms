@@ -2906,6 +2906,7 @@ virQEMUBuildCommandLineJSONArrayNumbered;
 virQEMUBuildDriveCommandlineFromJSON;
 virQEMUBuildNetdevCommandlineFromJSON;
 virQEMUBuildQemuImgKeySecretOpts;
+virQEMUFileOpenAs;
 
 
 # util/virrandom.h
@@ -3172,6 +3173,7 @@ virStorageFileBackendRegister;
 virSkipSpaces;
 virSkipSpacesAndBackslash;
 virSkipSpacesBackwards;
+virSkipToDigit;
 virStrcpy;
 virStringBufferIsPrintable;
 virStringFilterChars;

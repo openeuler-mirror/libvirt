@@ -1034,7 +1034,7 @@ vshCommandOptStringReq(vshControl *ctl,
     /* this should not be propagated here, just to be sure */
     if (ret == -1)
         error = N_("Mandatory option not present");
-    else if (!*arg->data && !(arg->def->flags & VSH_OFLAG_EMPTY_OK))
+    else if (arg && !*arg->data && !(arg->def->flags & VSH_OFLAG_EMPTY_OK))
         error = N_("Option argument is empty");
 
     if (error) {
@@ -1555,7 +1555,7 @@ vshCommandParse(vshControl *ctl, vshCommandParser *parser, vshCmd **partial)
 
             if (!partial &&
                 vshCommandCheckOpts(ctl, c, opts_required, opts_seen) < 0) {
-                VIR_FREE(c);
+                vshCommandFree(c);
                 goto syntaxError;
             }
 

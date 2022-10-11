@@ -683,7 +683,7 @@ virNetServerAddServiceActivation(virNetServerPtr srv,
                                  size_t max_queued_clients,
                                  size_t nrequests_client_max)
 {
-    int *fds;
+    g_autofree int *fds = NULL;
     size_t nfds;
 
     if (act == NULL)

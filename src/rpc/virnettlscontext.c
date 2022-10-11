@@ -38,8 +38,6 @@
 #include "virthread.h"
 #include "configmake.h"
 
-#define DH_BITS 2048
-
 #define LIBVIRT_PKI_DIR SYSCONFDIR "/pki"
 #define LIBVIRT_CACERT LIBVIRT_PKI_DIR "/CA/cacert.pem"
 #define LIBVIRT_CACRL LIBVIRT_PKI_DIR "/CA/cacrl.pem"
@@ -720,6 +718,15 @@ static virNetTLSContextPtr virNetTLSContextNew(const char *cacert,
      * security requirements.
      */
     if (isServer) {
+        unsigned int bits = 0;
+
+        bits = gnutls_sec_param_to_pk_bits(GNUTLS_PK_DH, GNUTLS_SEC_PARAM_MEDIUM);
+        if (bits == 0) {
+            virReportError(VIR_ERR_SYSTEM_ERROR, "%s",
+                           _("Unable to get key length for diffie-hellman parameters"));
+            goto error;
+        }
+
         err = gnutls_dh_params_init(&ctxt->dhParams);
         if (err < 0) {
             virReportError(VIR_ERR_SYSTEM_ERROR,
@@ -727,7 +734,7 @@ static virNetTLSContextPtr virNetTLSContextNew(const char *cacert,
                            gnutls_strerror(err));
             goto error;
         }
-        err = gnutls_dh_params_generate2(ctxt->dhParams, DH_BITS);
+        err = gnutls_dh_params_generate2(ctxt->dhParams, bits);
         if (err < 0) {
             virReportError(VIR_ERR_SYSTEM_ERROR,
                            _("Unable to generate diffie-hellman parameters: %s"),
@@ -1235,8 +1242,6 @@ virNetTLSSessionPtr virNetTLSSessionNew(virNetTLSContextPtr ctxt,
      */
     if (ctxt->isServer) {
         gnutls_certificate_server_set_request(sess->session, GNUTLS_CERT_REQUEST);
-
-        gnutls_dh_set_prime_bits(sess->session, DH_BITS);
     }
 
     gnutls_transport_set_ptr(sess->session, sess);

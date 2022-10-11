@@ -227,7 +227,7 @@ virCPUDefUpdateFeature(virCPUDefPtr cpu,
                        int policy);
 
 virCPUFeatureDefPtr
-virCPUDefFindFeature(virCPUDefPtr def,
+virCPUDefFindFeature(const virCPUDef *def,
                      const char *name);
 
 int

@@ -148,11 +148,6 @@ static int qemuDomainObjStart(virConnectPtr conn,
 static int qemuDomainManagedSaveLoad(virDomainObjPtr vm,
                                      void *opaque);
 
-static int qemuOpenFileAs(uid_t fallback_uid, gid_t fallback_gid,
-                          bool dynamicOwnership,
-                          const char *path, int oflags,
-                          bool *needUnlink);
-
 static virQEMUDriverPtr qemu_driver;
 
 /* Looks up the domain object from snapshot and unlocks the
@@ -539,18 +534,11 @@ qemuDomainCheckpointLoad(virDomainObjPtr vm,
             continue;
         }
 
-        def = virDomainCheckpointDefParseString(xmlStr,
-                                                qemu_driver->xmlopt,
-                                                priv->qemuCaps,
-                                                flags);
-        if (!def || virDomainCheckpointAlignDisks(def) < 0) {
-            /* Nothing we can do here, skip this one */
-            virReportError(VIR_ERR_INTERNAL_ERROR,
-                           _("Failed to parse checkpoint XML from file '%s'"),
-                           fullpath);
-            virObjectUnref(def);
+        if (!(def = virDomainCheckpointDefParseString(xmlStr,
+                                                      qemu_driver->xmlopt,
+                                                      priv->qemuCaps,
+                                                      flags)))
             continue;
-        }
 
         chk = virDomainCheckpointAssignDef(vm->checkpoints, def);
         if (chk == NULL)
@@ -3073,129 +3061,8 @@ qemuOpenFile(virQEMUDriverPtr driver,
         (virParseOwnershipIds(seclabel->label, &user, &group) < 0))
         return -1;
 
-    return qemuOpenFileAs(user, group, dynamicOwnership,
-                          path, oflags, needUnlink);
-}
-
-static int
-qemuOpenFileAs(uid_t fallback_uid, gid_t fallback_gid,
-               bool dynamicOwnership,
-               const char *path, int oflags,
-               bool *needUnlink)
-{
-    struct stat sb;
-    bool is_reg = true;
-    bool need_unlink = false;
-    unsigned int vfoflags = 0;
-    int fd = -1;
-    int path_shared = virFileIsSharedFS(path);
-    uid_t uid = geteuid();
-    gid_t gid = getegid();
-
-    /* path might be a pre-existing block dev, in which case
-     * we need to skip the create step, and also avoid unlink
-     * in the failure case */
-    if (oflags & O_CREAT) {
-        need_unlink = true;
-
-        /* Don't force chown on network-shared FS
-         * as it is likely to fail. */
-        if (path_shared <= 0 || dynamicOwnership)
-            vfoflags |= VIR_FILE_OPEN_FORCE_OWNER;
-
-        if (stat(path, &sb) == 0) {
-            /* It already exists, we don't want to delete it on error */
-            need_unlink = false;
-
-            is_reg = !!S_ISREG(sb.st_mode);
-            /* If the path is regular file which exists
-             * already and dynamic_ownership is off, we don't
-             * want to change its ownership, just open it as-is */
-            if (is_reg && !dynamicOwnership) {
-                uid = sb.st_uid;
-                gid = sb.st_gid;
-            }
-        }
-    }
-
-    /* First try creating the file as root */
-    if (!is_reg) {
-        if ((fd = open(path, oflags & ~O_CREAT)) < 0) {
-            fd = -errno;
-            goto error;
-        }
-    } else {
-        if ((fd = virFileOpenAs(path, oflags, S_IRUSR | S_IWUSR, uid, gid,
-                                vfoflags | VIR_FILE_OPEN_NOFORK)) < 0) {
-            /* If we failed as root, and the error was permission-denied
-               (EACCES or EPERM), assume it's on a network-connected share
-               where root access is restricted (eg, root-squashed NFS). If the
-               qemu user is non-root, just set a flag to
-               bypass security driver shenanigans, and retry the operation
-               after doing setuid to qemu user */
-            if ((fd != -EACCES && fd != -EPERM) || fallback_uid == geteuid())
-                goto error;
-
-            /* On Linux we can also verify the FS-type of the directory. */
-            switch (path_shared) {
-                case 1:
-                    /* it was on a network share, so we'll continue
-                     * as outlined above
-                     */
-                    break;
-
-                case -1:
-                    virReportSystemError(-fd, oflags & O_CREAT
-                                         ? _("Failed to create file "
-                                             "'%s': couldn't determine fs type")
-                                         : _("Failed to open file "
-                                             "'%s': couldn't determine fs type"),
-                                         path);
-                    goto cleanup;
-
-                case 0:
-                default:
-                    /* local file - log the error returned by virFileOpenAs */
-                    goto error;
-            }
-
-            /* If we created the file above, then we need to remove it;
-             * otherwise, the next attempt to create will fail. If the
-             * file had already existed before we got here, then we also
-             * don't want to delete it and allow the following to succeed
-             * or fail based on existing protections
-             */
-            if (need_unlink)
-                unlink(path);
-
-            /* Retry creating the file as qemu user */
-
-            /* Since we're passing different modes... */
-            vfoflags |= VIR_FILE_OPEN_FORCE_MODE;
-
-            if ((fd = virFileOpenAs(path, oflags,
-                                    S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP,
-                                    fallback_uid, fallback_gid,
-                                    vfoflags | VIR_FILE_OPEN_FORK)) < 0) {
-                virReportSystemError(-fd, oflags & O_CREAT
-                                     ? _("Error from child process creating '%s'")
-                                     : _("Error from child process opening '%s'"),
-                                     path);
-                goto cleanup;
-            }
-        }
-    }
- cleanup:
-    if (needUnlink)
-        *needUnlink = need_unlink;
-    return fd;
-
- error:
-    virReportSystemError(-fd, oflags & O_CREAT
-                         ? _("Failed to create file '%s'")
-                         : _("Failed to open file '%s'"),
-                         path);
-    goto cleanup;
+    return virQEMUFileOpenAs(user, group, dynamicOwnership,
+                             path, oflags, needUnlink);
 }
 
 
@@ -3258,9 +3125,9 @@ qemuDomainSaveMemory(virQEMUDriverPtr driver,
         }
     }
 
-    fd = qemuOpenFileAs(cfg->user, cfg->group, false, path,
-                        O_WRONLY | O_TRUNC | O_CREAT | directFlag,
-                        &needUnlink);
+    fd = virQEMUFileOpenAs(cfg->user, cfg->group, false, path,
+                           O_WRONLY | O_TRUNC | O_CREAT | directFlag,
+                           &needUnlink);
     if (fd < 0)
         goto cleanup;
 
@@ -3836,7 +3703,7 @@ doCoreDump(virQEMUDriverPtr driver,
     /* Core dumps usually imply last-ditch analysis efforts are
      * desired, so we intentionally do not unlink even if a file was
      * created.  */
-    if ((fd = qemuOpenFileAs(cfg->user, cfg->group, false, path,
+    if ((fd = virQEMUFileOpenAs(cfg->user, cfg->group, false, path,
                              O_CREAT | O_TRUNC | O_WRONLY | directFlag,
                              NULL)) < 0)
         goto cleanup;
@@ -4083,7 +3950,7 @@ qemuDomainScreenshot(virDomainPtr dom,
     }
     unlink_tmp = true;
 
-    qemuSecuritySetSavedStateLabel(driver, vm, tmp);
+    qemuSecurityDomainSetPathLabel(driver, vm, tmp, false);
 
     qemuDomainObjEnterMonitor(driver, vm);
     if (qemuMonitorScreendump(priv->mon, videoAlias, screen, tmp) < 0) {
@@ -9387,7 +9254,7 @@ qemuDomainSetBlkioParameters(virDomainPtr dom,
     if (virDomainObjGetDefs(vm, flags, &def, &persistentDef) < 0)
         goto endjob;
 
-    if (flags & VIR_DOMAIN_AFFECT_LIVE) {
+    if (def) {
         if (!virCgroupHasController(priv->cgroup, VIR_CGROUP_CONTROLLER_BLKIO)) {
             virReportError(VIR_ERR_OPERATION_INVALID, "%s",
                            _("blkio cgroup isn't mounted"));
@@ -11699,7 +11566,7 @@ qemuDomainMemoryPeek(virDomainPtr dom,
         goto endjob;
     }
 
-    qemuSecuritySetSavedStateLabel(driver, vm, tmp);
+    qemuSecurityDomainSetPathLabel(driver, vm, tmp, false);
 
     priv = vm->privateData;
     qemuDomainObjEnterMonitor(driver, vm);
@@ -15423,6 +15290,7 @@ static int
 qemuDomainSnapshotCreateDiskActive(virQEMUDriverPtr driver,
                                    virDomainObjPtr vm,
                                    virDomainMomentObjPtr snap,
+                                   virHashTablePtr blockNamedNodeData,
                                    unsigned int flags,
                                    virQEMUDriverConfigPtr cfg,
                                    qemuDomainAsyncJob asyncJob)
@@ -15436,16 +15304,11 @@ qemuDomainSnapshotCreateDiskActive(virQEMUDriverPtr driver,
     qemuDomainSnapshotDiskDataPtr diskdata = NULL;
     size_t ndiskdata = 0;
     bool blockdev =  virQEMUCapsGet(priv->qemuCaps, QEMU_CAPS_BLOCKDEV);
-    g_autoptr(virHashTable) blockNamedNodeData = NULL;
 
     if (virDomainObjCheckActive(vm) < 0)
         return -1;
 
     actions = virJSONValueNewArray();
-
-    if (blockdev &&
-        !(blockNamedNodeData = qemuBlockGetNamedNodeData(vm, asyncJob)))
-        return -1;
 
     /* prepare a list of objects to use in the vm definition so that we don't
      * have to roll back later */
@@ -15513,6 +15376,7 @@ qemuDomainSnapshotCreateActiveExternal(virQEMUDriverPtr driver,
     int compressed;
     g_autoptr(virCommand) compressor = NULL;
     virQEMUSaveDataPtr data = NULL;
+    g_autoptr(virHashTable) blockNamedNodeData = NULL;
 
     /* If quiesce was requested, then issue a freeze command, and a
      * counterpart thaw command when it is actually sent to agent.
@@ -15567,6 +15431,13 @@ qemuDomainSnapshotCreateActiveExternal(virQEMUDriverPtr driver,
         }
     }
 
+    /* We need to collect reply from 'query-named-block-nodes' prior to the
+     * migration step as qemu deactivates bitmaps after migration so the result
+     * would be wrong */
+    if (virQEMUCapsGet(priv->qemuCaps, QEMU_CAPS_BLOCKDEV) &&
+        !(blockNamedNodeData = qemuBlockGetNamedNodeData(vm, QEMU_ASYNC_JOB_SNAPSHOT)))
+        goto cleanup;
+
     /* do the memory snapshot if necessary */
     if (memory) {
         /* check if migration is possible */
@@ -15611,7 +15482,8 @@ qemuDomainSnapshotCreateActiveExternal(virQEMUDriverPtr driver,
 
     /* the domain is now paused if a memory snapshot was requested */
 
-    if ((ret = qemuDomainSnapshotCreateDiskActive(driver, vm, snap, flags, cfg,
+    if ((ret = qemuDomainSnapshotCreateDiskActive(driver, vm, snap,
+                                                  blockNamedNodeData, flags, cfg,
                                                   QEMU_ASYNC_JOB_SNAPSHOT)) < 0)
         goto cleanup;
 
@@ -19900,7 +19772,7 @@ qemuDomainPMSuspendAgent(virQEMUDriverPtr driver,
     if (qemuDomainObjBeginAgentJob(driver, vm, QEMU_AGENT_JOB_MODIFY) < 0)
         return -1;
 
-    if ((ret = virDomainObjCheckActive(vm)) < 0)
+    if (virDomainObjCheckActive(vm) < 0)
         goto endjob;
 
     if (!qemuDomainAgentAvailable(vm, true))
@@ -19948,6 +19820,9 @@ qemuDomainPMSuspendForDuration(virDomainPtr dom,
         goto cleanup;
 
     if (virDomainPMSuspendForDurationEnsureACL(dom->conn, vm->def) < 0)
+        goto cleanup;
+
+    if (!qemuDomainAgentAvailable(vm, true))
         goto cleanup;
 
     /*
@@ -21509,8 +21384,14 @@ qemuDomainGetStatsBlockExportDisk(virDomainDiskDefPtr disk,
         VIR_INFO("optional disk '%s' source file is missing, "
                  "skip getting stats", disk->dst);
 
-        return qemuDomainGetStatsBlockExportHeader(disk, disk->src, *recordnr,
-                                                   params);
+        if (qemuDomainGetStatsBlockExportHeader(disk, disk->src, *recordnr,
+                                                params) < 0) {
+            return -1;
+        }
+
+        (*recordnr)++;
+
+        return 0;
     }
 
     for (n = disk->src; virStorageSourceIsBacking(n); n = n->backingStore) {

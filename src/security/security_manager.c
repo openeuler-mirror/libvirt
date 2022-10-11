@@ -1302,7 +1302,8 @@ virSecurityManagerMetadataLock(virSecurityManagerPtr mgr G_GNUC_UNUSED,
      * paths in the same order and thus no deadlock can occur.
      * Lastly, it makes searching for duplicate paths below
      * simpler. */
-    qsort(paths, npaths, sizeof(*paths), cmpstringp);
+    if (paths)
+        qsort(paths, npaths, sizeof(*paths), cmpstringp);
 
     for (i = 0; i < npaths; i++) {
         const char *p = paths[i];
@@ -1331,11 +1332,17 @@ virSecurityManagerMetadataLock(virSecurityManagerPtr mgr G_GNUC_UNUSED,
             continue;
 
         if (S_ISDIR(sb.st_mode)) {
-            /* Directories can't be locked */
+            /* We need to open the path for writing because we need exclusive
+             * (write) lock. But directories can't be opened for writing. */
             continue;
         }
 
         if ((fd = open(p, O_RDWR)) < 0) {
+            if (errno == EROFS) {
+                /* There is nothing we can do for RO filesystem. */
+                continue;
+            }
+
 #ifndef WIN32
             if (S_ISSOCK(sb.st_mode)) {
                 /* Sockets can be opened only if there exists the

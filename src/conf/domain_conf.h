@@ -2078,7 +2078,7 @@ struct _virDomainTimerDef {
     int track;  /* host|guest */
 
     /* frequency & mode are only valid for name='tsc' */
-    unsigned long frequency; /* in Hz, unspecified = 0 */
+    unsigned long long frequency; /* in Hz, unspecified = 0 */
     int mode;       /* auto|native|emulate|paravirt */
 };
 
@@ -2938,6 +2938,7 @@ void virDomainNVRAMDefFree(virDomainNVRAMDefPtr def);
 void virDomainWatchdogDefFree(virDomainWatchdogDefPtr def);
 virDomainVideoDefPtr virDomainVideoDefNew(virDomainXMLOptionPtr xmlopt);
 void virDomainVideoDefFree(virDomainVideoDefPtr def);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(virDomainVideoDef, virDomainVideoDefFree);
 void virDomainVideoDefClear(virDomainVideoDefPtr def);
 virDomainHostdevDefPtr virDomainHostdevDefNew(void);
 void virDomainHostdevDefClear(virDomainHostdevDefPtr def);

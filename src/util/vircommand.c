@@ -775,6 +775,10 @@ virExec(virCommandPtr cmd)
         }
 
         if (pid > 0) {
+            /* At this point it's us and the child that holds the write end of
+             * the pipe open. Close the write end of the pipe, so that the pipe
+             * is fully closed if child dies prematurely. */
+            VIR_FORCE_CLOSE(pipesync[1]);
             /* The parent expect us to have written the pid file before
              * exiting. Wait here for the child to write it and signal us. */
             if (cmd->pidfile &&
@@ -787,15 +791,6 @@ virExec(virCommandPtr cmd)
         }
     }
 
-    if (virProcessSetMaxMemLock(0, cmd->maxMemLock) < 0)
-        goto fork_error;
-    if (virProcessSetMaxProcesses(0, cmd->maxProcesses) < 0)
-        goto fork_error;
-    if (virProcessSetMaxFiles(0, cmd->maxFiles) < 0)
-        goto fork_error;
-    if (cmd->setMaxCore &&
-        virProcessSetMaxCoreSize(0, cmd->maxCore) < 0)
-        goto fork_error;
     if (cmd->pidfile) {
         int pidfilefd = -1;
         char c;
@@ -819,6 +814,16 @@ virExec(virCommandPtr cmd)
 
         /* pidfilefd is intentionally leaked. */
     }
+
+    if (virProcessSetMaxMemLock(0, cmd->maxMemLock) < 0)
+        goto fork_error;
+    if (virProcessSetMaxProcesses(0, cmd->maxProcesses) < 0)
+        goto fork_error;
+    if (virProcessSetMaxFiles(0, cmd->maxFiles) < 0)
+        goto fork_error;
+    if (cmd->setMaxCore &&
+        virProcessSetMaxCoreSize(0, cmd->maxCore) < 0)
+        goto fork_error;
 
     if (cmd->hook) {
         VIR_DEBUG("Run hook %p %p", cmd->hook, cmd->opaque);

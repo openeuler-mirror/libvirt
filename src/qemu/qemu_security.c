@@ -32,7 +32,7 @@ VIR_LOG_INIT("qemu.qemu_process");
 int
 qemuSecuritySetAllLabel(virQEMUDriverPtr driver,
                         virDomainObjPtr vm,
-                        const char *stdin_path,
+                        const char *incomingPath,
                         bool migrated)
 {
     int ret = -1;
@@ -47,7 +47,7 @@ qemuSecuritySetAllLabel(virQEMUDriverPtr driver,
 
     if (virSecurityManagerSetAllLabel(driver->securityManager,
                                       vm->def,
-                                      stdin_path,
+                                      incomingPath,
                                       priv->chardevStdioLogd,
                                       migrated) < 0)
         goto cleanup;
@@ -594,37 +594,6 @@ qemuSecurityDomainSetPathLabel(virQEMUDriverPtr driver,
                                              vm->def,
                                              path,
                                              allowSubtree) < 0)
-        goto cleanup;
-
-    if (virSecurityManagerTransactionCommit(driver->securityManager,
-                                            pid, priv->rememberOwner) < 0)
-        goto cleanup;
-
-    ret = 0;
- cleanup:
-    virSecurityManagerTransactionAbort(driver->securityManager);
-    return ret;
-}
-
-
-int
-qemuSecuritySetSavedStateLabel(virQEMUDriverPtr driver,
-                                   virDomainObjPtr vm,
-                                   const char *savefile)
-{
-    qemuDomainObjPrivatePtr priv = vm->privateData;
-    pid_t pid = -1;
-    int ret = -1;
-
-    if (qemuDomainNamespaceEnabled(vm, QEMU_DOMAIN_NS_MOUNT))
-        pid = vm->pid;
-
-    if (virSecurityManagerTransactionStart(driver->securityManager) < 0)
-        goto cleanup;
-
-    if (virSecurityManagerSetSavedStateLabel(driver->securityManager,
-                                             vm->def,
-                                             savefile) < 0)
         goto cleanup;
 
     if (virSecurityManagerTransactionCommit(driver->securityManager,

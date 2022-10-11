@@ -66,6 +66,9 @@ struct _udevEventData {
     virCond threadCond;
     bool threadQuit;
     bool dataReady;
+
+    /* init thread */
+    virThread initThread;
 };
 
 static virClassPtr udevEventDataClass;
@@ -1467,6 +1470,7 @@ nodeStateCleanup(void)
         priv->threadQuit = true;
         virCondSignal(&priv->threadCond);
         virObjectUnlock(priv);
+        virThreadJoin(&priv->initThread);
         virThreadJoin(&priv->th);
     }
 
@@ -1747,10 +1751,11 @@ nodeStateInitializeEnumerate(void *opaque)
     if (udevEnumerateDevices(udev) != 0)
         goto error;
 
+ cleanup:
     nodeDeviceLock();
     driver->initialized = true;
-    nodeDeviceUnlock();
     virCondBroadcast(&driver->initCond);
+    nodeDeviceUnlock();
 
     return;
 
@@ -1761,6 +1766,8 @@ nodeStateInitializeEnumerate(void *opaque)
     priv->threadQuit = true;
     virCondSignal(&priv->threadCond);
     virObjectUnlock(priv);
+
+    goto cleanup;
 }
 
 
@@ -1796,7 +1803,6 @@ nodeStateInitialize(bool privileged,
 {
     udevEventDataPtr priv = NULL;
     struct udev *udev = NULL;
-    virThread enumThread;
 
     if (root != NULL) {
         virReportError(VIR_ERR_INVALID_ARG, "%s",
@@ -1905,7 +1911,7 @@ nodeStateInitialize(bool privileged,
     if (udevSetupSystemDev() != 0)
         goto cleanup;
 
-    if (virThreadCreateFull(&enumThread, false, nodeStateInitializeEnumerate,
+    if (virThreadCreateFull(&priv->initThread, true, nodeStateInitializeEnumerate,
                             "nodedev-init", false, udev) < 0) {
         virReportSystemError(errno, "%s",
                              _("failed to create udev enumerate thread"));

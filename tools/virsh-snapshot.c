@@ -1492,8 +1492,6 @@ cmdSnapshotList(vshControl *ctl, const vshCmd *cmd)
     virDomainSnapshotPtr snapshot = NULL;
     char *state = NULL;
     long long creation_longlong;
-    g_autoptr(GDateTime) then = NULL;
-    g_autofree gchar *thenstr = NULL;
     bool tree = vshCommandOptBool(cmd, "tree");
     bool name = vshCommandOptBool(cmd, "name");
     bool from = vshCommandOptBool(cmd, "from");
@@ -1588,6 +1586,8 @@ cmdSnapshotList(vshControl *ctl, const vshCmd *cmd)
     }
 
     for (i = 0; i < snaplist->nsnaps; i++) {
+        g_autoptr(GDateTime) then = NULL;
+        g_autofree gchar *thenstr = NULL;
         const char *snap_name;
 
         /* free up memory from previous iterations of the loop */

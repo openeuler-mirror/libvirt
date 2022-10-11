@@ -771,6 +771,7 @@ int virTestMain(int argc,
     while ((lib = va_arg(ap, const char *))) {
         if (!virFileIsExecutable(lib)) {
             perror(lib);
+            va_end(ap);
             return EXIT_FAILURE;
         }
 
@@ -848,6 +849,9 @@ int virTestMain(int argc,
         fprintf(stderr, "Some tests failed. Run them using:\n");
         fprintf(stderr, "VIR_TEST_DEBUG=1 VIR_TEST_RANGE=%s %s\n", failed, argv[0]);
     }
+
+    virBitmapFree(testBitmap);
+    virBitmapFree(failedTests);
     virLogReset();
     return ret;
 }
