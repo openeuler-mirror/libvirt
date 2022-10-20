@@ -303,4 +303,5 @@ stratovirtGetMemoryBackingBasePath(virStratoVirtDriverConfigPtr cfg,
 virStratoVirtConf stratovirtconf = {
     .stratovirtSharedDeviceEntryFree = qemuSharedDeviceEntryFree,
     .virStratoVirtCapsCacheNew = virQEMUCapsCacheNew,
+    .stratovirtCheckDiskConfig = qemuCheckDiskConfig,
 };
