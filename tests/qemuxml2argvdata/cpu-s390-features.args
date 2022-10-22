@@ -10,7 +10,8 @@ QEMU_AUDIO_DRV=none \
 /usr/bin/qemu-system-s390x \
 -name guest1 \
 -S \
--machine s390-ccw-virtio,accel=kvm,usb=off,dump-guest-core=off \
+-machine s390-ccw-virtio,usb=off,dump-guest-core=off \
+-accel kvm \
 -cpu zEC12,dfppc=on,stckf=off \
 -m 214 \
 -realtime mlock=off \

@@ -12,7 +12,8 @@ QEMU_AUDIO_DRV=none \
 -S \
 -object secret,id=masterKey0,format=raw,\
 file=/tmp/lib/domain--1-QEMUGuest1/master-key.aes \
--machine pc-i440fx-4.0,accel=tcg,usb=off,dump-guest-core=off \
+-machine pc-i440fx-4.0,usb=off,dump-guest-core=off \
+-accel tcg \
 -cpu Haswell,pclmuldq=on,ds_cpl=on,tsc_adjust=on,fxsr_opt=on,lahf_lm=on,\
 cmp_legacy=on,nodeid_msr=on,perfctr_core=on,perfctr_nb=on,kvm_pv_eoi=on,\
 kvm_pv_unhalt=on \

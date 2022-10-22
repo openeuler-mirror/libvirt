@@ -10,7 +10,8 @@ QEMU_AUDIO_DRV=none \
 /usr/bin/qemu-system-x86_64 \
 -name expander-test \
 -S \
--machine pc-i440fx-2.5,accel=tcg,usb=off,dump-guest-core=off \
+-machine pc-i440fx-2.5,usb=off,dump-guest-core=off \
+-accel tcg \
 -m 214 \
 -realtime mlock=off \
 -smp 16,sockets=2,cores=4,threads=2 \

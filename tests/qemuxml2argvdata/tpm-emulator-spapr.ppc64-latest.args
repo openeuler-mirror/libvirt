@@ -12,7 +12,8 @@ QEMU_AUDIO_DRV=none \
 -S \
 -object secret,id=masterKey0,format=raw,\
 file=/tmp/lib/domain--1-TPM-VM/master-key.aes \
--machine pseries-5.0,accel=tcg,usb=off,dump-guest-core=off \
+-machine pseries-5.0,usb=off,dump-guest-core=off \
+-accel tcg \
 -cpu POWER9 \
 -m 2048 \
 -overcommit mem-lock=off \

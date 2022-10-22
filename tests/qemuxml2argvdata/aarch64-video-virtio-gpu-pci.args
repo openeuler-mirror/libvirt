@@ -10,7 +10,8 @@ QEMU_AUDIO_DRV=none \
 /usr/bin/qemu-system-aarch64 \
 -name aarch64-vgpu \
 -S \
--machine virt,accel=tcg,usb=off,dump-guest-core=off \
+-machine virt,usb=off,dump-guest-core=off \
+-accel tcg \
 -cpu cortex-a57 \
 -m 1024 \
 -realtime mlock=off \

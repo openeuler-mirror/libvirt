@@ -10,7 +10,8 @@ QEMU_AUDIO_DRV=none \
 /usr/bin/qemu-system-i386 \
 -name guest=QEMUGuest1,debug-threads=on \
 -S \
--machine pc-i440fx-2.5,accel=tcg,usb=off,dump-guest-core=off \
+-machine pc-i440fx-2.5,usb=off,dump-guest-core=off \
+-accel tcg \
 -m 214 \
 -realtime mlock=off \
 -smp 1,sockets=1,cores=1,threads=1 \

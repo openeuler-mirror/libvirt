@@ -10,7 +10,8 @@ QEMU_AUDIO_DRV=none \
 /usr/bin/qemu-system-arm \
 -name armtest \
 -S \
--machine virt,accel=kvm,usb=off,dump-guest-core=off \
+-machine virt,usb=off,dump-guest-core=off \
+-accel kvm \
 -cpu host,aarch64=off \
 -m 1024 \
 -realtime mlock=off \

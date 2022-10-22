@@ -12,7 +12,8 @@ QEMU_AUDIO_DRV=none \
 -S \
 -object secret,id=masterKey0,format=raw,\
 file=/tmp/lib/domain--1-encryptdisk/master-key.aes \
--machine pc-i440fx-2.1,accel=tcg,usb=off,dump-guest-core=off \
+-machine pc-i440fx-2.1,usb=off,dump-guest-core=off \
+-accel tcg \
 -cpu qemu64 \
 -m 1024 \
 -overcommit mem-lock=off \

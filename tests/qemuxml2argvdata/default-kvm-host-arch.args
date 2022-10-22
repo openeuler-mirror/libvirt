@@ -10,7 +10,8 @@ QEMU_AUDIO_DRV=none \
 /usr/bin/qemu-system-x86_64 \
 -name kvm \
 -S \
--machine pc,accel=kvm,usb=off,dump-guest-core=off \
+-machine pc,usb=off,dump-guest-core=off \
+-accel kvm \
 -m 4096 \
 -realtime mlock=off \
 -smp 4,sockets=4,cores=1,threads=1 \

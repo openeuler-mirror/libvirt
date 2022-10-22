@@ -190,7 +190,7 @@ VIR_ENUM_IMPL(qemuNumaPolicy,
               "interleave",
 );
 
- 
+
 static int
 qemuBuildObjectCommandlineFromJSON(virBuffer *buf,
                                    virJSONValue *props,
@@ -7061,33 +7061,6 @@ qemuBuildMachineCommandLine(virCommandPtr cmd,
     virCommandAddArg(cmd, "-machine");
     virBufferAdd(&buf, def->os.machine, -1);
 
-    switch ((virDomainVirtType)def->virtType) {
-    case VIR_DOMAIN_VIRT_QEMU:
-        virBufferAddLit(&buf, ",accel=tcg");
-        break;
-
-    case VIR_DOMAIN_VIRT_KVM:
-        virBufferAddLit(&buf, ",accel=kvm");
-        break;
-
-    case VIR_DOMAIN_VIRT_KQEMU:
-    case VIR_DOMAIN_VIRT_XEN:
-    case VIR_DOMAIN_VIRT_LXC:
-    case VIR_DOMAIN_VIRT_UML:
-    case VIR_DOMAIN_VIRT_OPENVZ:
-    case VIR_DOMAIN_VIRT_TEST:
-    case VIR_DOMAIN_VIRT_VMWARE:
-    case VIR_DOMAIN_VIRT_HYPERV:
-    case VIR_DOMAIN_VIRT_VBOX:
-    case VIR_DOMAIN_VIRT_PHYP:
-    case VIR_DOMAIN_VIRT_PARALLELS:
-    case VIR_DOMAIN_VIRT_BHYVE:
-    case VIR_DOMAIN_VIRT_VZ:
-    case VIR_DOMAIN_VIRT_NONE:
-    case VIR_DOMAIN_VIRT_LAST:
-        break;
-    }
-
     /* To avoid the collision of creating USB controllers when calling
      * machine->init in QEMU, it needs to set usb=off
      */
@@ -7253,7 +7226,46 @@ qemuBuildMachineCommandLine(virCommandPtr cmd,
 
 
 static void
-qemuBuildTSEGCommandLine(virCommandPtr cmd,
+qemuBuildAccelCommandLine(virCommand *cmd,
+                          const virDomainDef *def)
+{
+    g_auto(virBuffer) buf = VIR_BUFFER_INITIALIZER;
+
+    virCommandAddArg(cmd, "-accel");
+
+    switch ((virDomainVirtType)def->virtType) {
+    case VIR_DOMAIN_VIRT_QEMU:
+        virBufferAddLit(&buf, "tcg");
+        break;
+
+    case VIR_DOMAIN_VIRT_KVM:
+        virBufferAddLit(&buf, "kvm");
+        break;
+
+    case VIR_DOMAIN_VIRT_KQEMU:
+    case VIR_DOMAIN_VIRT_XEN:
+    case VIR_DOMAIN_VIRT_LXC:
+    case VIR_DOMAIN_VIRT_UML:
+    case VIR_DOMAIN_VIRT_OPENVZ:
+    case VIR_DOMAIN_VIRT_TEST:
+    case VIR_DOMAIN_VIRT_VMWARE:
+    case VIR_DOMAIN_VIRT_HYPERV:
+    case VIR_DOMAIN_VIRT_VBOX:
+    case VIR_DOMAIN_VIRT_PHYP:
+    case VIR_DOMAIN_VIRT_PARALLELS:
+    case VIR_DOMAIN_VIRT_BHYVE:
+    case VIR_DOMAIN_VIRT_VZ:
+    case VIR_DOMAIN_VIRT_NONE:
+    case VIR_DOMAIN_VIRT_LAST:
+        break;
+    }
+
+    virCommandAddArgBuffer(cmd, &buf);
+}
+
+
+static void
+qemuBuildTSEGCommandLine(virCommand *cmd,
                          const virDomainDef *def)
 {
     if (!def->tseg_specified)
@@ -9987,6 +9999,8 @@ qemuBuildCommandLine(virQEMUDriverPtr driver,
 
     if (qemuBuildMachineCommandLine(cmd, cfg, def, qemuCaps, priv) < 0)
         return NULL;
+
+    qemuBuildAccelCommandLine(cmd, def);
 
     qemuBuildTSEGCommandLine(cmd, def);
 

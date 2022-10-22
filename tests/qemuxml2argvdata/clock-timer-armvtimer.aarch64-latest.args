@@ -12,7 +12,8 @@ QEMU_AUDIO_DRV=none \
 -S \
 -object secret,id=masterKey0,format=raw,\
 file=/tmp/lib/domain--1-guest/master-key.aes \
--machine virt,accel=kvm,usb=off,dump-guest-core=off,gic-version=3 \
+-machine virt,usb=off,dump-guest-core=off,gic-version=3 \
+-accel kvm \
 -cpu host,kvm-no-adjvtime=on \
 -m 4096 \
 -overcommit mem-lock=off \
