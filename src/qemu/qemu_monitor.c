@@ -4642,3 +4642,15 @@ qemuMonitorTransactionBackup(virJSONValuePtr actions,
     return qemuMonitorJSONTransactionBackup(actions, device, jobname, target,
                                             bitmap, syncmode);
 }
+
+
+int
+qemuMonitorStartDirtyRateCalc(qemuMonitorPtr mon,
+                              int seconds)
+{
+    VIR_DEBUG("seconds=%d", seconds);
+
+    QEMU_CHECK_MONITOR(mon);
+
+    return qemuMonitorJSONStartDirtyRateCalc(mon, seconds);
+}

@@ -3783,6 +3783,12 @@ struct remote_domain_hotpatch_manage_ret {
     remote_string info;
 };
 
+struct remote_domain_start_dirty_rate_calc_args {
+    remote_nonnull_domain dom;
+    int seconds;
+    unsigned int flags;
+};
+
 /*----- Protocol. -----*/
 
 /* Define the program number, protocol version and procedure numbers here. */
@@ -6681,6 +6687,12 @@ enum remote_procedure {
      * @acl: domain:read
      */
     REMOTE_PROC_DOMAIN_BACKUP_GET_XML_DESC = 422,
+
+    /**
+     * @generate: both
+     * @acl: domain:read
+     */
+    REMOTE_PROC_DOMAIN_START_DIRTY_RATE_CALC = 427,
 
     /**
      * @generate: both

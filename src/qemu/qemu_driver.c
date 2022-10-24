@@ -23179,6 +23179,64 @@ qemuDomainHotpatchManage(virDomainPtr domain,
     return ret;
 }
 
+#define MIN_DIRTYRATE_CALC_PERIOD 1  /* supported min dirtyrate calculating time: 1s */
+#define MAX_DIRTYRATE_CALC_PERIOD 60 /* supported max dirtyrate calculating time: 60s */
+
+static int
+qemuDomainStartDirtyRateCalc(virDomainPtr dom,
+                             int seconds,
+                             unsigned int flags)
+{
+    virQEMUDriverPtr driver = dom->conn->privateData;
+    virDomainObjPtr vm;
+    qemuDomainObjPrivatePtr priv;
+    int ret = -1;
+
+    virCheckFlags(0, -1);
+
+    if (seconds < MIN_DIRTYRATE_CALC_PERIOD ||
+        seconds > MAX_DIRTYRATE_CALC_PERIOD) {
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                       _("seconds=%d is invalid, please choose value within [%d, %d]."),
+                       seconds,
+                       MIN_DIRTYRATE_CALC_PERIOD,
+                       MAX_DIRTYRATE_CALC_PERIOD);
+        return -1;
+    }
+
+    if (!(vm = qemuDomainObjFromDomain(dom)))
+        return -1;
+
+    if (virDomainStartDirtyRateCalcEnsureACL(dom->conn, vm->def) < 0)
+        goto cleanup;
+
+    if (qemuDomainObjBeginJob(driver, vm, QEMU_JOB_QUERY) < 0)
+        goto cleanup;
+
+    if (!virDomainObjIsActive(vm)) {
+        virReportError(VIR_ERR_OPERATION_INVALID,
+                       "%s", _("domain is not running"));
+        goto endjob;
+    }
+
+    VIR_DEBUG("Calculate dirty rate in next %d seconds", seconds);
+
+    priv = vm->privateData;
+    qemuDomainObjEnterMonitor(driver, vm);
+    ret = qemuMonitorStartDirtyRateCalc(priv->mon, seconds);
+
+    if (qemuDomainObjExitMonitor(driver, vm) < 0)
+        ret = -1;
+
+ endjob:
+    qemuDomainObjEndJob(driver, vm);
+
+ cleanup:
+    virDomainObjEndAPI(&vm);
+    return ret;
+}
+
+
 static virHypervisorDriver qemuHypervisorDriver = {
     .name = QEMU_DRIVER_NAME,
     .connectURIProbe = qemuConnectURIProbe,
@@ -23419,6 +23477,7 @@ static virHypervisorDriver qemuHypervisorDriver = {
     .domainBackupBegin = qemuDomainBackupBegin, /* 6.0.0 */
     .domainBackupGetXMLDesc = qemuDomainBackupGetXMLDesc, /* 6.0.0 */
     .domainHotpatchManage = qemuDomainHotpatchManage, /* 6.2.0 */
+    .domainStartDirtyRateCalc = qemuDomainStartDirtyRateCalc, /* 6.2.0 */
 };
 
 

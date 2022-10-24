@@ -1394,6 +1394,11 @@ typedef char *
                               const char *id,
                               unsigned int flags);
 
+typedef int
+(*virDrvDomainStartDirtyRateCalc)(virDomainPtr domain,
+                                  int seconds,
+                                  unsigned int flags);
+
 typedef struct _virHypervisorDriver virHypervisorDriver;
 typedef virHypervisorDriver *virHypervisorDriverPtr;
 
@@ -1658,4 +1663,5 @@ struct _virHypervisorDriver {
     virDrvDomainBackupBegin domainBackupBegin;
     virDrvDomainBackupGetXMLDesc domainBackupGetXMLDesc;
     virDrvDomainHotpatchManage domainHotpatchManage;
+    virDrvDomainStartDirtyRateCalc domainStartDirtyRateCalc;
 };
