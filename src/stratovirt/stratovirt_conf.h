@@ -23,6 +23,9 @@
 #pragma once
 
 #include "qemu_migration.h"
+#include "qemu_capabilities.h"
+#include "qemu_command.h"
+#include "virconftypes.h"
 
 #define STRATOVIRT_DRIVER_NAME "StratoVirt"
 #define STRATOVIRT_CMD "stratovirt"
@@ -38,6 +41,9 @@ typedef virStratoVirtDriver *virStratoVirtDriverPtr;
 typedef virQEMUDriverConfig virStratoVirtDriverConfig;
 typedef virStratoVirtDriverConfig *virStratoVirtDriverConfigPtr;
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(virStratoVirtDriverConfig, virObjectUnref);
+
+typedef virQEMUCaps virStratoVirtCaps;
+typedef virStratoVirtCaps *virStratoVirtCapsPtr;
 
 virCapsPtr virStratoVirtDriverGetCapabilities(virStratoVirtDriverPtr driver,bool refresh);
 virStratoVirtDriverConfigPtr virStratoVirtDriverConfigNew(bool privileged);
@@ -64,6 +70,9 @@ typedef struct StratoVirtConf {
                                                  const char *cacheDir,
                                                  uid_t runUid,
                                                  gid_t runGid);
+    int (*stratovirtCheckDiskConfig)(virDomainDiskDefPtr disk,
+                                     const virDomainDef *def,
+                                     virStratoVirtCapsPtr stratovirtCaps);
 } virStratoVirtConf;
 
 extern virStratoVirtConf stratovirtconf;

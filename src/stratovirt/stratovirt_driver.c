@@ -1336,6 +1336,537 @@ stratovirtStateInitialize(bool privileged,
     return VIR_DRV_STATE_INIT_ERROR;
 }
 
+static char
+*stratovirtDomainGetXMLDesc(virDomainPtr dom,
+                            unsigned int flags)
+{
+    virStratoVirtDriverPtr driver = dom->conn->privateData;
+    virDomainObjPtr vm;
+    char *ret = NULL;
+
+    virCheckFlags(VIR_DOMAIN_XML_COMMON_FLAGS, NULL);
+
+    if (!(vm = stratovirtDomainObjFromDomain(dom)))
+        goto cleanup;
+
+    if (virDomainGetXMLDescEnsureACL(dom->conn, vm->def, flags) < 0)
+        goto cleanup;
+
+    ret = virDomainDefFormat(vm->def, driver->xmlopt,
+                             virDomainDefFormatConvertXMLFlags(flags));
+
+ cleanup:
+    virDomainObjEndAPI(&vm);
+    return ret;
+}
+
+static int
+stratovirtCheckDiskConfigAgainstDomain(const virDomainDef *def,
+                                       const virDomainDiskDef *disk)
+{
+    if (disk->bus == VIR_DOMAIN_DISK_BUS_SCSI &&
+        virDomainSCSIDriveAddressIsUsed(def, &disk->info.addr.drive)) {
+        virReportError(VIR_ERR_OPERATION_INVALID, "%s",
+                       _("Domain already contains a disk with that address"));
+        return -1;
+    }
+
+    return 0;
+}
+
+static int
+stratovirtDomainAttachDeviceConfigPersistent(virDomainDefPtr vmdef,
+                                             virDomainDeviceDefPtr dev,
+                                             virStratoVirtCapsPtr stratovirtCaps,
+                                             unsigned int parse_flags,
+                                             virDomainXMLOptionPtr xmlopt)
+{
+    virDomainControllerDefPtr controller;
+    virDomainDiskDefPtr disk;
+
+    switch ((virDomainDeviceType)dev->type) {
+    case VIR_DOMAIN_DEVICE_DISK:
+        disk = dev->data.disk;
+        if (virDomainDiskIndexByName(vmdef, disk->dst, true) >= 0) {
+            virReportError(VIR_ERR_OPERATION_INVALID,
+                           _("target %s already exists"), disk->dst);
+            return -1;
+        }
+        if (virDomainDiskTranslateSourcePool(disk) < 0)
+            return -1;
+        if (stratovirtconf.stratovirtCheckDiskConfig(disk, vmdef, NULL) < 0)
+            return -1;
+        if (stratovirtCheckDiskConfigAgainstDomain(vmdef, disk) < 0)
+            return -1;
+        if (virDomainDiskInsert(vmdef, disk) < 0)
+            return -1;
+        dev->data.disk = NULL;
+        break;
+
+    case VIR_DOMAIN_DEVICE_CONTROLLER:
+        controller = dev->data.controller;
+        if (controller->idx != -1 &&
+            virDomainControllerFind(vmdef, controller->type,
+                                    controller->idx) >= 0) {
+            virReportError(VIR_ERR_OPERATION_INVALID,
+                           _("controller index='%d' already exists"),
+                           controller->idx);
+            return -1;
+        }
+
+        if (virDomainControllerInsert(vmdef, controller) < 0)
+            return -1;
+        dev->data.controller = NULL;
+        break;
+
+    case VIR_DOMAIN_DEVICE_INPUT:
+        if (VIR_APPEND_ELEMENT(vmdef->inputs, vmdef->ninputs, dev->data.input) < 0)
+            return -1;
+        break;
+
+    case VIR_DOMAIN_DEVICE_FS:
+    case VIR_DOMAIN_DEVICE_HOSTDEV:
+    case VIR_DOMAIN_DEVICE_MEMORY:
+    case VIR_DOMAIN_DEVICE_LEASE:
+    case VIR_DOMAIN_DEVICE_NET:
+    case VIR_DOMAIN_DEVICE_SOUND:
+    case VIR_DOMAIN_DEVICE_CHR:
+    case VIR_DOMAIN_DEVICE_RNG:
+    case VIR_DOMAIN_DEVICE_REDIRDEV:
+    case VIR_DOMAIN_DEVICE_SHMEM:
+    case VIR_DOMAIN_DEVICE_WATCHDOG:
+    case VIR_DOMAIN_DEVICE_VSOCK:
+    case VIR_DOMAIN_DEVICE_VIDEO:
+    case VIR_DOMAIN_DEVICE_GRAPHICS:
+    case VIR_DOMAIN_DEVICE_HUB:
+    case VIR_DOMAIN_DEVICE_SMARTCARD:
+    case VIR_DOMAIN_DEVICE_MEMBALLOON:
+    case VIR_DOMAIN_DEVICE_NVRAM:
+    case VIR_DOMAIN_DEVICE_NONE:
+    case VIR_DOMAIN_DEVICE_TPM:
+    case VIR_DOMAIN_DEVICE_PANIC:
+    case VIR_DOMAIN_DEVICE_IOMMU:
+    case VIR_DOMAIN_DEVICE_LAST:
+         virReportError(VIR_ERR_OPERATION_UNSUPPORTED,
+                        _("persistent attach of device '%s' is not supported"),
+                        virDomainDeviceTypeToString(dev->type));
+         return -1;
+    }
+
+    if (virDomainDefPostParse(vmdef, parse_flags, xmlopt, stratovirtCaps) < 0)
+        return -1;
+
+    return 0;
+}
+
+static int
+stratovirtDomainAttachDeviceConfig(virDomainObjPtr vm,
+                                   virStratoVirtDriverPtr driver,
+                                   const char *xml,
+                                   unsigned int flags)
+{
+    stratovirtDomainObjPrivatePtr priv = vm->privateData;
+    virDomainDefPtr vmdef = NULL;
+    g_autoptr(virStratoVirtDriverConfig) cfg = NULL;
+    virDomainDeviceDefPtr devConf = NULL;
+    int ret = -1;
+    unsigned int parse_flags = VIR_DOMAIN_DEF_PARSE_INACTIVE |
+                               VIR_DOMAIN_DEF_PARSE_ABI_UPDATE;
+
+    virCheckFlags(VIR_DOMAIN_AFFECT_CONFIG, -1);
+
+    cfg = virStratoVirtDriverGetConfig(driver);
+
+    if (flags & VIR_DOMAIN_AFFECT_CONFIG) {
+        vmdef = virDomainObjCopyPersistentDef(vm, driver->xmlopt,
+                                              priv->qemuCaps);
+
+        if (!vmdef)
+            goto cleanup;
+
+        if (!(devConf = virDomainDeviceDefParse(xml, vmdef,
+                                                driver->xmlopt, priv->qemuCaps,
+                                                parse_flags)))
+            goto cleanup;
+
+        if (virDomainDeviceValidateAliasForHotplug(vm, devConf,
+                                                   VIR_DOMAIN_AFFECT_CONFIG) < 0)
+            goto cleanup;
+
+        if (virDomainDefCompatibleDevice(vmdef, devConf, NULL,
+                                         VIR_DOMAIN_DEVICE_ACTION_ATTACH,
+                                         false) < 0)
+            goto cleanup;
+
+        if (stratovirtDomainAttachDeviceConfigPersistent(vmdef, devConf, priv->qemuCaps,
+                                                         parse_flags,
+                                                         driver->xmlopt) < 0)
+            goto cleanup;
+
+        if (virDomainDefSave(vmdef, driver->xmlopt, cfg->configDir) < 0)
+            goto cleanup;
+
+        virDomainObjAssignDef(vm, vmdef, false, NULL);
+        vmdef = NULL;
+    }
+
+    ret = 0;
+
+ cleanup:
+    virDomainDefFree(vmdef);
+    virDomainDeviceDefFree(devConf);
+    return ret;
+}
+
+static int
+stratovirtDomainAttachDeviceFlags(virDomainPtr dom,
+                                  const char *xml,
+                                  unsigned int flags)
+{
+    virStratoVirtDriverPtr driver = dom->conn->privateData;
+    virDomainObjPtr vm = NULL;
+    int ret = -1;
+
+    if (!(vm = stratovirtDomainObjFromDomain(dom)))
+        goto cleanup;
+
+    if (virDomainAttachDeviceFlagsEnsureACL(dom->conn, vm->def, flags) < 0)
+        goto cleanup;
+
+    if (stratovirtDom.stratovirtDomainObjBeginJob(driver, vm, STRATOVIRT_JOB_MODIFY) < 0)
+        goto cleanup;
+
+    if (virDomainObjUpdateModificationImpact(vm, &flags) < 0)
+        goto endjob;
+
+    if (stratovirtDomainAttachDeviceConfig(vm, driver, xml, flags) < 0)
+        goto endjob;
+
+    ret = 0;
+
+ endjob:
+    stratovirtDom.stratovirtDomainObjEndJob(driver, vm);
+
+ cleanup:
+    virDomainObjEndAPI(&vm);
+    return ret;
+
+}
+
+static int
+stratovirtDomainAttachDevice(virDomainPtr dom, const char *xml)
+{
+    return stratovirtDomainAttachDeviceFlags(dom, xml,
+                                             VIR_DOMAIN_AFFECT_CONFIG);
+}
+
+static int
+stratovirtDomainDetachDeviceConfigPersistent(virDomainDefPtr vmdef,
+                                             virDomainDeviceDefPtr dev,
+                                             virStratoVirtCapsPtr stratovirtCaps,
+                                             unsigned int parse_flags,
+                                             virDomainXMLOptionPtr xmlopt)
+{
+    virDomainDiskDefPtr disk, det_disk;
+    virDomainControllerDefPtr cont, det_cont;
+    int idx;
+
+    switch ((virDomainDeviceType)dev->type) {
+    case VIR_DOMAIN_DEVICE_DISK:
+        disk = dev->data.disk;
+        if (!(det_disk = virDomainDiskRemoveByName(vmdef, disk->dst))) {
+            virReportError(VIR_ERR_DEVICE_MISSING,
+                           _("no target device %s"), disk->dst);
+            return -1;
+        }
+        virDomainDiskDefFree(det_disk);
+        break;
+
+    case VIR_DOMAIN_DEVICE_CONTROLLER:
+        cont = dev->data.controller;
+        if ((idx = virDomainControllerFind(vmdef, cont->type,
+                                           cont->idx)) < 0) {
+            virReportError(VIR_ERR_DEVICE_MISSING, "%s",
+                           _("device not present in domain configuration"));
+            return -1;
+        }
+        det_cont = virDomainControllerRemove(vmdef, idx);
+        virDomainControllerDefFree(det_cont);
+        break;
+
+    case VIR_DOMAIN_DEVICE_INPUT:
+        if ((idx = virDomainInputDefFind(vmdef, dev->data.input)) < 0) {
+            virReportError(VIR_ERR_DEVICE_MISSING, "%s",
+                           _("matching input device not found"));
+            return -1;
+        }
+        VIR_DELETE_ELEMENT(vmdef->inputs, idx, vmdef->ninputs);
+        break;
+
+    case VIR_DOMAIN_DEVICE_FS:
+    case VIR_DOMAIN_DEVICE_HOSTDEV:
+    case VIR_DOMAIN_DEVICE_NET:
+    case VIR_DOMAIN_DEVICE_MEMORY:
+    case VIR_DOMAIN_DEVICE_SOUND:
+    case VIR_DOMAIN_DEVICE_LEASE:
+    case VIR_DOMAIN_DEVICE_CHR:
+    case VIR_DOMAIN_DEVICE_RNG:
+    case VIR_DOMAIN_DEVICE_REDIRDEV:
+    case VIR_DOMAIN_DEVICE_SHMEM:
+    case VIR_DOMAIN_DEVICE_WATCHDOG:
+    case VIR_DOMAIN_DEVICE_VSOCK:
+    case VIR_DOMAIN_DEVICE_VIDEO:
+    case VIR_DOMAIN_DEVICE_GRAPHICS:
+    case VIR_DOMAIN_DEVICE_HUB:
+    case VIR_DOMAIN_DEVICE_SMARTCARD:
+    case VIR_DOMAIN_DEVICE_MEMBALLOON:
+    case VIR_DOMAIN_DEVICE_NVRAM:
+    case VIR_DOMAIN_DEVICE_NONE:
+    case VIR_DOMAIN_DEVICE_TPM:
+    case VIR_DOMAIN_DEVICE_PANIC:
+    case VIR_DOMAIN_DEVICE_IOMMU:
+    case VIR_DOMAIN_DEVICE_LAST:
+        virReportError(VIR_ERR_OPERATION_UNSUPPORTED,
+                       _("persistent detach of device '%s' is not supported"),
+                       virDomainDeviceTypeToString(dev->type));
+        return -1;
+    }
+
+    if (virDomainDefPostParse(vmdef, parse_flags, xmlopt, stratovirtCaps) < 0)
+        return -1;
+
+    return 0;
+}
+
+static int
+stratovirtDomainDetachDeviceConfig(virStratoVirtDriverPtr driver,
+                                   virDomainObjPtr vm,
+                                   const char *xml,
+                                   unsigned int flags)
+{
+    stratovirtDomainObjPrivatePtr priv = vm->privateData;
+    g_autoptr(virStratoVirtDriverConfig) cfg = NULL;
+    virDomainDeviceDefPtr dev = NULL;
+    unsigned int parse_flags =  VIR_DOMAIN_DEF_PARSE_SKIP_VALIDATE;
+    virDomainDefPtr vmdef = NULL;
+    int ret = -1;
+
+    virCheckFlags(VIR_DOMAIN_AFFECT_CONFIG, -1);
+
+    cfg = virStratoVirtDriverGetConfig(driver);
+
+    if (flags & VIR_DOMAIN_AFFECT_CONFIG)
+        parse_flags |= VIR_DOMAIN_DEF_PARSE_INACTIVE;
+
+    dev = virDomainDeviceDefParse(xml, vm->def,
+                                  driver->xmlopt, priv->qemuCaps,
+                                  parse_flags);
+    if (dev == NULL)
+        goto cleanup;
+
+    if (flags & VIR_DOMAIN_AFFECT_CONFIG) {
+        vmdef = virDomainObjCopyPersistentDef(vm, driver->xmlopt, priv->qemuCaps);
+        if (!vmdef)
+            goto cleanup;
+
+        if (stratovirtDomainDetachDeviceConfigPersistent(vmdef, dev, priv->qemuCaps,
+                                                         parse_flags,
+                                                         driver->xmlopt) < 0)
+            goto cleanup;
+
+        if (virDomainDefSave(vmdef, driver->xmlopt, cfg->configDir) < 0)
+            goto cleanup;
+
+        virDomainObjAssignDef(vm, vmdef, false, NULL);
+        vmdef = NULL;
+    }
+
+    ret = 0;
+
+ cleanup:
+    virDomainDeviceDefFree(dev);
+    virDomainDefFree(vmdef);
+    return ret;
+}
+
+static int
+stratovirtDomainDetachDeviceFlags(virDomainPtr dom,
+                                  const char *xml,
+                                  unsigned int flags)
+{
+    virStratoVirtDriverPtr driver = dom->conn->privateData;
+    virDomainObjPtr vm = NULL;
+    int ret = -1;
+
+    if (!(vm = stratovirtDomainObjFromDomain(dom)))
+        goto cleanup;
+
+    if (virDomainDetachDeviceFlagsEnsureACL(dom->conn, vm->def, flags) < 0)
+        goto cleanup;
+
+    if (stratovirtDom.stratovirtDomainObjBeginJob(driver, vm, STRATOVIRT_JOB_MODIFY) < 0)
+        goto cleanup;
+
+    if (virDomainObjUpdateModificationImpact(vm, &flags) < 0)
+        goto endjob;
+
+    if (stratovirtDomainDetachDeviceConfig(driver, vm, xml, flags) < 0)
+        goto endjob;
+
+    ret = 0;
+
+ endjob:
+    stratovirtDom.stratovirtDomainObjEndJob(driver, vm);
+
+ cleanup:
+    virDomainObjEndAPI(&vm);
+    return ret;
+}
+
+static int
+stratovirtDomainDetachDevice(virDomainPtr dom, const char *xml)
+{
+    return stratovirtDomainDetachDeviceFlags(dom, xml,
+                                             VIR_DOMAIN_AFFECT_CONFIG);
+}
+
+static int
+stratovirtDomainUpdateDeviceConfig(virDomainDefPtr vmdef,
+                                   virDomainDeviceDefPtr dev,
+                                   virStratoVirtCapsPtr stratovirtCaps,
+                                   unsigned int parse_flags,
+                                   virDomainXMLOptionPtr xmlopt)
+{
+    virDomainDiskDefPtr newDisk;
+    virDomainDeviceDef oldDev = { .type = dev->type };
+    int pos;
+
+    switch ((virDomainDeviceType)dev->type) {
+    case VIR_DOMAIN_DEVICE_DISK:
+        newDisk = dev->data.disk;
+        if ((pos = virDomainDiskIndexByName(vmdef, newDisk->dst, false)) < 0) {
+            virReportError(VIR_ERR_INVALID_ARG,
+                           _("target %s doesn't exist."), newDisk->dst);
+            return -1;
+        }
+
+        oldDev.data.disk = vmdef->disks[pos];
+        if (virDomainDefCompatibleDevice(vmdef, dev, &oldDev,
+                                         VIR_DOMAIN_DEVICE_ACTION_UPDATE,
+                                         false) < 0)
+            return -1;
+
+        virDomainDiskDefFree(vmdef->disks[pos]);
+        vmdef->disks[pos] = newDisk;
+        dev->data.disk = NULL;
+        break;
+
+    case VIR_DOMAIN_DEVICE_GRAPHICS:
+    case VIR_DOMAIN_DEVICE_NET:
+    case VIR_DOMAIN_DEVICE_FS:
+    case VIR_DOMAIN_DEVICE_INPUT:
+    case VIR_DOMAIN_DEVICE_SOUND:
+    case VIR_DOMAIN_DEVICE_VIDEO:
+    case VIR_DOMAIN_DEVICE_WATCHDOG:
+    case VIR_DOMAIN_DEVICE_HUB:
+    case VIR_DOMAIN_DEVICE_SMARTCARD:
+    case VIR_DOMAIN_DEVICE_MEMBALLOON:
+    case VIR_DOMAIN_DEVICE_NVRAM:
+    case VIR_DOMAIN_DEVICE_RNG:
+    case VIR_DOMAIN_DEVICE_SHMEM:
+    case VIR_DOMAIN_DEVICE_LEASE:
+    case VIR_DOMAIN_DEVICE_HOSTDEV:
+    case VIR_DOMAIN_DEVICE_CONTROLLER:
+    case VIR_DOMAIN_DEVICE_REDIRDEV:
+    case VIR_DOMAIN_DEVICE_CHR:
+    case VIR_DOMAIN_DEVICE_MEMORY:
+    case VIR_DOMAIN_DEVICE_NONE:
+    case VIR_DOMAIN_DEVICE_TPM:
+    case VIR_DOMAIN_DEVICE_PANIC:
+    case VIR_DOMAIN_DEVICE_IOMMU:
+    case VIR_DOMAIN_DEVICE_VSOCK:
+    case VIR_DOMAIN_DEVICE_LAST:
+        virReportError(VIR_ERR_OPERATION_UNSUPPORTED,
+                       _("persistent update of device '%s' is not supported"),
+                       virDomainDeviceTypeToString(dev->type));
+        return -1;
+    }
+
+    if (virDomainDefPostParse(vmdef, parse_flags, xmlopt, stratovirtCaps) < 0)
+        return -1;
+
+    return 0;
+}
+
+static int
+stratovirtDomainUpdateDeviceFlags(virDomainPtr dom,
+                                  const char *xml,
+                                  unsigned int flags)
+{
+    virStratoVirtDriverPtr driver = dom->conn->privateData;
+    virDomainObjPtr vm = NULL;
+    stratovirtDomainObjPrivatePtr priv;
+    virDomainDefPtr vmdef = NULL;
+    virDomainDeviceDefPtr dev = NULL;
+    int ret = -1;
+    g_autoptr(virStratoVirtDriverConfig) cfg = NULL;
+    unsigned int parse_flags = 0;
+
+    virCheckFlags(VIR_DOMAIN_AFFECT_CONFIG, -1);
+
+    cfg = virStratoVirtDriverGetConfig(driver);
+
+    if (!(vm = stratovirtDomainObjFromDomain(dom)))
+        goto cleanup;
+
+    priv = vm->privateData;
+
+    if (virDomainUpdateDeviceFlagsEnsureACL(dom->conn, vm->def, flags) < 0)
+        goto cleanup;
+
+    if (stratovirtDom.stratovirtDomainObjBeginJob(driver, vm, STRATOVIRT_JOB_MODIFY) < 0)
+        goto cleanup;
+
+    if (virDomainObjUpdateModificationImpact(vm, &flags) < 0)
+        goto endjob;
+
+    if (flags & VIR_DOMAIN_AFFECT_CONFIG) {
+        parse_flags |= VIR_DOMAIN_DEF_PARSE_INACTIVE;
+
+        dev = virDomainDeviceDefParse(xml, vm->def,
+                                      driver->xmlopt, priv->qemuCaps,
+                                      parse_flags);
+        if (dev == NULL)
+            goto endjob;
+
+        vmdef = virDomainObjCopyPersistentDef(vm, driver->xmlopt,
+                                              priv->qemuCaps);
+
+        if (vmdef == NULL)
+            goto endjob;
+
+        if  ((ret = stratovirtDomainUpdateDeviceConfig(vmdef, dev, priv->qemuCaps,
+                                                       parse_flags,
+                                                       driver->xmlopt)) < 0)
+            goto endjob;
+
+        ret = virDomainDefSave(vmdef, driver->xmlopt, cfg->configDir);
+        if (!ret) {
+            virDomainObjAssignDef(vm, vmdef, false, NULL);
+            vmdef = NULL;
+        }
+    }
+
+ endjob:
+    stratovirtDom.stratovirtDomainObjEndJob(driver, vm);
+
+ cleanup:
+    virDomainDefFree(vmdef);
+    virDomainDeviceDefFree(dev);
+    virDomainObjEndAPI(&vm);
+    return ret;
+}
+
 static virHypervisorDriver stratovirtHypervisorDriver = {
     .name = STRATOVIRT_DRIVER_NAME,
     .connectURIProbe = stratovirtConnectURIProbe,
@@ -1367,6 +1898,12 @@ static virHypervisorDriver stratovirtHypervisorDriver = {
     .domainUndefine = stratovirtDomainUndefine, /* 2.2.0 */
     .domainUndefineFlags = stratovirtDomainUndefineFlags, /* 2.2.0 */
     .domainIsActive = stratovirtDomainIsActive, /* 2.2.0 */
+    .domainGetXMLDesc = stratovirtDomainGetXMLDesc, /* 2.2.0 */
+    .domainAttachDevice = stratovirtDomainAttachDevice, /* 2.2.0 */
+    .domainAttachDeviceFlags = stratovirtDomainAttachDeviceFlags, /* 2.2.0 */
+    .domainDetachDevice = stratovirtDomainDetachDevice, /* 2.2.0 */
+    .domainDetachDeviceFlags = stratovirtDomainDetachDeviceFlags, /* 2.2.0 */
+    .domainUpdateDeviceFlags = stratovirtDomainUpdateDeviceFlags, /* 2.2.0 */
 };
 
 static virConnectDriver stratovirtConnectDriver = {
