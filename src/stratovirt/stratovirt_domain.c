@@ -74,6 +74,42 @@ static int virStratoVirtDomainPostParse(virDomainDefPtr def,
     return 0;
 }
 
+static int virStratoVirtDomainDefAssignAddresses(virDomainDef *def,
+                                                 unsigned int parseFlags G_GNUC_UNUSED,
+                                                 void *opaque,
+                                                 void *parseOpaque)
+{
+    virStratoVirtDriverPtr driver = opaque;
+    virStratoVirtCapsPtr stratovirtCaps = parseOpaque;
+    bool newDomain = parseFlags & VIR_DOMAIN_DEF_PARSE_ABI_UPDATE;
+
+    if (!stratovirtCaps)
+        return 1;
+
+    return stratovirtDom.stratovirtDomainAssignAddresses(def, stratovirtCaps, driver, NULL, newDomain);
+}
+
+static int virStratoVirtDomainPostParseDataAlloc(const virDomainDef *def,
+                                                 unsigned int parseFlags G_GNUC_UNUSED,
+                                                 void *opaque,
+                                                 void **parseOpaque)
+{
+    virStratoVirtDriverPtr driver = opaque;
+
+    if (!(*parseOpaque = stratovirtconf.virStratoVirtCapsCacheLookup(driver->qemuCapsCache,
+                                                                     def->emulator)))
+        return 1;
+
+    return 0;
+}
+
+static void virStratoVirtDomainPostParseDataFree(void *parseOpaque)
+{
+    virStratoVirtCapsPtr stratovirtCaps = parseOpaque;
+
+    virObjectUnref(stratovirtCaps);
+}
+
 static int virStratoVirtValidateDeviceDef(const virDomainDeviceDef* dev,
                                           const virDomainDef *def G_GNUC_UNUSED,
                                           void *opaque G_GNUC_UNUSED)
@@ -118,6 +154,9 @@ virDomainDefParserConfig virStratoVirtDriverDomainDefParserConfig = {
     .domainPostParseBasicCallback = virStratoVirtDomainPostParseBasic,
     .domainPostParseCallback = virStratoVirtDomainPostParse,
     .deviceValidateCallback = virStratoVirtValidateDeviceDef,
+    .domainPostParseDataAlloc = virStratoVirtDomainPostParseDataAlloc,
+    .domainPostParseDataFree = virStratoVirtDomainPostParseDataFree,
+    .assignAddressesCallback = virStratoVirtDomainDefAssignAddresses,
 };
 
 void stratovirtProcessEventFree(stratovirtProcessEventPtr event)
@@ -187,4 +226,5 @@ virStratoVirtDomain stratovirtDom = {
     .stratovirtDomainObjExitMonitor = qemuDomainObjExitMonitor,
     .stratovirtDomainSnapshotDiscardAllMetadata = qemuDomainSnapshotDiscardAllMetadata,
     .stratovirtDomainCheckpointDiscardAllMetadata = qemuCheckpointDiscardAllMetadata,
+    .stratovirtDomainAssignAddresses = qemuDomainAssignAddresses,
 };
