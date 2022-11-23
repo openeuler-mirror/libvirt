@@ -73,6 +73,8 @@ typedef struct StratoVirtConf {
     int (*stratovirtCheckDiskConfig)(virDomainDiskDefPtr disk,
                                      const virDomainDef *def,
                                      virStratoVirtCapsPtr stratovirtCaps);
+    virStratoVirtCapsPtr (*virStratoVirtCapsCacheLookup)(virFileCachePtr cache,
+                                                         const char *binary);
 } virStratoVirtConf;
 
 extern virStratoVirtConf stratovirtconf;

@@ -83,6 +83,11 @@ typedef struct StratoVirtDomain {
                                                      virDomainObjPtr vm);
     int (*stratovirtDomainCheckpointDiscardAllMetadata)(virStratoVirtDriverPtr driver,
                                                        virDomainObjPtr vm);
+    int (*stratovirtDomainAssignAddresses)(virDomainDefPtr def,
+                                           virStratoVirtCapsPtr stratovirtCaps,
+					   virStratoVirtDriverPtr driver,
+					   virDomainObjPtr obj,
+					   bool newDomain);
 } virStratoVirtDomain;
 
 extern virStratoVirtDomain stratovirtDom;

@@ -304,4 +304,5 @@ virStratoVirtConf stratovirtconf = {
     .stratovirtSharedDeviceEntryFree = qemuSharedDeviceEntryFree,
     .virStratoVirtCapsCacheNew = virQEMUCapsCacheNew,
     .stratovirtCheckDiskConfig = qemuCheckDiskConfig,
+    .virStratoVirtCapsCacheLookup = virQEMUCapsCacheLookup,
 };
