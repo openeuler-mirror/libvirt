@@ -1260,8 +1260,8 @@ qemuDomainDiskIsMissingLocalOptional(virDomainDiskDefPtr disk);
 
 void
 qemuDomainNVRAMPathFormat(virQEMUDriverConfigPtr cfg,
-                            virDomainDefPtr def,
-                            char **path);
+                          virDomainDefPtr def,
+                          char **path);
 
 void
 qemuDomainNVRAMPathGenerate(virQEMUDriverConfigPtr cfg,
