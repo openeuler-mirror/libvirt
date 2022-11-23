@@ -2140,7 +2140,7 @@ cmdBlockcommit(vshControl *ctl, const vshCmd *cmd)
             break;
 
         case VIR_DOMAIN_BLOCK_JOB_FAILED:
-            vshError(ctl, "\n%s", _("Commit failed"));
+            vshPrintExtra(ctl, "\n%s", _("Commit failed"));
             goto cleanup;
             break;
 
@@ -2457,7 +2457,7 @@ cmdBlockcopy(vshControl *ctl, const vshCmd *cmd)
             break;
 
         case VIR_DOMAIN_BLOCK_JOB_FAILED:
-            vshError(ctl, "\n%s", _("Copy failed"));
+            vshPrintExtra(ctl, "\n%s", _("Copy failed"));
             goto cleanup;
             break;
 
@@ -2865,7 +2865,7 @@ cmdBlockpull(vshControl *ctl, const vshCmd *cmd)
             break;
 
         case VIR_DOMAIN_BLOCK_JOB_FAILED:
-            vshError(ctl, "\n%s", _("Pull failed"));
+            vshPrintExtra(ctl, "\n%s", _("Pull failed"));
             goto cleanup;
             break;
 
@@ -13558,7 +13558,7 @@ virshEventMetadataChangePrint(virConnectPtr conn G_GNUC_UNUSED,
 {
     virBuffer buf = VIR_BUFFER_INITIALIZER;
 
-    virBufferAsprintf(&buf, _("event 'metdata-change' for domain %s: %s %s\n"),
+    virBufferAsprintf(&buf, _("event 'metadata-change' for domain %s: %s %s\n"),
                       virDomainGetName(dom),
                       UNKNOWNSTR(virshEventMetadataChangeTypeTypeToString(type)),
                       NULLSTR(nsuri));
