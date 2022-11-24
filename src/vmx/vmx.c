@@ -2667,7 +2667,7 @@ virVMXParseEthernet(virConfPtr conf, int controller, virDomainNetDefPtr *def)
         STRCASEEQ(connectionType, "bridged") ||
         STRCASEEQ(connectionType, "custom")) {
         if (virVMXGetConfigString(conf, networkName_name, &networkName,
-                                  true) < 0)
+                                  connectionType == NULL) < 0)
             goto cleanup;
 
         if (!networkName)
