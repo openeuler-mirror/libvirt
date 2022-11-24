@@ -9882,7 +9882,7 @@ qemuBuildVsockDevStr(virDomainDefPtr def,
 
     virBufferAsprintf(&buf, ",id=%s", vsock->info.alias);
     virBufferAsprintf(&buf, ",guest-cid=%u", vsock->guest_cid);
-    virBufferAsprintf(&buf, ",vhostfd=%s%u", fdprefix, priv->vhostfd);
+    virBufferAsprintf(&buf, ",vhostfd=%s%d", fdprefix, priv->vhostfd);
     if (qemuBuildDeviceAddressStr(&buf, def, &vsock->info, qemuCaps) < 0)
         return NULL;
 
