@@ -33,11 +33,12 @@
 static int
 testVshTableNew(const void *opaque G_GNUC_UNUSED)
 {
-    if (vshTableNew(NULL)) {
+    vshTablePtr table = vshTableNew(NULL);
+    if (table) {
         fprintf(stderr, "expected failure when passing null to vshTableNew\n");
         return -1;
     }
-
+    vshTableFree(table);
     return 0;
 }
 
