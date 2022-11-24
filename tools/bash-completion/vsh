@@ -21,7 +21,7 @@ _vsh_complete()
     # See what URI is user trying to connect to and if they are
     # connecting RO. Honour that.
     while [ $c -le $COMP_CWORD ]; do
-        word="${COMP_WORDS[c]}"
+        local word="${COMP_WORDS[c]}"
         case "$word" in
             -r|--readonly) RO=1 ;;
             -c|--connect) c=$((++c)); URI=${COMP_WORDS[c]} ;;
