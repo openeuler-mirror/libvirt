@@ -1426,20 +1426,19 @@ qemuMigrationAnyPostcopyFailed(virQEMUDriverPtr driver,
 }
 
 
-static int
+static void
 qemuMigrationSrcWaitForSpice(virDomainObjPtr vm)
 {
     qemuDomainObjPrivatePtr priv = vm->privateData;
 
     if (!priv->job.spiceMigration)
-        return 0;
+        return;
 
     VIR_DEBUG("Waiting for SPICE to finish migration");
     while (!priv->job.spiceMigrated && !priv->job.abortJob) {
         if (virDomainObjWait(vm) < 0)
-            return -1;
+            return;
     }
-    return 0;
 }
 
 
