@@ -1519,7 +1519,7 @@ static bool virNetClientIOEventLoopRemoveDone(virNetClientCallPtr call,
         if (call->expectReply)
             VIR_WARN("Got a call expecting a reply but without a waiting thread");
         virCondDestroy(&call->cond);
-        VIR_FREE(call->msg);
+        virNetMessageFree(call->msg);
         VIR_FREE(call);
     }
 
@@ -1546,7 +1546,7 @@ virNetClientIOEventLoopRemoveAll(virNetClientCallPtr call,
 
     VIR_DEBUG("Removing call %p", call);
     virCondDestroy(&call->cond);
-    VIR_FREE(call->msg);
+    virNetMessageFree(call->msg);
     VIR_FREE(call);
     return true;
 }
