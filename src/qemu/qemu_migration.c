@@ -2533,6 +2533,7 @@ qemuMigrationDstPrepareAny(virQEMUDriverPtr driver,
 
     priv = vm->privateData;
     priv->origname = g_strdup(origname);
+    VIR_FREE(priv->migrationPids);
 
     if (taint_hook) {
         /* Domain XML has been altered by a hook script. */
@@ -3600,6 +3601,8 @@ qemuMigrationSrcRun(virQEMUDriverPtr driver,
         qemuMigrationParamsSetULL(migParams, QEMU_MIGRATION_PARAM_MAX_BANDWIDTH,
                                   migrate_speed * 1024 * 1024) < 0)
         goto error;
+
+    qemuMigrationMigrationParamsToVM(migParams, vm);
 
     if (qemuMigrationParamsApply(driver, vm, QEMU_ASYNC_JOB_MIGRATION_OUT,
                                  migParams) < 0)

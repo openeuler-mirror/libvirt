@@ -333,6 +333,7 @@ struct _qemuDomainObjPrivate {
     char *origname;
     int nbdPort; /* Port used for migration with NBD */
     char *migrationPids;
+    char *migrationThreadPinList;
     unsigned short migrationPort;
     int preMigrationState;
     char *migrationMultiFdPids;
