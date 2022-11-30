@@ -113,6 +113,7 @@ static void qemuMonitorJSONHandleDumpCompleted(qemuMonitorPtr mon, virJSONValueP
 static void qemuMonitorJSONHandlePRManagerStatusChanged(qemuMonitorPtr mon, virJSONValuePtr data);
 static void qemuMonitorJSONHandleRdmaGidStatusChanged(qemuMonitorPtr mon, virJSONValuePtr data);
 static void qemuMonitorJSONHandleMigrationPid(qemuMonitorPtr mon, virJSONValuePtr data);
+static void qemuMonitorJSONHandleMigrationMultiFdPids(qemuMonitorPtr mon, virJSONValuePtr data);
 
 typedef struct {
     const char *type;
@@ -134,6 +135,7 @@ static qemuEventHandler eventHandlers[] = {
     { "GUEST_PANICKED", qemuMonitorJSONHandleGuestPanic, },
     { "JOB_STATUS_CHANGE", qemuMonitorJSONHandleJobStatusChange, },
     { "MIGRATION", qemuMonitorJSONHandleMigrationStatus, },
+    { "MIGRATION_MULTIFD_PID", qemuMonitorJSONHandleMigrationMultiFdPids, },
     { "MIGRATION_PASS", qemuMonitorJSONHandleMigrationPass, },
     { "MIGRATION_PID", qemuMonitorJSONHandleMigrationPid, },
     { "NIC_RX_FILTER_CHANGED", qemuMonitorJSONHandleNicRxFilterChanged, },
@@ -171,6 +173,19 @@ static void qemuMonitorJSONHandleMigrationPid(qemuMonitorPtr mon,
     }
 
     qemuMonitorEmitMigrationPid(mon, mpid);
+}
+
+static void qemuMonitorJSONHandleMigrationMultiFdPids(qemuMonitorPtr mon,
+                                                      virJSONValuePtr data)
+{
+    int mpid;
+
+    if (virJSONValueObjectGetNumberInt(data, "pid", &mpid) < 0) {
+        VIR_WARN("missing multifd pid in migration-multifd-pid event");
+        return;
+    }
+
+    qemuMonitorEmitMigrationMultiFdPids(mon, mpid);
 }
 
 static int
