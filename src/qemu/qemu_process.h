@@ -249,3 +249,8 @@ int qemuProcessHandleMigrationPid(qemuMonitorPtr mon ATTRIBUTE_UNUSED,
                                   virDomainObjPtr vm,
                                   int mpid,
                                   void *opaque);
+
+int qemuProcessHandleMigrationMultiFdPids(qemuMonitorPtr mon ATTRIBUTE_UNUSED,
+                                          virDomainObjPtr vm,
+                                          int mpid,
+                                          void *opaque);
