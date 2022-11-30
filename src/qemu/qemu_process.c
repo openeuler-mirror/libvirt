@@ -1914,6 +1914,7 @@ static qemuMonitorCallbacks monitorCallbacks = {
     .domainPRManagerStatusChanged = qemuProcessHandlePRManagerStatusChanged,
     .domainRdmaGidStatusChanged = qemuProcessHandleRdmaGidStatusChanged,
     .domainGuestCrashloaded = qemuProcessHandleGuestCrashloaded,
+    .domainMigrationPid = qemuProcessHandleMigrationPid,
 };
 
 static void
@@ -2777,6 +2778,194 @@ qemuProcessResctrlCreate(virQEMUDriverPtr driver,
                 return -1;
         }
     }
+
+    return 0;
+}
+
+
+int
+qemuProcessSetupMigration(virDomainObjPtr vm,
+                          virDomainMigrationIDDefPtr migration)
+{
+    return qemuProcessSetupPid(vm, migration->thread_id,
+                               VIR_CGROUP_THREAD_MIGRATION_THREAD,
+                               0,
+                               vm->def->cputune.emulatorpin,
+                               vm->def->cputune.emulator_period,
+                               vm->def->cputune.emulator_quota,
+                               &migration->sched);
+}
+
+
+unsigned char *
+virParseCPUList(int *cpumaplen, const char *cpulist, int maxcpu)
+{
+    unsigned char *cpumap = NULL;
+    virBitmapPtr map = NULL;
+
+    if (cpulist[0] == 'r') {
+        map = virBitmapNew(maxcpu);
+        if (!map)
+            return NULL;
+        virBitmapSetAll(map);
+    } else {
+        if (virBitmapParse(cpulist, &map, 1024) < 0 ||
+            virBitmapIsAllClear(map)) {
+                goto cleanup;
+            }
+
+            int lastcpu = virBitmapLastSetBit(map);
+            if (lastcpu >= maxcpu)
+                goto cleanup;
+    }
+
+    if (virBitmapToData(map, &cpumap, cpumaplen) < 0)
+        VIR_ERROR(_("Bitmap to data failure"));
+
+ cleanup:
+    virBitmapFree(map);
+    return cpumap;
+}
+
+
+/*
+ * If priv->pcpumap is NULL, it means migrationpin command is not called,
+ * otherwise we set the affinity of migration thread by migrationpin.
+ */
+static virBitmapPtr
+qemuProcessGetPcpumap(qemuDomainObjPrivatePtr priv)
+{
+    int cpumaplen = 0;
+    int maxcpu = 0;
+    g_autofree unsigned char *cpumap = NULL;
+    virBitmapPtr pcpumap = NULL;
+
+    if(priv->pcpumap)
+        return priv->pcpumap;
+
+    if (!(priv->migrationThreadPinList) || STREQ(priv->migrationThreadPinList, "")) {
+        VIR_ERROR(_("didn't set the migratin thread pin"));
+            return NULL;
+    }
+
+    /* judge whether migration.pin is default value or not */
+    if (STREQ(priv->migrationThreadPinList, "none"))
+        return NULL;
+
+    maxcpu = virHostCPUGetCount();
+    if (maxcpu < 0) {
+        VIR_ERROR(_("get the cpu count of host failure"));
+        return NULL;
+    }
+
+    cpumap = virParseCPUList(&cpumaplen, priv->migrationThreadPinList, maxcpu);
+    if (!cpumap) {
+        VIR_ERROR(_("parse migration.pin params failure : migration.pin = %s"),
+                  priv->migrationThreadPinList);
+        return NULL;
+    }
+
+    if (!(pcpumap = virBitmapNewData(cpumap, cpumaplen))) {
+        VIR_ERROR(_("Bitmap data failure"));
+        return pcpumap;
+    }
+
+    return pcpumap;
+}
+
+
+/*
+ * In order to set migration thread affinity when vm is migrating,
+ * we should create the cgroup for migration thread.
+ */
+static void
+qemuProcessSetMigthreadAffinity(qemuDomainObjPrivatePtr priv,
+                                virBitmapPtr pcpumap,
+                                int mpid)
+{
+    int migration_id = 0;
+    virCgroupPtr cgroup_migthread = NULL;
+
+    if (!pcpumap)
+        return;
+
+    if (virCgroupHasController(priv->cgroup,
+                               VIR_CGROUP_CONTROLLER_CPUSET)) {
+        if (virCgroupNewThread(priv->cgroup, VIR_CGROUP_THREAD_MIGRATION_THREAD,
+                               migration_id, false, &cgroup_migthread) < 0)
+            goto cleanup;
+
+        if (qemuSetupCgroupCpusetCpus(cgroup_migthread, pcpumap) < 0) {
+            virReportError(VIR_ERR_OPERATION_INVALID,
+                           _("failed to set cpuset.cpus in cgroup"
+                             " for migration%d thread"), migration_id);
+            goto cleanup;
+        }
+   }
+
+   if (virProcessSetAffinity(mpid, pcpumap) < 0)
+       VIR_WARN("failed to set affinity in migration");
+
+ cleanup:
+    if (cgroup_migthread)
+        virCgroupFree(&cgroup_migthread);
+    return;
+}
+
+
+int
+qemuProcessHandleMigrationPid(qemuMonitorPtr mon ATTRIBUTE_UNUSED,
+                              virDomainObjPtr vm,
+                              int mpid,
+                              void *opaque G_GNUC_UNUSED)
+{
+    qemuDomainObjPrivatePtr priv;
+    char *mpidStr = NULL;
+    virDomainMigrationIDDefPtr migration = NULL;
+    virBitmapPtr pcpumap = NULL;
+    virObjectLock(vm);
+
+    VIR_INFO("Migrating domain %p %s, migration pid %d",
+              vm, vm->def->name, mpid);
+
+    priv = vm->privateData;
+    if (priv->job.asyncJob == QEMU_ASYNC_JOB_NONE) {
+        VIR_DEBUG("got MIGRATION_PID event without a migration job");
+        goto cleanup;
+    }
+
+    if (VIR_ALLOC(migration) < 0) {
+        VIR_ERROR(_("alloc migrationIDDefPtr failure"));
+        goto cleanup;
+    }
+    migration->thread_id = mpid;
+
+    if (qemuProcessSetupMigration(vm, migration) < 0) {
+        VIR_ERROR(_("fail to setup migration cgroup"));
+        goto cleanup;
+    }
+
+    mpidStr = g_strdup_printf("%d", mpid);
+
+    VIR_FREE(priv->migrationPids);
+    priv->migrationPids = mpidStr;
+
+    pcpumap = qemuProcessGetPcpumap(priv);
+
+    if (!pcpumap)
+        goto cleanup;
+
+    qemuProcessSetMigthreadAffinity(priv, pcpumap, mpid);
+
+ cleanup:
+    /*
+     * If the value of pcpumap is setted by priv->migrationThreadPinList,
+     * we need to free pcpumap.
+     */
+    if (pcpumap != priv->pcpumap)
+        virBitmapFree(pcpumap);
+    virDomainMigrationIDDefFree(migration);
+    virObjectUnlock(vm);
 
     return 0;
 }
