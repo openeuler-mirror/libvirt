@@ -56,6 +56,7 @@ VIR_ENUM_IMPL(virStorage,
               "network",
               "volume",
               "nvme",
+              "vhostuser",
 );
 
 VIR_ENUM_IMPL(virStorageFileFormat,
@@ -2617,6 +2618,7 @@ virStorageSourceIsLocalStorage(const virStorageSource *src)
         /* While NVMe disks are local, they are not accessible via src->path.
          * Therefore, we have to return false here. */
     case VIR_STORAGE_TYPE_NVME:
+    case VIR_STORAGE_TYPE_VHOST_USER:
     case VIR_STORAGE_TYPE_LAST:
     case VIR_STORAGE_TYPE_NONE:
         return false;
@@ -4164,6 +4166,7 @@ virStorageSourceUpdatePhysicalSize(virStorageSourcePtr src,
     /* We shouldn't get VOLUME, but the switch requires all cases */
     case VIR_STORAGE_TYPE_VOLUME:
     case VIR_STORAGE_TYPE_NVME:
+    case VIR_STORAGE_TYPE_VHOST_USER:
     case VIR_STORAGE_TYPE_NONE:
     case VIR_STORAGE_TYPE_LAST:
         return -1;
@@ -4610,6 +4613,7 @@ virStorageSourceIsRelative(virStorageSourcePtr src)
     case VIR_STORAGE_TYPE_NETWORK:
     case VIR_STORAGE_TYPE_VOLUME:
     case VIR_STORAGE_TYPE_NVME:
+    case VIR_STORAGE_TYPE_VHOST_USER:
     case VIR_STORAGE_TYPE_NONE:
     case VIR_STORAGE_TYPE_LAST:
         return false;
