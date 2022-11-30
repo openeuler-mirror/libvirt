@@ -2977,6 +2977,13 @@
     &lt;/source&gt;
     &lt;target dev='vde' bus='virtio'/&gt;
   &lt;/disk&gt;
+  &lt;disk type='vhostuser' device='disk'&gt;
+    &lt;driver name='qemu' type='raw'/&gt;
+    &lt;source type='unix' path='/tmp/vhost-blk.sock'&gt;
+      &lt;reconnect enabled='yes' timeout='10'/&gt;
+    &lt;/source&gt;
+    &lt;target dev='vdf' bus='virtio'/&gt;
+  &lt;/disk&gt;
 &lt;/devices&gt;
 ...</pre>
 
@@ -2991,7 +2998,8 @@
             "dir" (<span class="since">since 0.7.5</span>),
             "network" (<span class="since">since 0.8.7</span>), or
             "volume" (<span class="since">since 1.0.5</span>), or
-            "nvme" (<span class="since">since 6.0.0</span>)
+            "nvme" (<span class="since">since 6.0.0</span>), or
+            "vhostuser" (<span class="since">since 6.2.0</span>)
             and refer to the underlying source for the disk.
             <span class="since">Since 0.0.3</span>
             </dd>
@@ -3217,6 +3225,31 @@
               <code>&lt;disk type='block'&gt;</code> and therefore lower
               latencies can be achieved.
               </dd>
+              <dt><code>vhostuser</code></dt>
+              <dd>
+              Enables the hypervisor to connect to another process using vhost-user
+              protocol. Requires shared memory configured for the VM, for more details
+              see <code>access</code> mode for
+              <code>memoryBacking &lt;#elementsMemoryBacking&gt;</code> element.
+
+              The <code>source</code> element has following mandatory attributes:
+              <dl>
+                <dt><code>type</code></dt>
+                <dd>The type of char device. Currently only <code>unix</code> type
+                is supported.
+                </dd>
+
+                <dt><code>path</code></dt>
+                <dd>Path to the unix socket to be used as disk source.
+                </dd>
+              </dl>
+
+              Note that the vhost server replaces both the disk frontend and backend
+              thus almost all of the disk properties can't be configured via the
+              <code>&lt;disk&gt;</code> XML for this disk type. Additionally features
+              such as blockjobs, incremental backups and snapshots are not supported 
+              for this disk type.
+              </dd>
           </dl>
         With "file", "block", and "volume", one or more optional
         sub-elements <code>seclabel</code>, <a href="#seclabel">described
@@ -3422,6 +3455,22 @@
           <dd>
             Specifies the connection timeout for protocols which support it.
             Note that '0' is considered as if the value is not provided.
+            <span class="since">Since 6.2.0</span>
+          </dd>
+          <dt><code>reconnect</code></dt>
+          <dd>
+            For disk type <code>vhostuser</code> configures reconnect timeout 
+            if the connection is lost. It has two mandatory attributes:
+            <dl>
+              <dt><code>enabled</code></dt>
+              <dd>If the reconnect feature is enabled, accepts<code>yes</code>
+              and <code>no</code>
+              </dd>
+
+              <dt><code>timeout</code></dt>
+              <dd>The amount of seconds after which hypervisor tries to reconnect.
+              </dd>
+            </dl>
             <span class="since">Since 6.2.0</span>
           </dd>
         </dl>
