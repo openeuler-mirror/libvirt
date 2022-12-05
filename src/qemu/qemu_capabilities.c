@@ -578,6 +578,7 @@ VIR_ENUM_IMPL(virQEMUCaps,
 
               /* 365 */
               "calc-dirty-rate",
+              "dirtyrate-param.mode",
     );
 
 
@@ -1160,6 +1161,7 @@ struct virQEMUCapsStringFlags virQEMUCapsEvents[] = {
     { "VSERPORT_CHANGE", QEMU_CAPS_VSERPORT_CHANGE },
     { "BLOCK_WRITE_THRESHOLD", QEMU_CAPS_BLOCK_WRITE_THRESHOLD },
     { "DUMP_COMPLETED", QEMU_CAPS_DUMP_COMPLETED },
+    { "calc-dirty-rate/arg-type/mode", QEMU_CAPS_DIRTYRATE_MODE },
 };
 
 struct virQEMUCapsStringFlags virQEMUCapsObjectTypes[] = {
