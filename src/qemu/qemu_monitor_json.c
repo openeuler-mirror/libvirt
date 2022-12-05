@@ -9375,15 +9375,27 @@ qemuMonitorJSONGetJobInfo(qemuMonitorPtr mon,
     return 0;
 }
 
+VIR_ENUM_IMPL(qemuMonitorDirtyRateCalcMode,
+              QEMU_MONITOR_DIRTYRATE_CALC_MODE_LAST,
+              "page-sampling",
+              "dirty-bitmap",
+              "dirty-ring");
+
 int
 qemuMonitorJSONStartDirtyRateCalc(qemuMonitorPtr mon,
-                                  int seconds)
+                                  int seconds,
+                                  qemuMonitorDirtyRateCalcMode mode)
 {
     g_autoptr(virJSONValue) cmd = NULL;
     g_autoptr(virJSONValue) reply = NULL;
+    const char *modestr = NULL;
+
+    if (mode != QEMU_MONITOR_DIRTYRATE_CALC_MODE_PAGE_SAMPLING)
+       modestr = qemuMonitorDirtyRateCalcModeTypeToString(mode);
 
     if (!(cmd = qemuMonitorJSONMakeCommand("calc-dirty-rate",
                                            "i:calc-time", seconds,
+                                           "S:mode", modestr,
                                            NULL)))
         return -1;
 

@@ -694,7 +694,8 @@ int qemuMonitorJSONSetDBusVMStateIdList(qemuMonitorPtr mon,
 
 int
 qemuMonitorJSONStartDirtyRateCalc(qemuMonitorPtr mon,
-                                  int seconds);
+                                  int seconds,
+                                  qemuMonitorDirtyRateCalcMode mode);
 
 int
 qemuMonitorJSONQueryDirtyRate(qemuMonitorPtr mon,
