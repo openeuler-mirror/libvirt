@@ -10,7 +10,8 @@ QEMU_AUDIO_DRV=none \
 /usr/bin/qemu-system-aarch64 \
 -name aarch64test \
 -S \
--machine virt,accel=kvm,usb=off,dump-guest-core=off,gic-version=3 \
+-machine virt,usb=off,dump-guest-core=off,gic-version=3 \
+-accel kvm \
 -cpu host \
 -m 1024 \
 -realtime mlock=off \

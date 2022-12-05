@@ -12,7 +12,8 @@ QEMU_AUDIO_DRV=none \
 -S \
 -object secret,id=masterKey0,format=raw,\
 file=/tmp/lib/domain--1-guest/master-key.aes \
--machine s390-ccw-virtio,accel=tcg,usb=off,dump-guest-core=off \
+-machine s390-ccw-virtio,usb=off,dump-guest-core=off \
+-accel tcg \
 -cpu qemu \
 -m 4096 \
 -overcommit mem-lock=off \
