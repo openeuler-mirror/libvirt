@@ -575,6 +575,9 @@ VIR_ENUM_IMPL(virQEMUCaps,
               "migration-param.xbzrle-cache-size",
               "object.qapified",
               "vhost-user-blk",
+
+              /* 365 */
+              "calc-dirty-rate",
     );
 
 
@@ -1144,6 +1147,7 @@ struct virQEMUCapsStringFlags virQEMUCapsCommands[] = {
     { "block-dirty-bitmap-merge", QEMU_CAPS_BITMAP_MERGE },
     { "query-cpu-model-baseline", QEMU_CAPS_QUERY_CPU_MODEL_BASELINE },
     { "query-cpu-model-comparison", QEMU_CAPS_QUERY_CPU_MODEL_COMPARISON },
+    { "calc-dirty-rate", QEMU_CAPS_CALC_DIRTY_RATE },
 };
 
 struct virQEMUCapsStringFlags virQEMUCapsMigration[] = {
