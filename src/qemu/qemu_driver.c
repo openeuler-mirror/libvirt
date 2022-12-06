@@ -23312,6 +23312,7 @@ qemuDomainStartDirtyRateCalc(virDomainPtr dom,
     virQEMUDriverPtr driver = dom->conn->privateData;
     virDomainObjPtr vm;
     qemuDomainObjPrivatePtr priv;
+    qemuMonitorDirtyRateCalcMode mode = QEMU_MONITOR_DIRTYRATE_CALC_MODE_PAGE_SAMPLING;
     int ret = -1;
 
     virCheckFlags(0, -1);
@@ -23354,7 +23355,7 @@ qemuDomainStartDirtyRateCalc(virDomainPtr dom,
     VIR_DEBUG("Calculate dirty rate in next %d seconds", seconds);
 
     qemuDomainObjEnterMonitor(driver, vm);
-    ret = qemuMonitorStartDirtyRateCalc(priv->mon, seconds);
+    ret = qemuMonitorStartDirtyRateCalc(priv->mon, seconds, mode);
 
     if (qemuDomainObjExitMonitor(driver, vm) < 0)
         ret = -1;
