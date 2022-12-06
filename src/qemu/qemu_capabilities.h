@@ -555,6 +555,7 @@ typedef enum { /* virQEMUCapsFlags grouping marker for syntax-check */
     QEMU_CAPS_MIGRATION_PARAM_XBZRLE_CACHE_SIZE, /* xbzrle-cache-size field in migrate-set-parameters */
 
     QEMU_CAPS_OBJECT_QAPIFIED, /* parameters for object-add are formally described */
+    QEMU_CAPS_DEVICE_VHOST_USER_BLK, /* -device vhost-user-blk */
 
     QEMU_CAPS_LAST /* this must always be the last item */
 } virQEMUCapsFlags;

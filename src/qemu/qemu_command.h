@@ -115,6 +115,10 @@ qemuBlockStorageSourceAttachDataPtr
 qemuBuildStorageSourceAttachPrepareDrive(virDomainDiskDefPtr disk,
                                          const virDomainDef *def,
                                          virQEMUCapsPtr qemuCaps);
+
+qemuBlockStorageSourceAttachDataPtr
+qemuBuildStorageSourceAttachPrepareChardev(virDomainDiskDefPtr disk);
+
 int
 qemuBuildStorageSourceAttachPrepareCommon(virStorageSourcePtr src,
                                           qemuBlockStorageSourceAttachDataPtr data,
@@ -126,6 +130,8 @@ qemuBuildStorageSourceChainAttachPrepareDrive(virDomainDiskDefPtr disk,
                                               const virDomainDef *def,
                                               virQEMUCapsPtr qemuCaps);
 
+qemuBlockStorageSourceChainDataPtr
+qemuBuildStorageSourceChainAttachPrepareChardev(virDomainDiskDefPtr disk);
 
 qemuBlockStorageSourceChainDataPtr
 qemuBuildStorageSourceChainAttachPrepareBlockdev(virStorageSourcePtr top,

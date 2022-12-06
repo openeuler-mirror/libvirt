@@ -7250,6 +7250,14 @@ qemuDomainDeviceDefValidateDisk(const virDomainDiskDef *disk,
         return -1;
     }
 
+    if (disk->src->type == VIR_STORAGE_TYPE_VHOST_USER) {
+        if (!virQEMUCapsGet(qemuCaps, QEMU_CAPS_DEVICE_VHOST_USER_BLK)) {
+            virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                           _("vhostuser disk is not supported with this QEMU binary"));
+            return -1;
+        }
+    }
+
     for (n = disk->src; virStorageSourceIsBacking(n); n = n->backingStore) {
         if (qemuDomainValidateStorageSource(n, qemuCaps) < 0)
             return -1;
@@ -16767,6 +16775,11 @@ qemuDomainPrepareDiskSource(virDomainDiskDefPtr disk,
                             qemuDomainObjPrivatePtr priv,
                             virQEMUDriverConfigPtr cfg)
 {
+    /* Nothing to prepare as it will use -chardev instead
+     * of -blockdev/-drive option. */
+    if (disk->src->type == VIR_STORAGE_TYPE_VHOST_USER)
+        return 0;
+
     qemuDomainPrepareDiskCachemode(disk);
 
     /* set default format for storage pool based disks */
