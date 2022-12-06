@@ -23332,7 +23332,17 @@ qemuDomainStartDirtyRateCalc(virDomainPtr dom,
     if (virDomainStartDirtyRateCalcEnsureACL(dom->conn, vm->def) < 0)
         goto cleanup;
 
-    if (qemuDomainObjBeginJob(driver, vm, QEMU_JOB_QUERY) < 0)
+    if (virDomainObjCheckActive(vm) < 0)
+        goto cleanup;
+
+    priv = vm->privateData;
+    if (!virQEMUCapsGet(priv->qemuCaps, QEMU_CAPS_CALC_DIRTY_RATE)) {
+        virReportError(VIR_ERR_OPERATION_UNSUPPORTED, "%s",
+                       _("QEMU does not support calculating dirty page rate"));
+        goto cleanup;
+    }
+
+    if (qemuDomainObjBeginJob(driver, vm, QEMU_JOB_MODIFY) < 0)
         goto cleanup;
 
     if (!virDomainObjIsActive(vm)) {
@@ -23343,7 +23353,6 @@ qemuDomainStartDirtyRateCalc(virDomainPtr dom,
 
     VIR_DEBUG("Calculate dirty rate in next %d seconds", seconds);
 
-    priv = vm->privateData;
     qemuDomainObjEnterMonitor(driver, vm);
     ret = qemuMonitorStartDirtyRateCalc(priv->mon, seconds);
 
