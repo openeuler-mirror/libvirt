@@ -1241,11 +1241,11 @@ static int lxcNodeGetSecurityModel(virConnectPtr conn,
     memset(secmodel, 0, sizeof(*secmodel));
 
     if (virNodeGetSecurityModelEnsureACL(conn) < 0) {
-         ret = -1;
+        ret = -1;
     }
 
     if (!(caps = virLXCDriverGetCapabilities(driver, false))) {
-        return = -1;
+        ret = -1;
     }
 
     /* we treat no driver as success, but simply return no data in *secmodel */
