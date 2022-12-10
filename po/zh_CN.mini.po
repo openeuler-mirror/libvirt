@@ -18301,7 +18301,7 @@ msgid "nvram device is only supported for PPC64"
 msgstr "只为 PPC64 支持 nvram 设备"
 
 msgid "nwfilter is in use"
-msgstr "nwfilter 未使用"
+msgstr "nwfilter 使用中"
 
 msgid "occupied"
 msgstr "已占用"
