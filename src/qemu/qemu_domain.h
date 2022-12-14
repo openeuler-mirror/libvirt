@@ -332,8 +332,11 @@ struct _qemuDomainObjPrivate {
     unsigned long migMaxBandwidth;
     char *origname;
     int nbdPort; /* Port used for migration with NBD */
+    char *migrationPids;
     unsigned short migrationPort;
     int preMigrationState;
+    char *migrationMultiFdPids;
+    unsigned int migrationMultiFdCount;
 
     virChrdevsPtr devs;
 
@@ -354,6 +357,7 @@ struct _qemuDomainObjPrivate {
     /* Bitmaps below hold data from the auto NUMA feature */
     virBitmapPtr autoNodeset;
     virBitmapPtr autoCpuset;
+    virBitmapPtr pcpumap;
 
     bool signalIOError; /* true if the domain condition should be signalled on
                            I/O error */

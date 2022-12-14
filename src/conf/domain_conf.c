@@ -32617,3 +32617,12 @@ virHostdevIsVFIODevice(const virDomainHostdevDef *hostdev)
         hostdev->source.subsys.type == VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_PCI &&
         hostdev->source.subsys.u.pci.backend == VIR_DOMAIN_HOSTDEV_PCI_BACKEND_VFIO;
 }
+
+void
+virDomainMigrationIDDefFree(virDomainMigrationIDDefPtr def)
+{
+    if (!def)
+        return;
+    virBitmapFree(def->cpumask);
+    VIR_FREE(def);
+}
