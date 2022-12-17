@@ -108,6 +108,7 @@ VIR_ENUM_IMPL(qemuMigrationParam,
               "xbzrle-cache-size",
               "max-postcopy-bandwidth",
               "multifd-channels",
+              "migrationpin",
 );
 
 typedef struct _qemuMigrationParamsAlwaysOnItem qemuMigrationParamsAlwaysOnItem;
@@ -201,6 +202,10 @@ static const qemuMigrationParamsTPMapItem qemuMigrationParamsTPMap[] = {
     {.typedParam = VIR_MIGRATE_PARAM_TLS_DESTINATION,
      .param = QEMU_MIGRATION_PARAM_TLS_HOSTNAME,
      .party = QEMU_MIGRATION_SOURCE},
+
+    {.typedParam = VIR_MIGRATE_PARAM_MIGRATIONPIN,
+     .param = QEMU_MIGRATION_PARAM_MIGRATIONPIN,
+     .party = QEMU_MIGRATION_SOURCE},
 };
 
 static const qemuMigrationParamType qemuMigrationParamTypes[] = {
@@ -217,6 +222,7 @@ static const qemuMigrationParamType qemuMigrationParamTypes[] = {
     [QEMU_MIGRATION_PARAM_XBZRLE_CACHE_SIZE] = QEMU_MIGRATION_PARAM_TYPE_ULL,
     [QEMU_MIGRATION_PARAM_MAX_POSTCOPY_BANDWIDTH] = QEMU_MIGRATION_PARAM_TYPE_ULL,
     [QEMU_MIGRATION_PARAM_MULTIFD_CHANNELS] = QEMU_MIGRATION_PARAM_TYPE_INT,
+    [QEMU_MIGRATION_PARAM_MIGRATIONPIN] = QEMU_MIGRATION_PARAM_TYPE_STRING,
 };
 G_STATIC_ASSERT(G_N_ELEMENTS(qemuMigrationParamTypes) == QEMU_MIGRATION_PARAM_LAST);
 
@@ -534,6 +540,16 @@ qemuMigrationParamsSetCompression(virTypedParameterPtr params,
 }
 
 
+void
+qemuMigrationMigrationParamsToVM(const qemuMigrationParamsPtr migParams, const virDomainObjPtr vm)
+{
+    if (migParams && migParams->params[QEMU_MIGRATION_PARAM_MIGRATIONPIN].set) {
+        qemuDomainObjPrivatePtr priv = vm->privateData;
+        priv->migrationThreadPinList = g_strdup(migParams->params[QEMU_MIGRATION_PARAM_MIGRATIONPIN].value.s);
+    }
+}
+
+
 qemuMigrationParamsPtr
 qemuMigrationParamsFromFlags(virTypedParameterPtr params,
                              int nparams,
@@ -740,6 +756,10 @@ qemuMigrationParamsToJSON(qemuMigrationParamsPtr migParams)
 
         if (!pv->set)
             continue;
+
+        if (i == QEMU_MIGRATION_PARAM_MIGRATIONPIN) {
+            continue;
+        }
 
         rc = 0;
         switch (qemuMigrationParamTypes[i]) {

@@ -25,6 +25,7 @@
 #include "qemu_domain.h"
 #include "virstoragefile.h"
 #include "vireventthread.h"
+#include "domain_conf.h"
 
 int qemuProcessPrepareMonitorChr(virDomainChrSourceDefPtr monConfig,
                                  const char *domainDir);
@@ -236,3 +237,20 @@ qemuProcessQMPPtr qemuProcessQMPNew(const char *binary,
 void qemuProcessQMPFree(qemuProcessQMPPtr proc);
 
 int qemuProcessQMPStart(qemuProcessQMPPtr proc);
+
+int qemuProcessSetupMigration(virDomainObjPtr vm,
+                              virDomainMigrationIDDefPtr migration);
+
+unsigned char * virParseCPUList(int *cpumaplen,
+                                const char *cpulist,
+                                int maxcpu);
+
+int qemuProcessHandleMigrationPid(qemuMonitorPtr mon ATTRIBUTE_UNUSED,
+                                  virDomainObjPtr vm,
+                                  int mpid,
+                                  void *opaque);
+
+int qemuProcessHandleMigrationMultiFdPids(qemuMonitorPtr mon ATTRIBUTE_UNUSED,
+                                          virDomainObjPtr vm,
+                                          int mpid,
+                                          void *opaque);

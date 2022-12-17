@@ -340,6 +340,16 @@ typedef int (*qemuMonitorDomainGuestCrashloadedCallback)(qemuMonitorPtr mon,
                                                          virDomainObjPtr vm,
                                                          void *opaque);
 
+typedef int (*qemuMonitorDomainMigrationPidCallback)(qemuMonitorPtr mon,
+                                                     virDomainObjPtr vm,
+                                                     int mcpid,
+                                                     void *opaque);
+
+typedef int (*qemuMonitorDomainMigrationMultiFdPidsCallback)(qemuMonitorPtr mon,
+                                                             virDomainObjPtr vm,
+                                                             int mcpid,
+                                                             void *opaque);
+
 typedef struct _qemuMonitorCallbacks qemuMonitorCallbacks;
 typedef qemuMonitorCallbacks *qemuMonitorCallbacksPtr;
 struct _qemuMonitorCallbacks {
@@ -376,6 +386,8 @@ struct _qemuMonitorCallbacks {
     qemuMonitorDomainPRManagerStatusChangedCallback domainPRManagerStatusChanged;
     qemuMonitorDomainRdmaGidStatusChangedCallback domainRdmaGidStatusChanged;
     qemuMonitorDomainGuestCrashloadedCallback domainGuestCrashloaded;
+    qemuMonitorDomainMigrationPidCallback domainMigrationPid;
+    qemuMonitorDomainMigrationMultiFdPidsCallback domainMigrationMultiFdPids;
 };
 
 qemuMonitorPtr qemuMonitorOpen(virDomainObjPtr vm,
@@ -476,6 +488,11 @@ int qemuMonitorEmitMigrationStatus(qemuMonitorPtr mon,
                                    int status);
 int qemuMonitorEmitMigrationPass(qemuMonitorPtr mon,
                                  int pass);
+
+int qemuMonitorEmitMigrationPid(qemuMonitorPtr mon, int mpid);
+
+int qemuMonitorEmitMigrationMultiFdPids(qemuMonitorPtr mon,
+                                        int mpid);
 
 int qemuMonitorEmitAcpiOstInfo(qemuMonitorPtr mon,
                                const char *alias,

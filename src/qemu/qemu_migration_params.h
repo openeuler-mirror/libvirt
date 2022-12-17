@@ -58,6 +58,7 @@ typedef enum {
     QEMU_MIGRATION_PARAM_XBZRLE_CACHE_SIZE,
     QEMU_MIGRATION_PARAM_MAX_POSTCOPY_BANDWIDTH,
     QEMU_MIGRATION_PARAM_MULTIFD_CHANNELS,
+    QEMU_MIGRATION_PARAM_MIGRATIONPIN,
 
     QEMU_MIGRATION_PARAM_LAST
 } qemuMigrationParam;
@@ -73,6 +74,9 @@ typedef enum {
 
 virBitmapPtr
 qemuMigrationParamsGetAlwaysOnCaps(qemuMigrationParty party);
+
+void
+qemuMigrationMigrationParamsToVM(const qemuMigrationParamsPtr migParams, const virDomainObjPtr vm);
 
 qemuMigrationParamsPtr
 qemuMigrationParamsFromFlags(virTypedParameterPtr params,

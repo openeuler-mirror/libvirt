@@ -112,6 +112,8 @@ static void qemuMonitorJSONHandleBlockThreshold(qemuMonitorPtr mon, virJSONValue
 static void qemuMonitorJSONHandleDumpCompleted(qemuMonitorPtr mon, virJSONValuePtr data);
 static void qemuMonitorJSONHandlePRManagerStatusChanged(qemuMonitorPtr mon, virJSONValuePtr data);
 static void qemuMonitorJSONHandleRdmaGidStatusChanged(qemuMonitorPtr mon, virJSONValuePtr data);
+static void qemuMonitorJSONHandleMigrationPid(qemuMonitorPtr mon, virJSONValuePtr data);
+static void qemuMonitorJSONHandleMigrationMultiFdPids(qemuMonitorPtr mon, virJSONValuePtr data);
 
 typedef struct {
     const char *type;
@@ -133,7 +135,9 @@ static qemuEventHandler eventHandlers[] = {
     { "GUEST_PANICKED", qemuMonitorJSONHandleGuestPanic, },
     { "JOB_STATUS_CHANGE", qemuMonitorJSONHandleJobStatusChange, },
     { "MIGRATION", qemuMonitorJSONHandleMigrationStatus, },
+    { "MIGRATION_MULTIFD_PID", qemuMonitorJSONHandleMigrationMultiFdPids, },
     { "MIGRATION_PASS", qemuMonitorJSONHandleMigrationPass, },
+    { "MIGRATION_PID", qemuMonitorJSONHandleMigrationPid, },
     { "NIC_RX_FILTER_CHANGED", qemuMonitorJSONHandleNicRxFilterChanged, },
     { "POWERDOWN", qemuMonitorJSONHandlePowerdown, },
     { "PR_MANAGER_STATUS_CHANGED", qemuMonitorJSONHandlePRManagerStatusChanged, },
@@ -157,6 +161,32 @@ static qemuEventHandler eventHandlers[] = {
     { "WATCHDOG", qemuMonitorJSONHandleWatchdog, },
     /* We use bsearch, so keep this list sorted.  */
 };
+
+static void qemuMonitorJSONHandleMigrationPid(qemuMonitorPtr mon,
+                                              virJSONValuePtr data)
+{
+    int mpid;
+
+    if (virJSONValueObjectGetNumberInt(data, "pid", &mpid) < 0) {
+        VIR_WARN("missing migration pid in migration-pid event");
+        return;
+    }
+
+    qemuMonitorEmitMigrationPid(mon, mpid);
+}
+
+static void qemuMonitorJSONHandleMigrationMultiFdPids(qemuMonitorPtr mon,
+                                                      virJSONValuePtr data)
+{
+    int mpid;
+
+    if (virJSONValueObjectGetNumberInt(data, "pid", &mpid) < 0) {
+        VIR_WARN("missing multifd pid in migration-multifd-pid event");
+        return;
+    }
+
+    qemuMonitorEmitMigrationMultiFdPids(mon, mpid);
+}
 
 static int
 qemuMonitorEventCompare(const void *key, const void *elt)

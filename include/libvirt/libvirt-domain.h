@@ -1017,6 +1017,14 @@ typedef enum {
 # define VIR_MIGRATE_PARAM_COMPRESSION_MT_DTHREADS "compression.mt.dthreads"
 
 /**
+ * VIR_MIGRATE_PARAM_MIGRATIONPIN:
+ *
+ * virDomainMigrate* params field: the pin of migration threads for
+ * migration as VIR_TYPED_PARAM_STRING.
+ */
+# define VIR_MIGRATE_PARAM_MIGRATIONPIN "migration.pin"
+
+/**
  * VIR_MIGRATE_PARAM_COMPRESSION_XBZRLE_CACHE:
  *
  * virDomainMigrate* params field: the size of page cache for xbzrle
