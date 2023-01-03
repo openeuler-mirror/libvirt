@@ -108,6 +108,11 @@ void
 virNWFilterObjListFree(virNWFilterObjListPtr nwfilters)
 {
     size_t i;
+
+    if (!nwfilters) {
+        return;
+    }
+
     for (i = 0; i < nwfilters->count; i++)
         virNWFilterObjFree(nwfilters->objs[i]);
     VIR_FREE(nwfilters->objs);

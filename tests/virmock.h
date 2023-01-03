@@ -57,6 +57,7 @@
 #define VIR_MOCK_GET_ARG20(z, a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t) z(a, b),  z(c, d), z(e, f), z(g, h), z(i, j), z(k, l), z(m, n), z(o, p), z(q, r), z(s, t)
 #define VIR_MOCK_GET_ARG21(z, a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u) z(a, b),  z(c, d), z(e, f), z(g, h), z(i, j), z(k, l), z(m, n), z(o, p), z(q, r), z(s, t)
 
+#define VIR_MOCK_STRINGIFY_SYMBOL(name) #name
 
 #define VIR_MOCK_ARGNAMES_EXPAND(a, b, ...) VIR_MOCK_ARG_PASTE(a, b, __VA_ARGS__)
 #define VIR_MOCK_ARGNAMES(...) \
@@ -283,7 +284,7 @@
     do { \
         if (real_##name == NULL && \
             !(real_##name = dlsym(RTLD_NEXT, \
-                                  #name))) { \
+                                  VIR_MOCK_STRINGIFY_SYMBOL(name)))) { \
             fprintf(stderr, "Missing symbol '" #name "'\n"); \
             abort(); \
         } \

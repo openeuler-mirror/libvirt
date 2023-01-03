@@ -9811,9 +9811,11 @@ qemuDomainObjBeginJobInternal(virQEMUDriverPtr driver,
     unsigned long long duration = 0;
     unsigned long long agentDuration = 0;
     unsigned long long asyncDuration = 0;
+    const char *currentAPI = virThreadJobGet();
 
-    VIR_DEBUG("Starting job: job=%s agentJob=%s asyncJob=%s "
+    VIR_DEBUG("Starting job: API=%s job=%s agentJob=%s asyncJob=%s "
               "(vm=%p name=%s, current job=%s agentJob=%s async=%s)",
+              NULLSTR(currentAPI),
               qemuDomainJobTypeToString(job),
               qemuDomainAgentJobTypeToString(agentJob),
               qemuDomainAsyncJobTypeToString(asyncJob),
@@ -9858,6 +9860,16 @@ qemuDomainObjBeginJobInternal(virQEMUDriverPtr driver,
     if (!nested && !qemuDomainNestedJobAllowed(priv, job))
         goto retry;
 
+    if (obj->removing) {
+        char uuidstr[VIR_UUID_STRING_BUFLEN];
+
+        virUUIDFormat(obj->def->uuid, uuidstr);
+        virReportError(VIR_ERR_NO_DOMAIN,
+                       _("no domain with matching uuid '%s' (%s)"),
+                       uuidstr, obj->def->name);
+        goto cleanup;
+    }
+    
     ignore_value(virTimeMillisNow(&now));
 
     if (job) {
@@ -9916,13 +9928,14 @@ qemuDomainObjBeginJobInternal(virQEMUDriverPtr driver,
     if (priv->job.asyncJob && priv->job.asyncStarted)
         asyncDuration = now - priv->job.asyncStarted;
 
-    VIR_WARN("Cannot start job (%s, %s, %s) for domain %s; "
+    VIR_WARN("Cannot start job (%s, %s, %s) in API %s for domain %s; "
              "current job is (%s, %s, %s) "
              "owned by (%llu %s, %llu %s, %llu %s (flags=0x%lx)) "
              "for (%llus, %llus, %llus)",
              qemuDomainJobTypeToString(job),
              qemuDomainAgentJobTypeToString(agentJob),
              qemuDomainAsyncJobTypeToString(asyncJob),
+             NULLSTR(currentAPI),
              obj->def->name,
              qemuDomainJobTypeToString(priv->job.active),
              qemuDomainAgentJobTypeToString(priv->job.agentActive),
@@ -17163,7 +17176,8 @@ qemuDomainInitializePflashStorageSource(virDomainObjPtr vm)
     pflash0->type = VIR_STORAGE_TYPE_FILE;
     pflash0->format = VIR_STORAGE_FILE_RAW;
     pflash0->path = g_strdup(def->os.loader->path);
-    pflash0->readonly = def->os.loader->readonly;
+    pflash0->readonly = false;
+    virTristateBoolToBool(def->os.loader->readonly, &pflash0->readonly);
     pflash0->nodeformat = g_strdup("libvirt-pflash0-format");
     pflash0->nodestorage = g_strdup("libvirt-pflash0-storage");
 

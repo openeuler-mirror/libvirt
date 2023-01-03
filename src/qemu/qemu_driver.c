@@ -5719,10 +5719,6 @@ qemuDomainPinIOThread(virDomainPtr dom,
         if (!(cpumask = virBitmapNewData(cpumap, maplen)))
             goto endjob;
 
-        virBitmapFree(iothrid->cpumask);
-        iothrid->cpumask = cpumask;
-        iothrid->autofill = false;
-
         /* Configure the corresponding cpuset cgroup before set affinity. */
         if (virCgroupHasController(priv->cgroup,
                                    VIR_CGROUP_CONTROLLER_CPUSET)) {
@@ -5739,6 +5735,10 @@ qemuDomainPinIOThread(virDomainPtr dom,
 
         if (virProcessSetAffinity(iothrid->thread_id, pcpumap) < 0)
             goto endjob;
+
+        virBitmapFree(iothrid->cpumask);
+        iothrid->cpumask = cpumask;
+        iothrid->autofill = false;
 
         if (virDomainObjSave(vm, driver->xmlopt, cfg->stateDir) < 0)
             goto endjob;

@@ -637,7 +637,8 @@ qemuMonitorTestProcessCommandVerbatim(qemuMonitorTestPtr test,
         ret = qemuMonitorTestAddResponse(test, data->response);
     } else {
         if (data->cmderr) {
-            errmsg = g_strdup_printf("%s: %s", data->cmderr, cmdstr);
+            errmsg = g_strdup_printf("%s: %s expected %s",
+                                     data->cmderr, cmdstr, data->command_name);
 
             ret = qemuMonitorTestAddErrorResponse(test, errmsg);
         } else {

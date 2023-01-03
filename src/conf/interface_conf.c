@@ -1110,13 +1110,16 @@ virInterfaceDefDevFormat(virBufferPtr buf,
                 virBufferAsprintf(buf, "<mac address='%s'/>\n", def->mac);
             break;
         case VIR_INTERFACE_TYPE_BRIDGE:
-            virInterfaceBridgeDefFormat(buf, def);
+            if (virInterfaceBridgeDefFormat(buf, def) < 0)
+                return -1;
             break;
         case VIR_INTERFACE_TYPE_BOND:
-            virInterfaceBondDefFormat(buf, def);
+            if (virInterfaceBondDefFormat(buf, def) < 0)
+                return -1;
             break;
         case VIR_INTERFACE_TYPE_VLAN:
-            virInterfaceVlanDefFormat(buf, def);
+            if (virInterfaceVlanDefFormat(buf, def) < 0)
+                return -1;
             break;
     }
 

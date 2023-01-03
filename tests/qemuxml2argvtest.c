@@ -990,6 +990,7 @@ mymain(void)
             QEMU_CAPS_DEVICE_ISA_SERIAL,
             QEMU_CAPS_SGA);
     DO_TEST("bios-nvram", NONE);
+    DO_TEST_PARSE_ERROR("bios-nvram-no-path", NONE);
     DO_TEST("bios-nvram-secure",
             QEMU_CAPS_DEVICE_DMI_TO_PCI_BRIDGE,
             QEMU_CAPS_DEVICE_PCI_BRIDGE,
@@ -997,7 +998,8 @@ mymain(void)
             QEMU_CAPS_ICH9_AHCI,
             QEMU_CAPS_MACHINE_SMM_OPT,
             QEMU_CAPS_VIRTIO_SCSI);
-
+    DO_TEST_CAPS_LATEST("bios-nvram-template");
+    
     /* Make sure all combinations of ACPI and UEFI behave as expected */
     DO_TEST("q35-acpi-uefi", NONE);
     DO_TEST_PARSE_ERROR("q35-noacpi-uefi", NONE);
@@ -1209,6 +1211,8 @@ mymain(void)
     VIR_FREE(driver.config->vxhsTLSx509certdir);
     DO_TEST("disk-no-boot", NONE);
     DO_TEST_CAPS_LATEST("disk-nvme");
+    DO_TEST_CAPS_VER("disk-vhostuser-numa", "4.2.0");
+    DO_TEST_CAPS_LATEST("disk-vhostuser-numa");
     DO_TEST_CAPS_LATEST("disk-vhostuser");
     DO_TEST_PARSE_ERROR("disk-device-lun-type-invalid",
                         QEMU_CAPS_VIRTIO_SCSI);

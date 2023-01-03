@@ -67,7 +67,7 @@ ip6tables \
 ip6tables \
 -A FJ-vnet0 \
 -p udp \
---destination ::10.1.2.3/128 \
+--destination ::ffff:10.1.2.3/128 \
 -m dscp \
 --dscp 63 \
 --dport 255:256 \
@@ -80,7 +80,7 @@ ip6tables \
 -p udp \
 -m mac \
 --mac-source 01:02:03:04:05:06 \
---source ::10.1.2.3/128 \
+--source ::ffff:10.1.2.3/128 \
 -m dscp \
 --dscp 63 \
 --sport 255:256 \
@@ -91,7 +91,7 @@ ip6tables \
 ip6tables \
 -A HJ-vnet0 \
 -p udp \
---destination ::10.1.2.3/128 \
+--destination ::ffff:10.1.2.3/128 \
 -m dscp \
 --dscp 63 \
 --dport 255:256 \
