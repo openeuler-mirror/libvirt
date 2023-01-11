@@ -5186,7 +5186,7 @@ qemuDomainDefValidateFeatures(const virDomainDef *def,
         switch ((virDomainFeature) i) {
         case VIR_DOMAIN_FEATURE_IOAPIC:
             if (def->features[i] != VIR_DOMAIN_IOAPIC_NONE) {
-                if (!ARCH_IS_X86(def->os.arch)) {
+                if (!ARCH_IS_X86(def->os.arch) && !ARCH_IS_LOONGARCH(def->os.arch)) {
                     virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
                                    _("The '%s' feature is not supported for "
                                      "architecture '%s' or machine type '%s'"),
@@ -9089,6 +9089,11 @@ qemuDomainControllerDefPostParse(virDomainControllerDefPtr cont,
                     cont->model = VIR_DOMAIN_CONTROLLER_MODEL_USB_QEMU_XHCI;
                 else if (virQEMUCapsGet(qemuCaps, QEMU_CAPS_NEC_USB_XHCI))
                     cont->model = VIR_DOMAIN_CONTROLLER_MODEL_USB_NEC_XHCI;
+            } else if (ARCH_IS_LOONGARCH(def->os.arch)) {
+                if (virQEMUCapsGet(qemuCaps, QEMU_CAPS_DEVICE_QEMU_XHCI))
+                    cont->model = VIR_DOMAIN_CONTROLLER_MODEL_USB_QEMU_XHCI;
+                else if (virQEMUCapsGet(qemuCaps, QEMU_CAPS_NEC_USB_XHCI))
+                    cont->model = VIR_DOMAIN_CONTROLLER_MODEL_USB_NEC_XHCI;
             }
         }
         /* forbid usb model 'qusb1' and 'qusb2' in this kind of hyperviosr */
@@ -12985,6 +12990,20 @@ qemuDomainMachineIsPSeries(const char *machine,
     return false;
 }
 
+static bool
+qemuDomainMachineIsLoongson(const char *machine,
+                            const virArch arch)
+{
+    if (!ARCH_IS_LOONGARCH(arch))
+        return false;
+
+    if (STREQ(machine, "loongson7a") ||
+        STRPREFIX(machine, "loongson7a-")) {
+        return true;
+    }
+
+    return false;
+}
 
 /* You should normally avoid this function and use
  * qemuDomainHasBuiltinIDE() instead. */
@@ -12996,7 +13015,8 @@ qemuDomainMachineHasBuiltinIDE(const char *machine,
         STREQ(machine, "malta") ||
         STREQ(machine, "sun4u") ||
         STREQ(machine, "core3") ||
-        STREQ(machine, "g3beige");
+        STREQ(machine, "g3beige") ||
+        STREQ(machine, "loongson7a");
 }
 
 
@@ -13063,6 +13083,13 @@ bool
 qemuDomainIsPSeries(const virDomainDef *def)
 {
     return qemuDomainMachineIsPSeries(def->os.machine, def->os.arch);
+}
+
+
+bool
+qemuDomainIsLoongson(const virDomainDef *def)
+{
+    return qemuDomainMachineIsLoongson(def->os.machine, def->os.arch);
 }
 
 

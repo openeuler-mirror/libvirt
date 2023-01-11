@@ -1983,6 +1983,10 @@ bool virQEMUCapsHasPCIMultiBus(virQEMUCapsPtr qemuCaps,
      * since forever */
     if (ARCH_IS_SW64(def->os.arch))
         return true;
+    /* loongarch64 support PCI-multibus on all machine types
+     * since forever */
+    if (ARCH_IS_LOONGARCH(def->os.arch))
+        return true;
 
     if (def->os.arch == VIR_ARCH_PPC ||
         ARCH_IS_PPC64(def->os.arch)) {
