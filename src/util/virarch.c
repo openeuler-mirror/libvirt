@@ -227,6 +227,8 @@ virArch virArchFromHost(void)
         arch = VIR_ARCH_X86_64;
     } else if (STREQ(ut.machine, "sw_64")) {
         arch = VIR_ARCH_SW_64;
+    } else if (STREQ(ut.machine, "loongarch64")) {
+        arch = VIR_ARCH_LOONGARCH64;
     } else {
         /* Otherwise assume the canonical name */
         if ((arch = virArchFromString(ut.machine)) == VIR_ARCH_NONE) {
