@@ -101,4 +101,9 @@
     <include filename='arm_FT-2000plus.xml'/>
     <include filename='arm_Tengyun-S2500.xml'/>
   </arch>
+
+  <arch name='loongarch64'>
+    <include filename="loongarch_vendors.xml"/>
+    <include filename="loongarch_3a5000.xml"/>
+  </arch>
 </cpus>
