@@ -4361,6 +4361,10 @@ qemuDomainDefAddDefaultDevices(virDomainDefPtr def,
 	addPCIeRoot = true;
 	break;
 
+    case VIR_ARCH_LOONGARCH64:
+        addPCIeRoot = true;
+        break;
+
     case VIR_ARCH_ARMV7B:
     case VIR_ARCH_CRIS:
     case VIR_ARCH_ITANIUM:

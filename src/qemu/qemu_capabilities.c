@@ -2692,6 +2692,7 @@ static const char *preferredMachines[] =
     "sim", /* VIR_ARCH_XTENSAEB */
 
     "core3", /* VIR_ARCH_SW_64 */
+    "loongson7a", /* VIR_ARCH_LOONGARCH64 */
 };
 G_STATIC_ASSERT(G_N_ELEMENTS(preferredMachines) == VIR_ARCH_LAST);
 

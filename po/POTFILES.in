@@ -60,6 +60,7 @@
 @SRCDIR@/src/cpu/cpu_arm.c
 @SRCDIR@/src/cpu/cpu_map.c
 @SRCDIR@/src/cpu/cpu_ppc64.c
+@SRCDIR@/src/cpu/cpu_loongarch.c
 @SRCDIR@/src/cpu/cpu_s390.c
 @SRCDIR@/src/cpu/cpu_x86.c
 @SRCDIR@/src/datatypes.c

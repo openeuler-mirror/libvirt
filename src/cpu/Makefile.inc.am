@@ -15,6 +15,9 @@ CPU_SOURCES = \
 	cpu/cpu_ppc64.h \
 	cpu/cpu_ppc64.c \
 	cpu/cpu_ppc64_data.h \
+	cpu/cpu_loongarch.h \
+	cpu/cpu_loongarch.c \
+	cpu/cpu_loongarch_data.h \
 	cpu/cpu_map.h \
 	cpu/cpu_map.c \
 	$(NULL)
