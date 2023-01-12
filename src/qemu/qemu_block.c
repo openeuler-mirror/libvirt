@@ -1681,9 +1681,9 @@ qemuBlockStorageSourceAttachApply(qemuMonitor *mon,
                                   qemuBlockStorageSourceAttachData *data)
 {
     if (qemuBlockStorageSourceAttachApplyStorageDeps(mon, data) < 0 ||
+        qemuBlockStorageSourceAttachApplyFormatDeps(mon, data) < 0 ||
         qemuBlockStorageSourceAttachApplyStorage(mon, data) < 0 ||
         qemuBlockStorageSourceAttachApplyStorageSlice(mon, data) < 0 ||
-        qemuBlockStorageSourceAttachApplyFormatDeps(mon, data) < 0 ||
         qemuBlockStorageSourceAttachApplyFormat(mon, data) < 0)
         return -1;
 
@@ -2651,6 +2651,8 @@ qemuBlockStorageSourceCreate(virDomainObj *vm,
         goto cleanup;
 
     rc = qemuBlockStorageSourceAttachApplyStorageDeps(priv->mon, data);
+    if (rc == 0)
+        rc = qemuBlockStorageSourceAttachApplyFormatDeps(priv->mon, data);
 
     qemuDomainObjExitMonitor(vm);
     if (rc < 0)
@@ -2663,9 +2665,6 @@ qemuBlockStorageSourceCreate(virDomainObj *vm,
         goto cleanup;
 
     rc = qemuBlockStorageSourceAttachApplyStorage(priv->mon, data);
-
-    if (rc == 0)
-        rc = qemuBlockStorageSourceAttachApplyFormatDeps(priv->mon, data);
 
     qemuDomainObjExitMonitor(vm);
     if (rc < 0)
