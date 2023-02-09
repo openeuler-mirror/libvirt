@@ -109,6 +109,7 @@ VIR_ENUM_IMPL(qemuMigrationParam,
               "max-postcopy-bandwidth",
               "multifd-channels",
               "migrationpin",
+              "compress-method",
 );
 
 typedef struct _qemuMigrationParamsAlwaysOnItem qemuMigrationParamsAlwaysOnItem;
@@ -206,6 +207,10 @@ static const qemuMigrationParamsTPMapItem qemuMigrationParamsTPMap[] = {
     {.typedParam = VIR_MIGRATE_PARAM_MIGRATIONPIN,
      .param = QEMU_MIGRATION_PARAM_MIGRATIONPIN,
      .party = QEMU_MIGRATION_SOURCE},
+
+    {.typedParam = VIR_MIGRATE_PARAM_COMPRESSION_ALGORITHM,
+     .param = QEMU_MIGRATION_PARAM_COMPRESS_METHOD,
+     .party = QEMU_MIGRATION_SOURCE | QEMU_MIGRATION_DESTINATION},
 };
 
 static const qemuMigrationParamType qemuMigrationParamTypes[] = {
@@ -223,6 +228,7 @@ static const qemuMigrationParamType qemuMigrationParamTypes[] = {
     [QEMU_MIGRATION_PARAM_MAX_POSTCOPY_BANDWIDTH] = QEMU_MIGRATION_PARAM_TYPE_ULL,
     [QEMU_MIGRATION_PARAM_MULTIFD_CHANNELS] = QEMU_MIGRATION_PARAM_TYPE_INT,
     [QEMU_MIGRATION_PARAM_MIGRATIONPIN] = QEMU_MIGRATION_PARAM_TYPE_STRING,
+    [QEMU_MIGRATION_PARAM_COMPRESS_METHOD] = QEMU_MIGRATION_PARAM_TYPE_STRING,
 };
 G_STATIC_ASSERT(G_N_ELEMENTS(qemuMigrationParamTypes) == QEMU_MIGRATION_PARAM_LAST);
 
@@ -516,7 +522,8 @@ qemuMigrationParamsSetCompression(virTypedParameterPtr params,
 
     if ((migParams->params[QEMU_MIGRATION_PARAM_COMPRESS_LEVEL].set ||
          migParams->params[QEMU_MIGRATION_PARAM_COMPRESS_THREADS].set ||
-         migParams->params[QEMU_MIGRATION_PARAM_DECOMPRESS_THREADS].set) &&
+         migParams->params[QEMU_MIGRATION_PARAM_DECOMPRESS_THREADS].set ||
+         migParams->params[QEMU_MIGRATION_PARAM_COMPRESS_METHOD].set) &&
         !(migParams->compMethods & (1ULL << QEMU_MIGRATION_COMPRESS_MT))) {
         virReportError(VIR_ERR_INVALID_ARG, "%s",
                        _("Turn multithread compression on to tune it"));

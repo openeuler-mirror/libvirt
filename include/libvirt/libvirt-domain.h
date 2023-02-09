@@ -1073,6 +1073,16 @@ typedef enum {
  */
 # define VIR_MIGRATE_PARAM_TLS_DESTINATION          "tls.destination"
 
+/**
+* VIR_MIGRATE_PARAM_COMPRESSION_ALGORITHM:
+*
+* virDomainMigrate* params field: choose compression algorithm, you can choose
+* zlib or zstd.
+*
+* Since: 6.2.0
+*/
+# define VIR_MIGRATE_PARAM_COMPRESSION_ALGORITHM     "compression.algorithm"
+
 /* Domain migration. */
 virDomainPtr virDomainMigrate (virDomainPtr domain, virConnectPtr dconn,
                                unsigned long flags, const char *dname,

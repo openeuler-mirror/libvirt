@@ -10723,6 +10723,11 @@ static const vshCmdOptDef opts_migrate[] = {
      .type = VSH_OT_STRING,
      .help = N_("override the destination host name used for TLS verification")
     },
+    {.name = "comp-algorithm",
+     .type = VSH_OT_STRING,
+     .help = N_("choose migration compression algorithm")
+    },
+
     {.name = NULL}
 };
 
@@ -10865,6 +10870,13 @@ doMigrate(void *opaque)
                                     ullOpt) < 0)
             goto save_error;
     }
+
+    if (vshCommandOptStringReq(ctl, cmd, "comp-algorithm", &opt) < 0)
+        goto out;
+    if (opt &&
+        virTypedParamsAddString(&params, &nparams, &maxparams,
+                                VIR_MIGRATE_PARAM_COMPRESSION_ALGORITHM, opt) < 0)
+        goto save_error;
 
     if (vshCommandOptStringReq(ctl, cmd, "xml", &opt) < 0)
         goto out;
