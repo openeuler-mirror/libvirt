@@ -37,3 +37,12 @@ char *vir_g_strdup_vprintf(const char *msg, va_list args)
 #define g_canonicalize_filename vir_g_canonicalize_filename
 #undef g_fsync
 #define g_fsync vir_g_fsync
+
+/* Intentionally redefine macro so that it's not marked as available in 2.58
+ * and newer. Drop when bumping to 2.58 or newer. */
+#undef G_GNUC_NO_INLINE
+#if g_macro__has_attribute(__noinline__)
+# define G_GNUC_NO_INLINE __attribute__ ((__noinline__))
+#else
+# define G_GNUC_NO_INLINE
+#endif
