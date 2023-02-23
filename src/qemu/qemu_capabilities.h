@@ -677,6 +677,7 @@ typedef enum { /* virQEMUCapsFlags grouping marker for syntax-check */
     /* 450 */
     QEMU_CAPS_RUN_WITH_ASYNC_TEARDOWN, /* asynchronous teardown -run-with async-teardown=on|off */
     QEMU_CAPS_DEVICE_VIRTIO_BLK_VHOST_VDPA, /* virtio-blk-vhost-vdpa block driver */
+    QEMU_CAPS_VIRTIO_BLK_IOTHREAD_MAPPING, /* virtio-blk supports per-virtqueue iothread mapping */
     QEMU_CAPS_SMP_CLUSTERS, /* -smp clusters= */
     QEMU_CAPS_VIRTCCA, /* tmm-guest */
     QEMU_CAPS_CCA_GUEST, /* -object rme-guest */
