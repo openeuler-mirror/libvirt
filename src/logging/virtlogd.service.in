@@ -24,3 +24,4 @@ LimitNOFILE=16384
 
 [Install]
 Also=virtlogd.socket
+Also=virtlogd-admin.socket
