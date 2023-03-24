@@ -19301,9 +19301,6 @@ qemuDomainSetBlockIoTune(virDomainPtr dom,
                 goto endjob;
         }
 
-        if (!qemuDomainDiskBlockIoTuneIsSupported(conf_disk->src))
-            goto endjob;
-
         cur_info = qemuDomainFindGroupBlockIoTune(def, disk, &info);
 
         if (qemuDomainSetBlockIoTuneDefaults(&info, cur_info,
@@ -19385,6 +19382,9 @@ qemuDomainSetBlockIoTune(virDomainPtr dom,
                            path);
             goto endjob;
         }
+
+	if (!qemuDomainDiskBlockIoTuneIsSupported(conf_disk->src))
+            goto endjob;
 
         conf_cur_info = qemuDomainFindGroupBlockIoTune(persistentDef, conf_disk, &info);
 
