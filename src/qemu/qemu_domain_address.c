@@ -2078,6 +2078,87 @@ qemuDomainValidateDevicePCISlotsQ35(virDomainDefPtr def,
     return 0;
 }
 
+static int
+qemuDomainValidateDevicePCISlotsLoongson(virDomainDefPtr def,
+                                         virQEMUCapsPtr qemuCaps,
+                                         virDomainPCIAddressSetPtr addrs)
+{
+    int ret = -1;
+    virPCIDeviceAddress tmp_addr;
+    bool qemuDeviceVideoUsable = virQEMUCapsGet(qemuCaps, QEMU_CAPS_DEVICE_VIDEO_PRIMARY);
+    g_autofree char *addrStr = NULL;
+    virDomainPCIConnectFlags flags = VIR_PCI_CONNECT_TYPE_PCI_DEVICE;
+
+    if (addrs->nbuses) {
+        memset(&tmp_addr, 0, sizeof(tmp_addr));
+        tmp_addr.slot = 1;
+        /* pci-ohci at 00:01.0 */
+        if (virDomainPCIAddressReserveAddr(addrs, &tmp_addr, flags, 0) < 0)
+            return -1;
+    }
+
+    if (def->nvideos > 0 &&
+        def->videos[0]->type != VIR_DOMAIN_VIDEO_TYPE_NONE &&
+        def->videos[0]->type != VIR_DOMAIN_VIDEO_TYPE_RAMFB) {
+        /* reserve slot 2 for vga device */
+        virDomainVideoDefPtr primaryVideo = def->videos[0];
+
+        if (virDeviceInfoPCIAddressIsWanted(&primaryVideo->info)) {
+            memset(&tmp_addr, 0, sizeof(tmp_addr));
+            tmp_addr.slot = 2;
+
+            if (!(addrStr = virPCIDeviceAddressAsString(&tmp_addr)))
+                return -1;
+            if (!virDomainPCIAddressValidate(addrs, &tmp_addr,
+                                             addrStr, flags, true))
+                return ret;
+
+            if (virDomainPCIAddressSlotInUse(addrs, &tmp_addr)) {
+                if (qemuDeviceVideoUsable) {
+                    if (qemuDomainPCIAddressReserveNextAddr(addrs,
+                                                            &primaryVideo->info) < 0) {
+                        return ret;
+                    }
+                } else {
+                    virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                                   _("PCI address 0:0:2.0 is in use, "
+                                     "QEMU needs it for primary video"));
+                    return ret;
+                }
+            } else {
+                if (virDomainPCIAddressReserveAddr(addrs, &tmp_addr, flags, 0) < 0)
+                    return ret;
+                primaryVideo->info.addr.pci = tmp_addr;
+                primaryVideo->info.type = VIR_DOMAIN_DEVICE_ADDRESS_TYPE_PCI;
+            }
+        } else if (!qemuDeviceVideoUsable) {
+            if (primaryVideo->info.addr.pci.domain != 0 ||
+                primaryVideo->info.addr.pci.bus != 0 ||
+                primaryVideo->info.addr.pci.slot != 2 ||
+                primaryVideo->info.addr.pci.function != 0) {
+                virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                               _("Primary video card must have PCI address 0:0:2.0"));
+                return ret;
+            }
+            /* If TYPE == PCI, then qemuDomainCollectPCIAddress() function
+             * has already reserved the address, so we must skip */
+        }
+    } else if (addrs->nbuses && !qemuDeviceVideoUsable) {
+        memset(&tmp_addr, 0, sizeof(tmp_addr));
+        tmp_addr.slot = 2;
+
+        if (virDomainPCIAddressSlotInUse(addrs, &tmp_addr)) {
+            VIR_DEBUG("PCI address 0:0:2.0 in use, future addition of a video"
+                      " device will not be possible without manual"
+                      " intervention");
+        } else if (virDomainPCIAddressReserveAddr(addrs, &tmp_addr, flags, 0) < 0) {
+            return ret;
+        }
+    }
+
+    ret = 0;
+    return ret;
+}
 
 static int
 qemuDomainValidateDevicePCISlotsChipsets(virDomainDefPtr def,
@@ -2091,6 +2172,11 @@ qemuDomainValidateDevicePCISlotsChipsets(virDomainDefPtr def,
 
     if (qemuDomainIsQ35(def) &&
         qemuDomainValidateDevicePCISlotsQ35(def, qemuCaps, addrs) < 0) {
+        return -1;
+    }
+
+    if (qemuDomainIsLoongson(def) &&
+        qemuDomainValidateDevicePCISlotsLoongson(def, qemuCaps, addrs) < 0) {
         return -1;
     }
 

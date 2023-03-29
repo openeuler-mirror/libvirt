@@ -28,7 +28,7 @@
 #include "cpu_x86_data.h"
 #include "cpu_ppc64_data.h"
 #include "cpu_arm_data.h"
-
+#include "cpu_loongarch_data.h"
 
 typedef struct _virCPUData virCPUData;
 typedef virCPUData *virCPUDataPtr;
@@ -38,6 +38,7 @@ struct _virCPUData {
         virCPUx86Data x86;
         virCPUppc64Data ppc64;
         virCPUarmData arm;
+        virCPULoongArchData loongarch;
         /* generic driver needs no data */
     } data;
 };

@@ -85,6 +85,7 @@ static const struct virArchData {
     { "xtensaeb",     32, VIR_ARCH_BIG_ENDIAN },
 
     { "sw_64",        64, VIR_ARCH_LITTLE_ENDIAN},
+    { "loongarch64",  64, VIR_ARCH_LITTLE_ENDIAN },
 };
 
 G_STATIC_ASSERT(G_N_ELEMENTS(virArchData) == VIR_ARCH_LAST);
@@ -226,6 +227,8 @@ virArch virArchFromHost(void)
         arch = VIR_ARCH_X86_64;
     } else if (STREQ(ut.machine, "sw_64")) {
         arch = VIR_ARCH_SW_64;
+    } else if (STREQ(ut.machine, "loongarch64")) {
+        arch = VIR_ARCH_LOONGARCH64;
     } else {
         /* Otherwise assume the canonical name */
         if ((arch = virArchFromString(ut.machine)) == VIR_ARCH_NONE) {

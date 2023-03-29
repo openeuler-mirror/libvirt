@@ -1,0 +1,6 @@
+<cpus>
+  <model name='Loongson-3A5000'>
+    <vendor name='Loongson'/>
+      <prid value='0x14c010' mask='0xfffff0'/>
+  </model>
+</cpus>

@@ -68,6 +68,8 @@ cpumap_DATA = \
 	cpu_map/x86_Skylake-Server-noTSX-IBRS.xml \
 	cpu_map/x86_Westmere.xml \
 	cpu_map/x86_Westmere-IBRS.xml \
+	cpu_map/loongarch_vendors.xml \
+	cpu_map/loongarch_3a5000.xml \
 	cpu_map/arm_vendors.xml \
 	cpu_map/arm_cortex-a53.xml \
 	cpu_map/arm_cortex-a57.xml \

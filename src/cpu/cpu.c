@@ -30,6 +30,7 @@
 #include "cpu_s390.h"
 #include "cpu_arm.h"
 #include "cpu_sw64.h"
+#include "cpu_loongarch.h"
 #include "capabilities.h"
 #include "virstring.h"
 
@@ -44,6 +45,7 @@ static struct cpuArchDriver *drivers[] = {
     &cpuDriverS390,
     &cpuDriverArm,
     &cpuDriverSW64,
+    &cpuDriverLoongArch,
 };
 
 
