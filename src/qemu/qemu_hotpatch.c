@@ -214,7 +214,6 @@ qemuDomainHotpatchAutoload(virDomainObjPtr vm, char *hotpatch_path)
     VIR_AUTOSTRINGLIST applied_patches = NULL;
     VIR_AUTOSTRINGLIST lines = NULL;
     g_autofree char *applied_patch = NULL;
-    g_autofree char *libvirtd_conf = NULL;
     g_autofree char *patch_conf = NULL;
     g_autofree char *buf = NULL;
     char *ret = NULL;
