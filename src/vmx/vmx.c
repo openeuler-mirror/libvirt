@@ -1494,6 +1494,7 @@ virVMXParseConfig(virVMXContext *ctx,
             goto cleanup;
         }
         cpu->dies = 1;
+        cpu->clusters = 1;
         cpu->cores = coresPerSocket;
         cpu->threads = 1;
 
@@ -3219,6 +3220,12 @@ virVMXFormatConfig(virVMXContext *ctx, virDomainXMLOptionPtr xmlopt, virDomainDe
         if (def->cpu->dies != 1) {
             virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
                            _("Only 1 die per socket is supported"));
+            goto cleanup;
+        }
+
+        if (def->cpu->clusters != 1) {
+            virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                           _("Only 1 cluster per die is supported"));
             goto cleanup;
         }
 
