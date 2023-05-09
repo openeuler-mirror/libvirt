@@ -560,6 +560,7 @@ typedef enum { /* virQEMUCapsFlags grouping marker for syntax-check */
     /* 365 */
     QEMU_CAPS_CALC_DIRTY_RATE, /* accepts calc-dirty-rate */
     QEMU_CAPS_DIRTYRATE_MODE , /* calc-dirty-rate accepts mode parameter */
+    QEMU_CAPS_SMP_CLUSTERS, /*  -smp clusters= */
 
     QEMU_CAPS_LAST /* this must always be the last item */
 } virQEMUCapsFlags;
