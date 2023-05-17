@@ -579,6 +579,7 @@ struct qemuMonitorQueryHotpluggableCpusEntry {
     int node_id;
     int socket_id;
     int die_id;
+    int cluster_id;
     int core_id;
     int thread_id;
 
@@ -602,6 +603,7 @@ struct _qemuMonitorCPUInfo {
      * all entries are -1 */
     int socket_id;
     int die_id;
+    int cluster_id;
     int core_id;
     int thread_id;
     int node_id;
