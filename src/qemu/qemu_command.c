@@ -7338,6 +7338,8 @@ qemuBuildSmpCommandLine(virCommandPtr cmd,
         virBufferAsprintf(&buf, ",sockets=%u", def->cpu->sockets);
         if (virQEMUCapsGet(qemuCaps, QEMU_CAPS_SMP_DIES))
             virBufferAsprintf(&buf, ",dies=%u", def->cpu->dies);
+        if (virQEMUCapsGet(qemuCaps, QEMU_CAPS_SMP_CLUSTERS))
+            virBufferAsprintf(&buf, ",clusters=%u", def->cpu->clusters);
         virBufferAsprintf(&buf, ",cores=%u", def->cpu->cores);
         virBufferAsprintf(&buf, ",threads=%u", def->cpu->threads);
     } else {

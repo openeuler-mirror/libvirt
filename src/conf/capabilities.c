@@ -874,9 +874,10 @@ virCapabilitiesHostNUMAFormat(virCapsHostNUMAPtr caps,
                     return -1;
 
                 virBufferAsprintf(buf,
-                                  " socket_id='%d' die_id='%d' core_id='%d' siblings='%s'",
+                                  " socket_id='%d' die_id='%d' cluster_id='%d' core_id='%d' siblings='%s'",
                                   cell->cpus[j].socket_id,
                                   cell->cpus[j].die_id,
+                                  cell->cpus[j].cluster_id,
                                   cell->cpus[j].core_id,
                                   siblings);
                 VIR_FREE(siblings);
@@ -1465,6 +1466,7 @@ virCapabilitiesFillCPUInfo(int cpu_id G_GNUC_UNUSED,
 
     if (virHostCPUGetSocket(cpu_id, &cpu->socket_id) < 0 ||
         virHostCPUGetDie(cpu_id, &cpu->die_id) < 0 ||
+        virHostCPUGetCluster(cpu_id, &cpu->cluster_id) < 0 ||
         virHostCPUGetCore(cpu_id, &cpu->core_id) < 0)
         return -1;
 

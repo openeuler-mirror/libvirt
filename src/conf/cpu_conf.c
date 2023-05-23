@@ -240,6 +240,7 @@ virCPUDefCopyWithoutModel(const virCPUDef *cpu)
     copy->fallback = cpu->fallback;
     copy->sockets = cpu->sockets;
     copy->dies = cpu->dies;
+    copy->clusters = cpu->clusters;
     copy->cores = cpu->cores;
     copy->threads = cpu->threads;
     copy->arch = cpu->arch;
@@ -547,6 +548,17 @@ virCPUDefParseXML(xmlXPathContextPtr ctxt,
             def->dies = 1;
         }
 
+        if (virXPathNode("./topology[1]/@clusters", ctxt)) {
+            if (virXPathULong("string(./topology[1]/@clusters)", ctxt, &ul) < 0) {
+                virReportError(VIR_ERR_XML_ERROR, "%s",
+                               _("Malformed 'clusters' attribute in CPU topology"));
+                goto cleanup;
+            }
+            def->clusters = (unsigned int) ul;
+        } else {
+            def->clusters = 1;
+        }
+
         if (virXPathULong("string(./topology[1]/@cores)", ctxt, &ul) < 0) {
             virReportError(VIR_ERR_XML_ERROR, "%s",
                            _("Missing 'cores' attribute in CPU topology"));
@@ -561,7 +573,8 @@ virCPUDefParseXML(xmlXPathContextPtr ctxt,
         }
         def->threads = (unsigned int) ul;
 
-        if (!def->sockets || !def->cores || !def->threads || !def->dies) {
+        if (!def->sockets || !def->cores || !def->threads || !def->dies ||
+            !def -> clusters) {
             virReportError(VIR_ERR_XML_ERROR, "%s",
                            _("Invalid CPU topology"));
             goto cleanup;
@@ -833,10 +846,12 @@ virCPUDefFormatBuf(virBufferPtr buf,
         virBufferAddLit(buf, "/>\n");
     }
 
-    if (def->sockets && def->dies && def->cores && def->threads) {
+    if (def->sockets && def->dies && def->clusters && def->cores &&
+        def->threads) {
         virBufferAddLit(buf, "<topology");
         virBufferAsprintf(buf, " sockets='%u'", def->sockets);
         virBufferAsprintf(buf, " dies='%u'", def->dies);
+        virBufferAsprintf(buf, " clusters='%u'", def->clusters);
         virBufferAsprintf(buf, " cores='%u'", def->cores);
         virBufferAsprintf(buf, " threads='%u'", def->threads);
         virBufferAddLit(buf, "/>\n");
@@ -1078,6 +1093,12 @@ virCPUDefIsEqual(virCPUDefPtr src,
     if (src->dies != dst->dies) {
         MISMATCH(_("Target CPU dies %d does not match source %d"),
                  dst->dies, src->dies);
+        return false;
+    }
+
+    if (src->clusters != dst->clusters) {
+        MISMATCH(_("Target CPU clusters %d does not match source %d"),
+                 dst->clusters, src->clusters);
         return false;
     }
 

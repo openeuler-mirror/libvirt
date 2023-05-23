@@ -241,6 +241,28 @@ virHostCPUGetDie(unsigned int cpu, unsigned int *die)
 }
 
 int
+virHostCPUGetCluster(unsigned int cpu, unsigned int *cluster)
+{
+    int cluster_id;
+    int ret = virFileReadValueInt(&cluster_id,
+                                  "%s/cpu/cpu%u/topology/cluster_id",
+                                  SYSFS_SYSTEM_PATH, cpu);
+    if (ret == -1)
+        return -1;
+
+    /* If the file is not there, it's 0.
+     * Another alternative is cluster_id set to -1, meaning that
+     * the arch does not have cluster_id support. Set @cluster to
+     * 0 in this case too. */
+    if (ret == -2 || cluster_id < 0)
+        cluster_id = 0;
+
+    *cluster = cluster_id;
+
+    return 0;
+}
+
+int
 virHostCPUGetCore(unsigned int cpu, unsigned int *core)
 {
     int ret = virFileReadValueUint(core,

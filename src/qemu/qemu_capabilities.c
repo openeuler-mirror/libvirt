@@ -579,6 +579,7 @@ VIR_ENUM_IMPL(virQEMUCaps,
               /* 365 */
               "calc-dirty-rate",
               "dirtyrate-param.mode",
+              "smp-clusters",
     );
 
 
@@ -3218,6 +3219,7 @@ static struct virQEMUCapsCommandLineProps virQEMUCapsCommandLine[] = {
     { "chardev", "fd", QEMU_CAPS_CHARDEV_FD_PASS },
     { "overcommit", NULL, QEMU_CAPS_OVERCOMMIT },
     { "smp-opts", "dies", QEMU_CAPS_SMP_DIES },
+    { "smp-opts", "clusters", QEMU_CAPS_SMP_CLUSTERS },
 };
 
 static int
