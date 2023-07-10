@@ -188,6 +188,10 @@ static void virDBusWatchCallback(int fdatch G_GNUC_UNUSED,
     int dbus_flags = 0;
 
     info = dbus_watch_get_data(watch);
+    if (!info || !info->bus) {
+        VIR_INFO("The dbus watch data was freed.");
+        return;
+    }
 
     if (events & VIR_EVENT_HANDLE_READABLE)
         dbus_flags |= DBUS_WATCH_READABLE;
