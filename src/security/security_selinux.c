@@ -541,7 +541,7 @@ static char *
 virSecuritySELinuxContextAddRange(char *src,
                                   char *dst)
 {
-    const char *str = NULL;
+    char *str = NULL;
     char *ret = NULL;
     context_t srccon = NULL;
     context_t dstcon = NULL;
@@ -582,7 +582,7 @@ virSecuritySELinuxGenNewContext(const char *basecontext,
 {
     context_t context = NULL;
     char *ret = NULL;
-    const char *str;
+    char *str;
     char *ourSecContext = NULL;
     context_t ourContext = NULL;
 
