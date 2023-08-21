@@ -9311,7 +9311,7 @@ qemuBuildTPMDevStr(const virDomainDef *def,
     virDomainTPMDef *tpm = def->tpm;
     const char *model = virDomainTPMModelTypeToString(tpm->model);
 
-    if (tpm->model == VIR_DOMAIN_TPM_MODEL_TIS && def->os.arch == VIR_ARCH_AARCH64)
+    if (tpm->model == VIR_DOMAIN_TPM_MODEL_TIS && !ARCH_IS_X86(def->os.arch))
         model = "tpm-tis-device";
 
     virBufferAsprintf(&buf, "%s,tpmdev=tpm-%s,id=%s",
