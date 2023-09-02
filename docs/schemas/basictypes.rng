@@ -440,6 +440,7 @@
       <value>sh4eb</value>
       <value>sparc</value>
       <value>sparc64</value>
+      <value>sw_64</value>
       <value>unicore32</value>
       <value>x86_64</value>
       <value>xtensa</value>
