@@ -5665,7 +5665,7 @@ int qemuMonitorJSONGetMachines(qemuMonitorPtr mon,
         if (virJSONValueObjectHasKey(child, "numa-mem-supported")) {
             if (virJSONValueObjectGetBoolean(child, "numa-mem-supported", &info->numaMemSupported) < 0) {
                 virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
-                               _("qemu-machines reply has malformed "
+                               _("query-machines reply has malformed "
                                  "'numa-mem-supported' data"));
                 goto cleanup;
             }
