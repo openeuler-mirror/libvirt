@@ -3828,6 +3828,7 @@ virDomainSecDefFree(virDomainSecDef *def)
     case VIR_DOMAIN_LAUNCH_SECURITY_SEV:
         g_free(def->data.sev.dh_cert);
         g_free(def->data.sev.session);
+        g_free(def->data.sev.user_id);
         break;
     case VIR_DOMAIN_LAUNCH_SECURITY_PV:
     case VIR_DOMAIN_LAUNCH_SECURITY_CVM:
@@ -13547,6 +13548,7 @@ virDomainSEVDefParseXML(virDomainSEVDef *def,
 
     def->dh_cert = virXPathString("string(./dhCert)", ctxt);
     def->session = virXPathString("string(./session)", ctxt);
+    def->user_id = virXPathString("string(./userid)", ctxt);
 
     return 0;
 }
@@ -26612,6 +26614,9 @@ virDomainSecDefFormat(virBuffer *buf, virDomainSecDef *sec)
 
         if (sev->session)
             virBufferEscapeString(&childBuf, "<session>%s</session>\n", sev->session);
+
+        if (sev->user_id)
+            virBufferEscapeString(&childBuf, "<userid>%s</userid>\n", sev->user_id);
 
         break;
     }
