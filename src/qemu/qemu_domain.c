@@ -12998,7 +12998,7 @@ qemuDomainMachineIsLoongson(const char *machine,
         return false;
 
     if (STREQ(machine, "loongson7a") ||
-        STRPREFIX(machine, "loongson7a-")) {
+        STRPREFIX(machine, "loongson7a")) {
         return true;
     }
 
