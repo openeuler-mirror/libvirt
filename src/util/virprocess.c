@@ -366,9 +366,8 @@ int virProcessKill(pid_t pid, int sig)
 /*
  * Try to kill the process and verify it has exited
  *
- * Returns 0 if it was killed gracefully, 1 if it
- * was killed forcibly, -1 if it is still alive,
- * or another error occurred.
+ * Returns 0 if it was killed, -1 if it is still alive or another error
+ * occurred.
  *
  * Callers can proide an extra delay in seconds to
  * wait longer than the default.
@@ -422,7 +421,7 @@ virProcessKillPainfullyDelay(pid_t pid, bool force, unsigned int extradelay)
                                      (long long)pid, signame);
                 return -1;
             }
-            return signum == SIGTERM ? 0 : 1;
+            return 0;
         }
 
         g_usleep(200 * 1000);
