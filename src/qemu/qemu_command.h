@@ -198,6 +198,10 @@ char *
 qemuBuildHostdevMediatedDevStr(const virDomainDef *def,
                                virDomainHostdevDefPtr dev,
                                virQEMUCapsPtr qemuCaps);
+char *
+qemuBuildHostdevVDPAStr(const virDomainDef *def,
+                        virDomainHostdevDefPtr dev,
+                        virQEMUCapsPtr qemuCaps);
 
 char *qemuBuildRedirdevDevStr(const virDomainDef *def,
                               virDomainRedirdevDefPtr dev,

@@ -6879,6 +6879,8 @@ qemuDomainDeviceDefValidateHostdev(const virDomainHostdevDef *hostdev,
             break;
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_MDEV:
             return qemuDomainMdevDefValidate(hostdev, def, qemuCaps);
+        case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
+            break;
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_LAST:
         default:
             virReportEnumRangeError(virDomainHostdevSubsysType,
@@ -14442,6 +14444,7 @@ qemuDomainGetHostdevPath(virDomainHostdevDefPtr dev,
     virDomainHostdevSubsysSCSIPtr scsisrc = &dev->source.subsys.u.scsi;
     virDomainHostdevSubsysSCSIVHostPtr hostsrc = &dev->source.subsys.u.scsi_host;
     virDomainHostdevSubsysMediatedDevPtr mdevsrc = &dev->source.subsys.u.mdev;
+    virDomainHostdevSubsysVDPAPtr vdpasrc = &dev->source.subsys.u.vdpa;
     g_autoptr(virUSBDevice) usb = NULL;
     g_autoptr(virSCSIDevice) scsi = NULL;
     g_autoptr(virSCSIVHostDevice) host = NULL;
@@ -14512,6 +14515,10 @@ qemuDomainGetHostdevPath(virDomainHostdevDefPtr dev,
             if (!(tmpPath = virMediatedDeviceGetIOMMUGroupDev(mdevsrc->uuidstr)))
                 return -1;
 
+            perm = VIR_CGROUP_DEVICE_RW;
+            break;
+        case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
+            tmpPath = g_strdup(vdpasrc->devpath);
             perm = VIR_CGROUP_DEVICE_RW;
             break;
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_LAST:

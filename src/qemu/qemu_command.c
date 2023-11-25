@@ -5476,6 +5476,25 @@ qemuBuildHostdevMediatedDevStr(const virDomainDef *def,
     return virBufferContentAndReset(&buf);
 }
 
+char *
+qemuBuildHostdevVDPAStr(const virDomainDef *def,
+                        virDomainHostdevDefPtr dev,
+                        virQEMUCapsPtr qemuCaps)
+{
+    g_auto(virBuffer) buf = VIR_BUFFER_INITIALIZER;
+    virDomainHostdevSubsysVDPAPtr vdpa = &dev->source.subsys.u.vdpa;
+    if (!vdpa->devpath) {
+        return NULL;
+    }
+
+    virBufferAdd(&buf, "vhost-vdpa-device-pci", -1);
+    virBufferAsprintf(&buf, ",id=%s", dev->info->alias);
+    virBufferAsprintf(&buf, ",vhostdev=%s", vdpa->devpath);
+    if (qemuBuildDeviceAddressStr(&buf, def, dev->info, qemuCaps) < 0)
+        return NULL;
+    return virBufferContentAndReset(&buf);
+}
+
 static int
 qemuBuildHostdevCommandLine(virCommandPtr cmd,
                             const virDomainDef *def,
@@ -5603,6 +5622,16 @@ qemuBuildHostdevCommandLine(virCommandPtr cmd,
             if (!(devstr =
                   qemuBuildHostdevMediatedDevStr(def, hostdev, qemuCaps)))
                 return -1;
+            virCommandAddArg(cmd, devstr);
+
+            break;
+
+        /* VDPA */
+        case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
+            virCommandAddArg(cmd, "-device");
+            if (!(devstr = qemuBuildHostdevVDPAStr(def, hostdev, qemuCaps))) {
+                return -1;
+            }
             virCommandAddArg(cmd, devstr);
 
             break;
