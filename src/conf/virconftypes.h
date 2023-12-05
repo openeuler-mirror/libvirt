@@ -174,6 +174,9 @@ typedef virDomainHostdevSubsys *virDomainHostdevSubsysPtr;
 typedef struct _virDomainHostdevSubsysMediatedDev virDomainHostdevSubsysMediatedDev;
 typedef virDomainHostdevSubsysMediatedDev *virDomainHostdevSubsysMediatedDevPtr;
 
+typedef struct _virDomainHostdevSubsysVDPA virDomainHostdevSubsysVDPA;
+typedef virDomainHostdevSubsysVDPA *virDomainHostdevSubsysVDPAPtr;
+
 typedef struct _virDomainHostdevSubsysPCI virDomainHostdevSubsysPCI;
 typedef virDomainHostdevSubsysPCI *virDomainHostdevSubsysPCIPtr;
 

@@ -2907,6 +2907,89 @@ qemuDomainAttachMediatedDevice(virQEMUDriverPtr driver,
 }
 
 
+static int
+qemuDomainAttachVDPADevice(virQEMUDriverPtr driver,
+                           virDomainObjPtr vm,
+                           virDomainHostdevDefPtr hostdev)
+{
+    int ret = -1;
+    g_autofree char *devstr = NULL;
+    bool teardowncgroup = false;
+    bool teardownlabel = false;
+    bool teardowndevice = false;
+    bool teardownmemlock = false;
+    bool releaseaddr = false;
+    qemuDomainObjPrivatePtr priv = vm->privateData;
+    virDomainDeviceDef dev = { VIR_DOMAIN_DEVICE_HOSTDEV,
+                               { .hostdev = hostdev } };
+
+    if (qemuDomainNamespaceSetupHostdev(vm, hostdev) < 0)
+        goto error;
+    teardowndevice = true;
+
+    if (qemuSetupHostdevCgroup(vm, hostdev) < 0)
+        goto error;
+    teardowncgroup = true;
+
+    if (qemuSecuritySetHostdevLabel(driver, vm, hostdev) < 0)
+        goto error;
+    teardownlabel = true;
+
+    if (qemuDomainEnsurePCIAddress(vm, &dev, driver) < 0)
+        goto error;
+    releaseaddr = true;
+
+    if (qemuAssignDeviceHostdevAlias(vm->def, &hostdev->info->alias, -1) < 0)
+        goto error;
+
+    if (!virDomainObjIsActive(vm)) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                       _("guest unexpectedly quit during hotplug"));
+        goto error;
+    }
+
+    if (!(devstr = qemuBuildHostdevVDPAStr(vm->def, hostdev, priv->qemuCaps)))
+        goto error;
+
+    if (VIR_REALLOC_N(vm->def->hostdevs, vm->def->nhostdevs + 1) < 0)
+        goto error;
+
+    if (qemuDomainAdjustMaxMemLockHostdev(vm, hostdev) < 0)
+        goto error;
+    teardownmemlock = true;
+
+    qemuDomainObjEnterMonitor(driver, vm);
+    ret = qemuMonitorAddDevice(priv->mon, devstr);
+    if (qemuDomainObjExitMonitor(driver, vm) < 0) {
+        goto error;
+    }
+
+    virDomainAuditHostdev(vm, hostdev, "attach", ret == 0);
+    if (ret < 0)
+        goto error;
+
+    vm->def->hostdevs[vm->def->nhostdevs++] = hostdev;
+
+    return 0;
+
+ error:
+    if (teardowncgroup && qemuTeardownHostdevCgroup(vm, hostdev) < 0)
+        VIR_WARN("Unable to remove host device cgroup ACL on hotplug fail");
+    if (teardownlabel &&
+        qemuSecurityRestoreHostdevLabel(driver, vm, hostdev) < 0)
+        VIR_WARN("Unable to restore host device labelling on hotplug fail");
+    if (teardowndevice &&
+        qemuDomainNamespaceTeardownHostdev(vm, hostdev) < 0)
+        VIR_WARN("Unable to remove host device from /dev");
+    if (teardownmemlock && qemuDomainAdjustMaxMemLock(vm, false) < 0)
+        VIR_WARN("Unable to reset maximum locked memory on hotplug fail");
+    if (releaseaddr)
+        qemuDomainReleaseDeviceAddress(vm, hostdev->info);
+
+    return -1;
+}
+
+
 int
 qemuDomainAttachHostDevice(virQEMUDriverPtr driver,
                            virDomainObjPtr vm,
@@ -2944,6 +3027,11 @@ qemuDomainAttachHostDevice(virQEMUDriverPtr driver,
         break;
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_MDEV:
         if (qemuDomainAttachMediatedDevice(driver, vm, hostdev) < 0)
+            return -1;
+        break;
+
+    case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
+        if (qemuDomainAttachVDPADevice(driver, vm, hostdev) < 0)
             return -1;
         break;
 
@@ -4564,6 +4652,7 @@ qemuDomainRemoveHostDevice(virQEMUDriverPtr driver,
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_MDEV:
         qemuDomainRemoveMediatedDevice(driver, vm, hostdev);
         break;
+    case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_LAST:
         break;
     }
@@ -5397,6 +5486,7 @@ qemuDomainDetachPrepHostdev(virDomainObjPtr vm,
     virDomainHostdevSubsysPCIPtr pcisrc = &subsys->u.pci;
     virDomainHostdevSubsysSCSIPtr scsisrc = &subsys->u.scsi;
     virDomainHostdevSubsysMediatedDevPtr mdevsrc = &subsys->u.mdev;
+    virDomainHostdevSubsysVDPAPtr vdpasrc = &subsys->u.vdpa;
     virDomainHostdevDefPtr hostdev = NULL;
     int idx;
 
@@ -5453,6 +5543,11 @@ qemuDomainDetachPrepHostdev(virDomainObjPtr vm,
                            mdevsrc->uuidstr);
             break;
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_SCSI_HOST:
+            break;
+        case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
+            virReportError(VIR_ERR_DEVICE_MISSING,
+                           _("vdpa device '%s' not found"),
+                           vdpasrc->devpath);
             break;
         default:
             virReportError(VIR_ERR_INTERNAL_ERROR,

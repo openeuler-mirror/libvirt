@@ -911,6 +911,7 @@ VIR_ENUM_IMPL(virDomainHostdevSubsys,
               "scsi",
               "scsi_host",
               "mdev",
+              "vdpa",
 );
 
 VIR_ENUM_IMPL(virDomainHostdevSubsysPCIBackend,
@@ -2979,6 +2980,9 @@ void virDomainHostdevDefClear(virDomainHostdevDefPtr def)
             break;
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_SCSI_HOST:
             VIR_FREE(def->source.subsys.u.scsi_host.wwpn);
+            break;
+        case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
+            VIR_FREE(def->source.subsys.u.vdpa.devpath);
             break;
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_USB:
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_PCI:
@@ -6706,6 +6710,7 @@ virDomainHostdevDefValidate(const virDomainHostdevDef *hostdev)
             }
             break;
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_MDEV:
+        case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_LAST:
             break;
         }
@@ -8591,6 +8596,22 @@ virDomainHostdevSubsysMediatedDevDefParseXML(virDomainHostdevDefPtr def,
 }
 
 static int
+virDomainHostdevSubsysVDPADefParseXML(virDomainHostdevDefPtr def,
+                                      xmlNodePtr sourcenode)
+{
+    g_autofree char *devpath = NULL;
+    virDomainHostdevSubsysVDPAPtr vdpa = &def->source.subsys.u.vdpa;
+
+    if (!(devpath = virXMLPropString(sourcenode, "dev"))) {
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                       _("Missing 'dev' attribute for element <source>"));
+        return -1;
+    }
+    vdpa->devpath = g_steal_pointer(&devpath);
+    return 0;
+}
+
+static int
 virDomainHostdevDefParseXMLSubsys(xmlNodePtr node,
                                   xmlXPathContextPtr ctxt,
                                   const char *type,
@@ -8778,6 +8799,11 @@ virDomainHostdevDefParseXMLSubsys(xmlNodePtr node,
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_MDEV:
         if (virDomainHostdevSubsysMediatedDevDefParseXML(def, ctxt) < 0)
             return -1;
+        break;
+    case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
+        if (virDomainHostdevSubsysVDPADefParseXML(def, sourcenode) < 0) {
+            return -1;
+        }
         break;
 
     default:
@@ -16328,6 +16354,7 @@ virDomainHostdevDefParseXML(virDomainXMLOptionPtr xmlopt,
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_PCI:
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_SCSI_HOST:
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_MDEV:
+        case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_LAST:
             break;
         }
@@ -17407,6 +17434,9 @@ virDomainHostdevMatchSubsys(virDomainHostdevDefPtr a,
             return 0;
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_MDEV:
         return virDomainHostdevMatchSubsysMediatedDev(a, b);
+    case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
+        return STREQ(a->source.subsys.u.vdpa.devpath,
+                     b->source.subsys.u.vdpa.devpath);
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_LAST:
         return 0;
     }
@@ -25891,6 +25921,7 @@ virDomainHostdevDefFormatSubsys(virBufferPtr buf,
     virDomainHostdevSubsysSCSIPtr scsisrc = &def->source.subsys.u.scsi;
     virDomainHostdevSubsysSCSIVHostPtr hostsrc = &def->source.subsys.u.scsi_host;
     virDomainHostdevSubsysMediatedDevPtr mdevsrc = &def->source.subsys.u.mdev;
+    virDomainHostdevSubsysVDPAPtr vdpasrc = &def->source.subsys.u.vdpa;
     virDomainHostdevSubsysSCSIHostPtr scsihostsrc = &scsisrc->u.host;
     virDomainHostdevSubsysSCSIiSCSIPtr iscsisrc = &scsisrc->u.iscsi;
 
@@ -25938,6 +25969,11 @@ virDomainHostdevDefFormatSubsys(virBufferPtr buf,
 
         virBufferAsprintf(buf, " protocol='%s' wwpn='%s'/",
                           protocol, hostsrc->wwpn);
+    }
+
+    if (def->source.subsys.type == VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA) {
+        closedSource = true;
+        virBufferAsprintf(buf, " dev='%s'/", vdpasrc->devpath);
     }
 
     virBufferAddLit(buf, ">\n");
@@ -25997,6 +26033,8 @@ virDomainHostdevDefFormatSubsys(virBufferPtr buf,
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_MDEV:
         virBufferAsprintf(buf, "<address uuid='%s'/>\n",
                           mdevsrc->uuidstr);
+        break;
+    case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
         break;
     default:
         virReportError(VIR_ERR_INTERNAL_ERROR,

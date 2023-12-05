@@ -65,6 +65,7 @@ VIR_ENUM_IMPL(virNodeDevCap,
               "mdev_types",
               "mdev",
               "ccw",
+              "vdpa",
 );
 
 VIR_ENUM_IMPL(virNodeDevNetCap,
@@ -500,6 +501,12 @@ virNodeDeviceCapStorageDefFormat(virBufferPtr buf,
         virBufferAddLit(buf, "<capability type='hotpluggable'/>\n");
 }
 
+static void
+virNodeDeviceCapVDPADefFormat(virBufferPtr buf,
+                              const virNodeDevCapData *data)
+{
+    virBufferEscapeString(buf, "<chardev>%s</chardev>\n", data->vdpa.chardev);
+}
 
 char *
 virNodeDeviceDefFormat(const virNodeDeviceDef *def)
@@ -594,6 +601,9 @@ virNodeDeviceDefFormat(const virNodeDeviceDef *def)
                               data->ccw_dev.ssid);
             virBufferAsprintf(&buf, "<devno>0x%04x</devno>\n",
                               data->ccw_dev.devno);
+            break;
+        case VIR_NODE_DEV_CAP_VDPA:
+            virNodeDeviceCapVDPADefFormat(&buf, data);
             break;
         case VIR_NODE_DEV_CAP_MDEV_TYPES:
         case VIR_NODE_DEV_CAP_FC_HOST:
@@ -1897,6 +1907,7 @@ virNodeDevCapsDefParseXML(xmlXPathContextPtr ctxt,
     case VIR_NODE_DEV_CAP_FC_HOST:
     case VIR_NODE_DEV_CAP_VPORTS:
     case VIR_NODE_DEV_CAP_SCSI_GENERIC:
+    case VIR_NODE_DEV_CAP_VDPA:
     case VIR_NODE_DEV_CAP_LAST:
         virReportError(VIR_ERR_INTERNAL_ERROR,
                        _("unknown capability type '%d' for '%s'"),
@@ -2209,6 +2220,7 @@ virNodeDevCapsDefFree(virNodeDevCapsDefPtr caps)
     case VIR_NODE_DEV_CAP_FC_HOST:
     case VIR_NODE_DEV_CAP_VPORTS:
     case VIR_NODE_DEV_CAP_CCW_DEV:
+    case VIR_NODE_DEV_CAP_VDPA:
     case VIR_NODE_DEV_CAP_LAST:
         /* This case is here to shutup the compiler */
         break;
@@ -2262,6 +2274,7 @@ virNodeDeviceUpdateCaps(virNodeDeviceDefPtr def)
         case VIR_NODE_DEV_CAP_MDEV_TYPES:
         case VIR_NODE_DEV_CAP_MDEV:
         case VIR_NODE_DEV_CAP_CCW_DEV:
+        case VIR_NODE_DEV_CAP_VDPA:
         case VIR_NODE_DEV_CAP_LAST:
             break;
         }

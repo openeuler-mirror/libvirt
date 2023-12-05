@@ -85,6 +85,7 @@
         <ref name="capdrm"/>
         <ref name="capmdev"/>
         <ref name="capccwdev"/>
+        <ref name="capvdpa"/>
       </choice>
     </element>
   </define>
@@ -648,6 +649,15 @@
     </element>
     <element name='devno'>
       <ref name='ccwDevnoRange'/>
+    </element>
+  </define>
+
+  <define name="capvdpa">
+    <attribute name="type">
+      <value>vdpa</value>
+    </attribute>
+    <element name="chardev">
+      <ref name="path"/>
     </element>
   </define>
 

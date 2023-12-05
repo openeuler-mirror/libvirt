@@ -792,7 +792,8 @@ qemuDomainDeviceCalculatePCIConnectFlags(virDomainDeviceDefPtr dev,
         if (!virHostdevIsMdevDevice(hostdev) &&
             (hostdev->mode != VIR_DOMAIN_HOSTDEV_MODE_SUBSYS ||
              (hostdev->source.subsys.type != VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_PCI &&
-              hostdev->source.subsys.type != VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_SCSI_HOST))) {
+              hostdev->source.subsys.type != VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_SCSI_HOST &&
+              hostdev->source.subsys.type != VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA))) {
             return 0;
         }
 
@@ -2418,7 +2419,8 @@ qemuDomainAssignDevicePCISlots(virDomainDefPtr def,
         if (subsys->type != VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_PCI &&
             subsys->type != VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_SCSI_HOST &&
             !(subsys->type == VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_MDEV &&
-              subsys->u.mdev.model == VIR_MDEV_MODEL_TYPE_VFIO_PCI)) {
+              subsys->u.mdev.model == VIR_MDEV_MODEL_TYPE_VFIO_PCI) &&
+            subsys->type != VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA) {
             continue;
         }
 

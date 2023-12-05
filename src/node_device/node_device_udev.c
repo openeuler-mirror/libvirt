@@ -1089,6 +1089,56 @@ udevProcessCCW(struct udev_device *device,
     return 0;
 }
 
+static int
+udevGetVDPACharDev(const char *sysfs_path,
+                   virNodeDevCapDataPtr data)
+{
+    struct dirent *entry;
+    DIR *dir = NULL;
+    int direrr;
+
+    if (virDirOpenIfExists(&dir, sysfs_path) <= 0)
+        return -1;
+
+    while ((direrr = virDirRead(dir, &entry, NULL)) > 0) {
+        if (g_str_has_prefix(entry->d_name, "vhost-vdpa")) {
+            g_autofree char *chardev = g_strdup_printf("/dev/%s", entry->d_name);
+
+            if (!virFileExists(chardev)) {
+                virReportError(VIR_ERR_INTERNAL_ERROR,
+                               _("vDPA chardev path '%s' does not exist"),
+                               chardev);
+                VIR_DIR_CLOSE(dir);
+                return -1;
+            }
+            VIR_DEBUG("vDPA chardev is at '%s'", chardev);
+
+            data->vdpa.chardev = g_steal_pointer(&chardev);
+            break;
+        }
+    }
+
+    VIR_DIR_CLOSE(dir);
+
+    if (direrr < 0)
+        return -1;
+
+    return 0;
+}
+
+static int
+udevProcessVDPA(struct udev_device *device,
+                virNodeDeviceDefPtr def)
+{
+    if (udevGenerateDeviceName(device, def, NULL) != 0)
+        return -1;
+
+    if (udevGetVDPACharDev(def->sysfs_path, &def->caps->data) < 0)
+        return -1;
+
+    return 0;
+}
+
 
 static int
 udevGetDeviceNodes(struct udev_device *device,
@@ -1168,6 +1218,8 @@ udevGetDeviceType(struct udev_device *device,
             *type = VIR_NODE_DEV_CAP_MDEV;
         else if (STREQ_NULLABLE(subsystem, "ccw"))
             *type = VIR_NODE_DEV_CAP_CCW_DEV;
+        else if (STREQ_NULLABLE(subsystem, "vdpa"))
+            *type = VIR_NODE_DEV_CAP_VDPA;
 
         VIR_FREE(subsystem);
     }
@@ -1212,6 +1264,8 @@ udevGetDeviceDetails(struct udev_device *device,
         return udevProcessMediatedDevice(device, def);
     case VIR_NODE_DEV_CAP_CCW_DEV:
         return udevProcessCCW(device, def);
+    case VIR_NODE_DEV_CAP_VDPA:
+        return udevProcessVDPA(device, def);
     case VIR_NODE_DEV_CAP_MDEV_TYPES:
     case VIR_NODE_DEV_CAP_SYSTEM:
     case VIR_NODE_DEV_CAP_FC_HOST:
