@@ -2609,8 +2609,7 @@ qemuMigrationSrcBeginXML(virDomainObj *vm,
         g_autoptr(virDomainDef) def = NULL;
 
         if (!(def = virDomainDefParseString(xmlin, driver->xmlopt, priv->qemuCaps,
-                                            VIR_DOMAIN_DEF_PARSE_INACTIVE |
-                                            VIR_DOMAIN_DEF_PARSE_SKIP_VALIDATE)))
+                                            VIR_DOMAIN_DEF_PARSE_INACTIVE)))
             return NULL;
 
         if (!qemuDomainCheckABIStability(driver, vm, def))
@@ -3413,8 +3412,7 @@ qemuMigrationDstPrepareFresh(virQEMUDriver *driver,
 
                 VIR_DEBUG("Using hook-filtered domain XML: %s", xmlout);
                 newdef = virDomainDefParseString(xmlout, driver->xmlopt, NULL,
-                                                 VIR_DOMAIN_DEF_PARSE_INACTIVE |
-                                                 VIR_DOMAIN_DEF_PARSE_SKIP_VALIDATE);
+                                                 VIR_DOMAIN_DEF_PARSE_INACTIVE);
                 if (!newdef)
                     goto cleanup;
 
@@ -3970,8 +3968,7 @@ qemuMigrationAnyPrepareDef(virQEMUDriver *driver,
 
     if (!(def = virDomainDefParseString(dom_xml, driver->xmlopt,
                                         qemuCaps,
-                                        VIR_DOMAIN_DEF_PARSE_INACTIVE |
-                                        VIR_DOMAIN_DEF_PARSE_SKIP_VALIDATE)))
+                                        VIR_DOMAIN_DEF_PARSE_INACTIVE)))
         goto cleanup;
 
     if (dname) {
