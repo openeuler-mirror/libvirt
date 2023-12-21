@@ -8471,7 +8471,7 @@ qemuBuildGraphicsSPICECommandLine(virQEMUDriverConfig *cfg,
 
     switch (glisten->type) {
     case VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_SOCKET:
-        virBufferAddLit(&opt, "unix,addr=");
+        virBufferAddLit(&opt, "unix=on,addr=");
         virQEMUBuildBufferEscapeComma(&opt, glisten->socket);
         virBufferAddLit(&opt, ",");
         hasInsecure = true;
