@@ -300,6 +300,9 @@ qemuVirtioFSSetupCgroup(virDomainObjPtr vm,
     pid_t pid = -1;
     int rc;
 
+    if (!cgroup)
+        return 0;
+
     if (!(pidfile = qemuVirtioFSCreatePidFilename(vm, fs->info.alias)))
         return -1;
 
