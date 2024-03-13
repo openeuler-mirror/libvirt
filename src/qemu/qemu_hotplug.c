@@ -4560,6 +4560,12 @@ qemuDomainRemoveMediatedDevice(virQEMUDriverPtr driver,
     qemuDomainReleaseDeviceAddress(vm, hostdev->info);
 }
 
+static void
+qemuDomainRemoveVDPADevice(virDomainObjPtr vm,
+                           virDomainHostdevDefPtr hostdev)
+{
+    qemuDomainReleaseDeviceAddress(vm, hostdev->info);
+}
 
 static int
 qemuDomainRemoveHostDevice(virQEMUDriverPtr driver,
@@ -4653,6 +4659,8 @@ qemuDomainRemoveHostDevice(virQEMUDriverPtr driver,
         qemuDomainRemoveMediatedDevice(driver, vm, hostdev);
         break;
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
+        qemuDomainRemoveVDPADevice(vm, hostdev);
+        break;
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_LAST:
         break;
     }
