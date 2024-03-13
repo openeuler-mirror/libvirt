@@ -825,6 +825,13 @@ qemuDomainDeviceCalculatePCIConnectFlags(virDomainDeviceDefPtr dev,
         if (hostdev->source.subsys.type == VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_MDEV)
             return pcieFlags;
 
+        /*
+         * vDPA passthrough is currently only support on arm architechture.
+         * Thus, we just assume it's PCI Express.
+         */
+        if (hostdev->source.subsys.type == VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA)
+            return pcieFlags;
+
         /* according to pbonzini, from the guest PoV vhost-scsi devices
          * are the same as virtio-scsi, so they should follow virtio logic
          */
