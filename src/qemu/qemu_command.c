@@ -7223,6 +7223,8 @@ qemuBuildMachineCommandLine(virCommand *cmd,
                 virBufferAddLit(&buf, ",memory-encryption=lsec0");
             }
             break;
+        case VIR_DOMAIN_LAUNCH_SECURITY_SEV_SNP:
+            break;
         case VIR_DOMAIN_LAUNCH_SECURITY_PV:
             virBufferAddLit(&buf, ",confidential-guest-support=lsec0");
             break;
@@ -10068,6 +10070,8 @@ qemuBuildSecCommandLine(virDomainObj *vm, virCommand *cmd,
     switch (sec->sectype) {
     case VIR_DOMAIN_LAUNCH_SECURITY_SEV:
         return qemuBuildSEVCommandLine(vm, cmd, &sec->data.sev);
+        break;
+    case VIR_DOMAIN_LAUNCH_SECURITY_SEV_SNP:
         break;
     case VIR_DOMAIN_LAUNCH_SECURITY_PV:
         return qemuBuildPVCommandLine(vm, cmd);

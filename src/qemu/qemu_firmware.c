@@ -1373,6 +1373,9 @@ qemuFirmwareMatchDomain(const virDomainDef *def,
                 return false;
             }
             break;
+
+        case VIR_DOMAIN_LAUNCH_SECURITY_SEV_SNP:
+            break;
         case VIR_DOMAIN_LAUNCH_SECURITY_PV:
         case VIR_DOMAIN_LAUNCH_SECURITY_CVM:
             break;

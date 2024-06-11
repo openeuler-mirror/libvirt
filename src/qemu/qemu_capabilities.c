@@ -6745,6 +6745,8 @@ virQEMUCapsFillDomainLaunchSecurity(virQEMUCaps *qemuCaps,
 
     if (virQEMUCapsGet(qemuCaps, QEMU_CAPS_SEV_GUEST))
         VIR_DOMAIN_CAPS_ENUM_SET(launchSecurity->sectype, VIR_DOMAIN_LAUNCH_SECURITY_SEV);
+    if (virQEMUCapsGet(qemuCaps, QEMU_CAPS_SEV_SNP_GUEST))
+        VIR_DOMAIN_CAPS_ENUM_SET(launchSecurity->sectype, VIR_DOMAIN_LAUNCH_SECURITY_SEV_SNP);
     if (virQEMUCapsGet(qemuCaps, QEMU_CAPS_S390_PV_GUEST) &&
         virQEMUCapsGet(qemuCaps, QEMU_CAPS_MACHINE_CONFIDENTAL_GUEST_SUPPORT))
         VIR_DOMAIN_CAPS_ENUM_SET(launchSecurity->sectype, VIR_DOMAIN_LAUNCH_SECURITY_PV);
