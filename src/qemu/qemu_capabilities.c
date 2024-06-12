@@ -699,8 +699,19 @@ VIR_ENUM_IMPL(virQEMUCaps,
               "run-with.async-teardown", /* QEMU_CAPS_RUN_WITH_ASYNC_TEARDOWN */
               "virtio-blk-vhost-vdpa", /* QEMU_CAPS_DEVICE_VIRTIO_BLK_VHOST_VDPA */
 			  "virtio-blk.iothread-mapping", /* QEMU_CAPS_VIRTIO_BLK_IOTHREAD_MAPPING */
-              "smp-clusters", /* QEMU_CAPS_SMP_CLUSTERS */
-              "tmm-guest", /* QEMU_CAPS_VIRTCCA */
+
+			  "smp-clusters", /* QEMU_CAPS_SMP_CLUSTERS */
+			  "tmm-guest", /* QEMU_CAPS_VIRTCCA */
+
+			  /* 455 */
+			  "blockjob.backing-mask-protocol", /* QEMU_CAPS_BLOCKJOB_BACKING_MASK_PROTOCOL */
+			  "display-reload", /* QEMU_CAPS_DISPLAY_RELOAD */
+			  "usb-mtp", /* QEMU_CAPS_DEVICE_USB_MTP */
+			  "machine.virt.ras", /* QEMU_CAPS_MACHINE_VIRT_RAS */
+			  "virtio-sound", /* QEMU_CAPS_DEVICE_VIRTIO_SOUND */
+
+			  /* 460 */
+			  "sev-snp-guest", /* QEMU_CAPS_SEV_SNP_GUEST */
               "rme-guest", /* QEMU_CAPS_CCA_GUEST */
 
               /* 455 */
@@ -1398,6 +1409,7 @@ struct virQEMUCapsStringFlags virQEMUCapsObjectTypes[] = {
     { "cryptodev-backend-lkcf", QEMU_CAPS_OBJECT_CRYPTO_LKCF },
     { "pvpanic-pci", QEMU_CAPS_DEVICE_PANIC_PCI },
     { "tmm-guest", QEMU_CAPS_VIRTCCA },
+    { "sev-snp-guest", QEMU_CAPS_SEV_SNP_GUEST },
     { "rme-guest", QEMU_CAPS_CCA_GUEST },
 };
 
