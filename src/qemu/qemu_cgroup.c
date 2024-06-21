@@ -861,6 +861,8 @@ qemuSetupDevicesCgroup(virDomainObj *vm)
             break;
         case VIR_DOMAIN_LAUNCH_SECURITY_PV:
             break;
+        case VIR_DOMAIN_LAUNCH_SECURITY_CCA:
+            break;
 	case VIR_DOMAIN_LAUNCH_SECURITY_CVM:
         case VIR_DOMAIN_LAUNCH_SECURITY_NONE:
         case VIR_DOMAIN_LAUNCH_SECURITY_LAST:
