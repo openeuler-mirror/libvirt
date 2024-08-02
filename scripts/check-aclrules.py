@@ -54,6 +54,7 @@ permitted = {
     "localOnly": True,
     "domainQemuAttach": True,
     "domainHotpatchManage": True,
+    "connectGetTmmMemoryInfo": True,
 }
 
 # XXX this vzDomainMigrateConfirm3Params looks

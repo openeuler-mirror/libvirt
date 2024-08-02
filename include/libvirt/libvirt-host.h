@@ -1016,5 +1016,7 @@ int virNodeAllocPages(virConnectPtr conn,
                       unsigned int cellCount,
                       unsigned int flags);
 
+char *virConnectGetTmmMemoryInfo(virConnectPtr conn,
+                                 unsigned int detail);
 
 #endif /* LIBVIRT_HOST_H */

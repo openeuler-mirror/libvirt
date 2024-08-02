@@ -7406,6 +7406,33 @@ remoteDomainFDAssociate(virDomainPtr domain,
     return 0;
 }
 
+static char *
+remoteConnectGetTmmMemoryInfo(virConnectPtr conn,
+                              bool detail)
+{
+    char *rv = NULL;
+    struct private_data *priv = conn->privateData;
+    remote_connect_get_tmm_memory_info_args args;
+    remote_connect_get_tmm_memory_info_ret ret;
+
+    remoteDriverLock(priv);
+
+    args.detail = detail;
+
+    memset(&ret, 0, sizeof(ret));
+
+    if (call(conn, priv, 0, REMOTE_PROC_CONNECT_GET_TMM_MEMORY_INFO,
+             (xdrproc_t)xdr_remote_connect_get_tmm_memory_info_args, (char *)&args,
+             (xdrproc_t)xdr_remote_connect_get_tmm_memory_info_ret, (char *)&ret) < 0) {
+        goto done;
+    }
+
+    rv = ret.meminfo;
+
+ done:
+    remoteDriverUnlock(priv);
+    return rv;
+}
 
 /* get_nonnull_domain and get_nonnull_network turn an on-wire
  * (name, uuid) pair into virDomainPtr or virNetworkPtr object.
@@ -7849,6 +7876,7 @@ static virHypervisorDriver hypervisor_driver = {
     .domainStartDirtyRateCalc = remoteDomainStartDirtyRateCalc, /* 7.2.0 */
     .domainSetLaunchSecurityState = remoteDomainSetLaunchSecurityState, /* 8.0.0 */
     .domainFDAssociate = remoteDomainFDAssociate, /* 9.0.0 */
+    .connectGetTmmMemoryInfo = remoteConnectGetTmmMemoryInfo /* 9.0.0 */
 };
 
 static virNetworkDriver network_driver = {

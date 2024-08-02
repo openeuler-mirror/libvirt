@@ -1457,6 +1457,10 @@ typedef char *
 
 typedef struct _virHypervisorDriver virHypervisorDriver;
 
+typedef char *
+(*virDrvConnectGetTmmMemoryInfo)(virConnectPtr conn,
+                                 bool detail);
+
 /**
  * _virHypervisorDriver:
  *
@@ -1728,4 +1732,5 @@ struct _virHypervisorDriver {
     virDrvDomainStartDirtyRateCalc domainStartDirtyRateCalc;
     virDrvDomainFDAssociate domainFDAssociate;
     virDrvDomainHotpatchManage domainHotpatchManage;
+    virDrvConnectGetTmmMemoryInfo connectGetTmmMemoryInfo;
 };

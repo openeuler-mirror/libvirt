@@ -1826,6 +1826,98 @@ cmdHypervisorCPUBaseline(vshControl *ctl,
     return ret;
 }
 
+/*
+ * "securememinfo" command
+ */
+static const vshCmdInfo info_tmm[] = {
+    {.name = "help",
+     .data = N_("Interaction with the tmm")
+    },
+    {.name = "desc",
+     .data = N_("Call the host kernel dev which is provided for virsh to use receiving tmm informations.")
+    },
+    {.name = NULL}
+};
+
+static const vshCmdOptDef opts_tmm[] = {
+    {.name = "dev",
+     .type = VSH_OT_DATA,
+     .flags = VSH_OFLAG_REQ,
+     .help = N_("Device name of host kernel dev")
+    },
+    {.name = "detail",
+     .type = VSH_OT_BOOL,
+     .help = N_("print detailed info if this option contained in cmd")
+    },
+    {.name = NULL}
+};
+
+static bool
+virshGetTmmMemoryInfo(vshControl *ctl,
+                      const vshCmd *cmd)
+{
+    char *tmmMemoryInfo = NULL;
+    bool detail;
+    virshControl *priv = ctl->privData;
+
+    detail = vshCommandOptBool(cmd, "detail");
+    if (!(tmmMemoryInfo = virConnectGetTmmMemoryInfo(priv->conn, (unsigned int)detail))) {
+        vshError(ctl, _("Get tmm_memory_info failed"));
+        return false;
+    }
+
+    vshPrintExtra(ctl, _("%s"), tmmMemoryInfo);
+
+    VIR_FREE(tmmMemoryInfo);
+    return true;
+}
+
+typedef bool
+(*virshTmmFunc)(vshControl *ctl,
+                const vshCmd *cmd);
+
+struct _virshTmmFuncInfo {
+    const char *devName;
+    virshTmmFunc funcPtr;
+};
+
+typedef struct _virshTmmFuncInfo virshTmmFuncInfo;
+
+static virshTmmFuncInfo virshTmmFuncMap[] = {
+    {"tmm_memory_info", virshGetTmmMemoryInfo},
+};
+
+static bool
+virshTmmRunFunc(vshControl *ctl,
+                const char *devName,
+                const vshCmd *cmd)
+{
+    int funcIndex;
+
+    for (funcIndex = 0; funcIndex < sizeof(virshTmmFuncMap) / sizeof(virshTmmFuncInfo); funcIndex++) {
+        if (strcmp(devName, virshTmmFuncMap[funcIndex].devName) == 0) {
+            virshTmmFuncMap[funcIndex].funcPtr(ctl, cmd);
+            return true;
+        }
+    }
+
+    vshError(ctl, _("Invalid dev name"));
+    return false;
+}
+
+static bool
+cmdTmm(vshControl *ctl, const vshCmd *cmd)
+{
+    const char *devName = NULL;
+
+    if (vshCommandOptStringReq(ctl, cmd, "dev", &devName) < 0)
+        return false;
+
+    if (!virshTmmRunFunc(ctl, devName, cmd))
+        return false;
+
+    return true;
+}
 
 const vshCmdDef hostAndHypervisorCmds[] = {
     {.name = "allocpages",
@@ -1958,6 +2050,12 @@ const vshCmdDef hostAndHypervisorCmds[] = {
      .handler = cmdVersion,
      .opts = opts_version,
      .info = info_version,
+     .flags = 0
+    },
+    {.name = "tmm",
+     .handler = cmdTmm,
+     .opts = opts_tmm,
+     .info = info_tmm,
      .flags = 0
     },
     {.name = NULL}

@@ -1829,3 +1829,39 @@ virNodeGetSEVInfo(virConnectPtr conn,
     virDispatchError(conn);
     return -1;
 }
+
+/*
+ * virConnectGetTmmMemoryInfo:
+ * @conn: pointer to the hypervisor connection
+ * @detail: whether libvirtd return detailed tmm memory information;
+ * the default value is 0 which means don't return detailed tmm memory information.
+ *
+ * If Tmm enable, then will fill the cotents of string buffer with tmm memory information.
+ *
+ * Returns string ptr in case of success, and NULL in case of failure.
+ *
+ * Since: 9.7.0
+ */
+char *
+virConnectGetTmmMemoryInfo(virConnectPtr conn,
+                           unsigned int detail)
+{
+    VIR_DEBUG("conn=%p", conn);
+
+    virResetLastError();
+
+    virCheckConnectReturn(conn, NULL);
+
+    if (conn->driver->connectGetTmmMemoryInfo) {
+        char *ret;
+        ret = conn->driver->connectGetTmmMemoryInfo(conn, detail);
+        if (!ret)
+            goto error;
+        return ret;
+    }
+
+    virReportUnsupportedError();
+ error:
+    virDispatchError(conn);
+    return NULL;
+}
