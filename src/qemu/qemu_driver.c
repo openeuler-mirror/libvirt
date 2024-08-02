@@ -6315,6 +6315,14 @@ qemuDomainObjStart(virConnectPtr conn,
         }
     }
 
+    if (vm->def->sec && vm->def->sec->sectype == VIR_DOMAIN_LAUNCH_SECURITY_CVM) {
+        if (virFileWriteStr("/proc/sys/vm/overcommit_memory", "1", 0)) {
+            virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                           _("Failed to enable overcommit_memory"));
+            return -1;
+        }
+    }
+
     ret = qemuProcessStart(conn, driver, vm, NULL, asyncJob,
                            NULL, -1, NULL, NULL,
                            VIR_NETDEV_VPORT_PROFILE_OP_CREATE, start_flags);

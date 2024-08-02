@@ -7035,6 +7035,9 @@ qemuBuildMachineCommandLine(virCommand *cmd,
         case VIR_DOMAIN_LAUNCH_SECURITY_PV:
             virBufferAddLit(&buf, ",confidential-guest-support=lsec0");
             break;
+        case VIR_DOMAIN_LAUNCH_SECURITY_CVM:
+            virBufferAddLit(&buf, ",kvm-type=cvm");
+            break;
         case VIR_DOMAIN_LAUNCH_SECURITY_NONE:
         case VIR_DOMAIN_LAUNCH_SECURITY_LAST:
             virReportEnumRangeError(virDomainLaunchSecurity, def->sec->sectype);
@@ -9768,6 +9771,8 @@ qemuBuildSecCommandLine(virDomainObj *vm, virCommand *cmd,
         break;
     case VIR_DOMAIN_LAUNCH_SECURITY_PV:
         return qemuBuildPVCommandLine(vm, cmd);
+        break;
+    case VIR_DOMAIN_LAUNCH_SECURITY_CVM:
         break;
     case VIR_DOMAIN_LAUNCH_SECURITY_NONE:
     case VIR_DOMAIN_LAUNCH_SECURITY_LAST:

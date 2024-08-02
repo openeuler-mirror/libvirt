@@ -520,6 +520,9 @@
             <value>s390-pv</value>
           </attribute>
         </group>
+        <group>
+          <ref name="launchSecurityCVM"/>
+        </group>
       </choice>
     </element>
   </define>
@@ -563,6 +566,12 @@
         </element>
       </optional>
     </interleave>
+  </define>
+
+  <define name="launchSecurityCVM">
+    <attribute name="type">
+      <value>cvm</value>
+    </attribute>
   </define>
 
   <!--
