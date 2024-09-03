@@ -1516,6 +1516,7 @@ VIR_ENUM_IMPL(virDomainLaunchSecurity,
               "",
               "sev",
               "s390-pv",
+              "cvm",
 );
 
 typedef enum {
@@ -3829,6 +3830,7 @@ virDomainSecDefFree(virDomainSecDef *def)
         g_free(def->data.sev.session);
         break;
     case VIR_DOMAIN_LAUNCH_SECURITY_PV:
+    case VIR_DOMAIN_LAUNCH_SECURITY_CVM:
     case VIR_DOMAIN_LAUNCH_SECURITY_NONE:
     case VIR_DOMAIN_LAUNCH_SECURITY_LAST:
         break;
@@ -13570,6 +13572,7 @@ virDomainSecDefParseXML(xmlNodePtr lsecNode,
             return NULL;
         break;
     case VIR_DOMAIN_LAUNCH_SECURITY_PV:
+    case VIR_DOMAIN_LAUNCH_SECURITY_CVM:
         break;
     case VIR_DOMAIN_LAUNCH_SECURITY_NONE:
     case VIR_DOMAIN_LAUNCH_SECURITY_LAST:
@@ -26614,6 +26617,7 @@ virDomainSecDefFormat(virBuffer *buf, virDomainSecDef *sec)
     }
 
     case VIR_DOMAIN_LAUNCH_SECURITY_PV:
+    case VIR_DOMAIN_LAUNCH_SECURITY_CVM:
         break;
 
     case VIR_DOMAIN_LAUNCH_SECURITY_NONE:
