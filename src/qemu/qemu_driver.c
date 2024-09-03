@@ -20051,6 +20051,18 @@ qemuConnectTmmInfoListAppend(char **format,
     return ret;
 }
 
+/*
+* The format of baseMeminfo should be:
+* available: X num nodes (1 2 3 4)
+* numa node 0 size:         XXXMi
+* numa node 0 free:         XXXMi
+* ...
+*
+* The format of slabInfo should be:
+* numa node 0 td meta_data cnt:         xxx
+* numa node 0 td meta_data free cnt:    xxx
+* ...
+*/
 static char *
 qemuConnectTmmDetailInfoFormat(char *baseMeminfo,
                                char *slabInfo)
