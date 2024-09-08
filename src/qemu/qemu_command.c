@@ -5492,6 +5492,8 @@ qemuBuildHostdevVDPAStr(const virDomainDef *def,
     virBufferAsprintf(&buf, ",vhostdev=%s", vdpa->devpath);
     if (qemuBuildDeviceAddressStr(&buf, def, dev->info, qemuCaps) < 0)
         return NULL;
+    if (dev->info->bootIndex)
+        virBufferAsprintf(&buf, ",bootindex=%u", dev->info->bootIndex);
     return virBufferContentAndReset(&buf);
 }
 
