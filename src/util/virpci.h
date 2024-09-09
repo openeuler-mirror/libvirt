@@ -302,6 +302,9 @@ void virPCIEDeviceInfoFree(virPCIEDeviceInfo *dev);
 
 void virPCIDeviceAddressFree(virPCIDeviceAddress *address);
 
+int virtccaVirPCIDeviceDetach(virPCIDevice *dev);
+bool virtccaVirPCIDeviceGetSecure(virPCIDevice *dev);
+void virtccaVirPCIDeviceSetSecure(virPCIDevice *dev, bool secure);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(virPCIDevice, virPCIDeviceFree);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(virPCIDeviceAddress, virPCIDeviceAddressFree);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(virPCIEDeviceInfo, virPCIEDeviceInfoFree);

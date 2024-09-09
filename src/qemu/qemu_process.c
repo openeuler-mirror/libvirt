@@ -7507,6 +7507,9 @@ qemuProcessPrepareHost(virQEMUDriver *driver,
         hostdev_flags |= VIR_HOSTDEV_STRICT_ACS_CHECK;
     if (flags & VIR_QEMU_PROCESS_START_NEW)
         hostdev_flags |= VIR_HOSTDEV_COLD_BOOT;
+    if (vm->def->sec && vm->def->sec->sectype == VIR_DOMAIN_LAUNCH_SECURITY_CVM) {
+        hostdev_flags |= VIR_HOSTDEV_SP_SECURE;
+    }
     if (qemuHostdevPrepareDomainDevices(driver, vm->def, hostdev_flags) < 0)
         return -1;
 
