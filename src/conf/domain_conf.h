@@ -2874,6 +2874,8 @@ struct _virDomainSEVDef {
     unsigned int reduced_phys_bits;
     virTristateBool kernel_hashes;
     char *user_id;
+    char *secret_header;
+    char *secret;
 };
 
 struct _virDomainSecDef {

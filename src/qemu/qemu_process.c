@@ -7029,6 +7029,16 @@ qemuProcessPrepareSEVGuestInput(virDomainObj *vm)
             return -1;
     }
 
+    if (sev->secret_header) {
+        if (qemuProcessSEVCreateFile(vm, "secret_header", sev->secret_header) < 0)
+            return -1;
+    }
+
+    if (sev->secret) {
+        if (qemuProcessSEVCreateFile(vm, "secret", sev->secret) < 0)
+            return -1;
+    }
+
     return 0;
 }
 
