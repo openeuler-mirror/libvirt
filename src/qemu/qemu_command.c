@@ -5018,15 +5018,22 @@ qemuBuildHostdevMediatedDevProps(const virDomainDef *def,
 }
 
 virJSONValue *
-qemuBuildHostdevVDPADevProps(virDomainHostdevDef *dev)
+qemuBuildHostdevVDPADevProps(const virDomainDef *def,
+                             virDomainHostdevDef *dev)
 {
     g_autoptr(virJSONValue) props = NULL;
     virDomainHostdevSubsysVDPA *vdpasrc = &dev->source.subsys.u.vdpa;
     if (virJSONValueObjectAdd(&props,
                               "s:driver", "vhost-vdpa-device-pci",
+                              "s:id", dev->info->alias,
                               "s:vhostdev", vdpasrc->devpath,
+                              "p:bootindex", dev->info->bootIndex,
                               NULL) < 0)
         return NULL;
+
+    if (qemuBuildDeviceAddressProps(props, def, dev->info) < 0)
+        return NULL;
+
     return g_steal_pointer(&props);
 }
 
@@ -5225,7 +5232,7 @@ qemuBuildHostdevCommandLine(virCommand *cmd,
             break;
 
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
-            if (!(devprops = qemuBuildHostdevVDPADevProps(hostdev)))
+            if (!(devprops = qemuBuildHostdevVDPADevProps(def, hostdev)))
                 return -1;
             if (qemuBuildDeviceCommandlineFromJSON(cmd, devprops, def, qemuCaps) < 0)
                 return -1;
