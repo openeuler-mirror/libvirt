@@ -828,7 +828,8 @@ qemuDomainDeviceCalculatePCIConnectFlags(virDomainDeviceDef *dev,
         if (!virHostdevIsMdevDevice(hostdev) &&
             (hostdev->mode != VIR_DOMAIN_HOSTDEV_MODE_SUBSYS ||
              (hostdev->source.subsys.type != VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_PCI &&
-              hostdev->source.subsys.type != VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_SCSI_HOST))) {
+              hostdev->source.subsys.type != VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_SCSI_HOST &&
+              hostdev->source.subsys.type != VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA))) {
             return 0;
         }
 
@@ -858,6 +859,13 @@ qemuDomainDeviceCalculatePCIConnectFlags(virDomainDeviceDef *dev,
          * assume they're PCI Express. This is a very reasonable assumption,
          * as all current mdev-capable devices are indeed PCI Express */
         if (hostdev->source.subsys.type == VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_MDEV)
+            return pcieFlags;
+
+        /*
+         * if pcieFlags not equal to pciFlags, domain has pcie root port.
+         * Thus, we just return pcieFlags.
+         */
+        if (hostdev->source.subsys.type == VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA)
             return pcieFlags;
 
         /* according to pbonzini, from the guest PoV vhost-scsi devices
@@ -2333,7 +2341,8 @@ qemuDomainAssignDevicePCISlots(virDomainDef *def,
         if (subsys->type != VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_PCI &&
             subsys->type != VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_SCSI_HOST &&
             !(subsys->type == VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_MDEV &&
-              subsys->u.mdev.model == VIR_MDEV_MODEL_TYPE_VFIO_PCI)) {
+              subsys->u.mdev.model == VIR_MDEV_MODEL_TYPE_VFIO_PCI) &&
+            subsys->type != VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA) {
             continue;
         }
 

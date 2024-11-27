@@ -2800,7 +2800,7 @@ qemuDomainAttachVDPADevice(virQEMUDriver *driver,
         goto cleanup;
     }
 
-    if (!(devprops = qemuBuildHostdevVDPADevProps(hostdev)))
+    if (!(devprops = qemuBuildHostdevVDPADevProps(vm->def, hostdev)))
         goto cleanup;
 
     VIR_REALLOC_N(vm->def->hostdevs, vm->def->nhostdevs + 1);
@@ -4726,6 +4726,14 @@ qemuDomainRemoveMediatedDevice(virQEMUDriver *driver,
 }
 
 
+static void
+qemuDomainRemoveVDPADevice(virDomainObj *vm,
+                           virDomainHostdevDef *hostdev)
+{
+    qemuDomainReleaseDeviceAddress(vm, hostdev->info);
+}
+
+
 static int
 qemuDomainRemoveHostDevice(virQEMUDriver *driver,
                            virDomainObj *vm,
@@ -4798,6 +4806,8 @@ qemuDomainRemoveHostDevice(virQEMUDriver *driver,
         qemuDomainRemoveMediatedDevice(driver, vm, hostdev);
         break;
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
+        qemuDomainRemoveVDPADevice(vm, hostdev);
+        break;
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_LAST:
         break;
     }

@@ -1198,7 +1198,6 @@ udevGetVDPACharDev(const char *sysfs_path,
                 virReportError(VIR_ERR_INTERNAL_ERROR,
                                _("vDPA chardev path '%1$s' does not exist"),
                                chardev);
-                virDirClose(dir);
                 return -1;
             }
             VIR_DEBUG("vDPA chardev is at '%s'", chardev);
@@ -1207,9 +1206,6 @@ udevGetVDPACharDev(const char *sysfs_path,
             break;
         }
     }
-
-    virDirClose(dir);
-
     if (direrr < 0)
         return -1;
 
