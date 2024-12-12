@@ -103,6 +103,7 @@
 #include "logging/log_protocol.h"
 
 #define VIR_FROM_THIS VIR_FROM_QEMU
+#define MEMORY_LATENCY_FACTOR (1 << 20)
 
 VIR_LOG_INIT("qemu.qemu_process");
 
@@ -8610,6 +8611,9 @@ qemuProcessCreatePretendCmdBuild(virDomainObj *vm,
 int
 qemuProcessKill(virDomainObj *vm, unsigned int flags)
 {
+    unsigned long long memoryPotentialDelay;
+    size_t extraWaitingTime;
+
     VIR_DEBUG("vm=%p name=%s pid=%lld flags=0x%x",
               vm, vm->def->name,
               (long long)vm->pid, flags);
@@ -8629,10 +8633,19 @@ qemuProcessKill(virDomainObj *vm, unsigned int flags)
     }
 
     /* Request an extra delay of two seconds per current nhostdevs
-     * to be safe against stalls by the kernel freeing up the resources */
+     * to be safe against stalls by the kernel freeing up the resources 
+     * At the same time, Calculate the extra waiting delay required by the 
+     * VM specifications. The unpin time during device passthrough is 
+     * related to the momory */
+    extraWaitingTime = vm->def->nhostdevs * 2;
+    if (vm->def->nhostdevs > 0) {
+        memoryPotentialDelay = vm->def->mem.total_memory / MEMORY_LATENCY_FACTOR;
+        extraWaitingTime += (size_t)memoryPotentialDelay;
+    }
+
     return virProcessKillPainfullyDelay(vm->pid,
                                         !!(flags & VIR_QEMU_PROCESS_KILL_FORCE),
-                                        vm->def->nhostdevs * 2,
+                                        extraWaitingTime,
                                         false);
 }
 
