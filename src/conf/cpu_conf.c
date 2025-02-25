@@ -81,6 +81,15 @@ VIR_ENUM_IMPL(virCPUCacheMode,
               "disable",
 );
 
+VIR_ENUM_IMPL(virCPUCacheLevelAndType,
+              VIR_CPU_CACHE_LEVEL_AND_TYPE_LAST,
+              "l1d",
+              "l1i",
+              "l1",
+              "l2",
+              "l3",
+);
+
 
 virCPUDefPtr virCPUDefNew(void)
 {
@@ -127,6 +136,8 @@ virCPUDefFree(virCPUDefPtr def)
         virCPUDefFreeModel(def);
         VIR_FREE(def->cache);
         VIR_FREE(def->tsc);
+        VIR_FREE(def->cacheinfo);
+        def->ncacheinfo = 0;
         VIR_FREE(def);
     }
 }
@@ -250,6 +261,17 @@ virCPUDefCopyWithoutModel(const virCPUDef *cpu)
             goto error;
 
         *copy->cache = *cpu->cache;
+    }
+
+    if (cpu->ncacheinfo > 0) {
+        if (VIR_ALLOC_N(copy->cacheinfo, cpu->ncacheinfo) < 0)
+            goto error;
+
+        for (size_t i = 0; i < cpu->ncacheinfo; i++) {
+            copy->cacheinfo[i] = cpu->cacheinfo[i];
+        }
+
+        copy->ncacheinfo = cpu->ncacheinfo;
     }
 
     if (cpu->tsc) {
@@ -644,6 +666,60 @@ virCPUDefParseXML(xmlXPathContextPtr ctxt,
         def->features[i].policy = policy;
     }
 
+    VIR_FREE(nodes);
+
+    if ((n = virXPathNodeSet("./cacheinfo", ctxt, &nodes)) < 0)
+        goto cleanup;
+
+    if (n > VIR_CPU_CACHE_LEVEL_AND_TYPE_LAST) {
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+            _("Exceeded the maximum number of cacheinfo"));
+        goto cleanup;
+    }
+
+    if (n > 0) {
+        if (VIR_ALLOC_N(def->cacheinfo, n) < 0)
+            goto cleanup;
+
+        def->ncacheinfo = n;
+    }
+
+    for (i = 0; i < n; i++) {
+        virCPUCacheLevelAndType cache;
+        char *tmp;
+        unsigned long long size;
+
+        tmp = virXMLPropString(nodes[i], "cache");
+        if (tmp == NULL) {
+            virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                           _("Missing cache level and type"));
+            goto cleanup;
+        }
+        cache = virCPUCacheLevelAndTypeTypeFromString(tmp);
+        VIR_FREE(tmp);
+
+        if (cache < 0) {
+            virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                           _("Invalid CPU cache level and type"));
+            goto cleanup;
+        }
+
+        tmp = virXMLPropString(nodes[i], "size");
+        if (tmp == NULL) {
+            size = 0;
+        }
+        if (virStrToLong_ullp(tmp, NULL, 10, &size) < 0) {
+            virReportError(VIR_ERR_XML_ERROR,
+                            _("invalid setting for cache size '%s'"), tmp);
+            VIR_FREE(tmp);
+            goto cleanup;
+        }
+        VIR_FREE(tmp);
+
+        def->cacheinfo[i].cache = cache;
+        def->cacheinfo[i].size = size;
+    }
+
     if (virXPathInt("count(./cache)", ctxt, &n) < 0) {
         goto cleanup;
     } else if (n > 1) {
@@ -864,6 +940,14 @@ virCPUDefFormatBuf(virBufferPtr buf,
         virBufferAsprintf(buf, "mode='%s'",
                           virCPUCacheModeTypeToString(def->cache->mode));
         virBufferAddLit(buf, "/>\n");
+    }
+
+    for (i = 0; i < def->ncacheinfo; i++) {
+        virCPUCacheInfoDefPtr cacheinfo = def->cacheinfo + i;
+
+        virBufferAsprintf(buf, "<cacheinfo cache='%s' size='%llu'/>\n",
+                          virCPUCacheLevelAndTypeTypeToString(cacheinfo->cache),
+                          cacheinfo->size);
     }
 
     for (i = 0; i < def->nfeatures; i++) {
@@ -1142,6 +1226,20 @@ virCPUDefIsEqual(virCPUDefPtr src,
           src->cache->mode != dst->cache->mode))) {
         MISMATCH("%s", _("Target CPU cache does not match source"));
         return false;
+    }
+
+    if (src->ncacheinfo != dst->ncacheinfo) {
+        MISMATCH(_("Target CPU cacheinfo count %zu does not match source %zu"),
+                 dst->ncacheinfo, src->ncacheinfo);
+        return false;
+    }
+
+    for (i = 0; i < src->ncacheinfo; i++) {
+        if (src->cacheinfo[i].cache != dst->cacheinfo[i].cache ||
+            src->cacheinfo[i].size != dst->cacheinfo[i].size) {
+            MISMATCH("%s", _("Target CPU cacheinfo does not match source"));
+            return false;
+        }
     }
 
 #undef MISMATCH
