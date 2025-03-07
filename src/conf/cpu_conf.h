@@ -117,6 +117,25 @@ struct _virCPUCacheDef {
     virCPUCacheMode mode;
 };
 
+typedef enum {
+    VIR_CPU_CACHE_LEVEL_AND_TYPE_L1D,
+    VIR_CPU_CACHE_LEVEL_AND_TYPE_L1I,
+    VIR_CPU_CACHE_LEVEL_AND_TYPE_L1,
+    VIR_CPU_CACHE_LEVEL_AND_TYPE_L2,
+    VIR_CPU_CACHE_LEVEL_AND_TYPE_L3,
+
+    VIR_CPU_CACHE_LEVEL_AND_TYPE_LAST
+} virCPUCacheLevelAndType;
+
+VIR_ENUM_DECL(virCPUCacheLevelAndType);
+
+typedef struct _virCPUCacheInfoDef virCPUCacheInfoDef;
+typedef virCPUCacheInfoDef *virCPUCacheInfoDefPtr;
+struct _virCPUCacheInfoDef {
+    virCPUCacheLevelAndType cache;
+    unsigned long long size;
+};
+
 
 typedef struct _virCPUDef virCPUDef;
 typedef virCPUDef *virCPUDefPtr;
@@ -142,6 +161,8 @@ struct _virCPUDef {
     virCPUFeatureDefPtr features;
     virCPUCacheDefPtr cache;
     virHostCPUTscInfoPtr tsc;
+    size_t ncacheinfo;
+    virCPUCacheInfoDefPtr cacheinfo;
 };
 
 virCPUDefPtr virCPUDefNew(void);

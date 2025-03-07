@@ -7278,6 +7278,16 @@ qemuBuildMachineCommandLine(virCommandPtr cmd,
             virBufferAsprintf(&buf, ",pflash1=%s", priv->pflash1->nodeformat);
     }
 
+    if (cpu) {
+        for (i = 0; i < cpu->ncacheinfo; i++) {
+            const char *str;
+            str = virCPUCacheLevelAndTypeTypeToString(cpu->cacheinfo[i].cache);
+            virBufferAsprintf(&buf, ",smp-cache.%zu.cache=%s", i, str);
+            virBufferAsprintf(&buf, ",smp-cache.%zu.size=%llu", i,
+                              cpu->cacheinfo[i].size);
+        }
+    }
+
     virCommandAddArgBuffer(cmd, &buf);
 
     return 0;
