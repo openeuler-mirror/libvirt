@@ -1134,6 +1134,7 @@ qemuValidateDomainDef(const virDomainDef *def,
     g_autoptr(virQEMUCaps) qemuCapsLocal = NULL;
     virQEMUCaps *qemuCaps = parseOpaque;
     size_t i;
+    bool isCvm = def->sec && def->sec->sectype == VIR_DOMAIN_LAUNCH_SECURITY_CVM;
 
     if (!qemuCaps) {
         if (!(qemuCapsLocal = virQEMUCapsCacheLookup(driver->qemuCapsCache,
@@ -1200,9 +1201,11 @@ qemuValidateDomainDef(const virDomainDef *def,
         def->os.arch == VIR_ARCH_AARCH64 &&
         (def->os.firmware != VIR_DOMAIN_OS_DEF_FIRMWARE_EFI &&
          !virDomainDefHasOldStyleUEFI(def))) {
-        virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
-                       _("ACPI requires UEFI on this architecture"));
-        return -1;
+        if (!isCvm || def->os.firmware != VIR_DOMAIN_OS_DEF_FIRMWARE_NONE) { 
+            virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                           _("ACPI requires UEFI on this architecture"));
+            return -1;
+        }
     }
 
     if (def->genidRequested &&
