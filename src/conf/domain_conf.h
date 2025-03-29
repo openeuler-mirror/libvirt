@@ -3001,6 +3001,8 @@ struct _virDomainDef {
 
     virDomainDefaultIOThreadDef *defaultIOThread;
 
+    size_t iommufds;
+
     virDomainCputune cputune;
 
     virDomainResctrlDef **resctrls;
