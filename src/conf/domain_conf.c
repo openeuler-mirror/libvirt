@@ -6226,6 +6226,13 @@ virDomainHostdevDefParseXMLSubsys(xmlNodePtr node,
 
     model = virXMLPropString(node, "model");
 
+    if (virXMLPropUInt(node, "iommufd", 10, VIR_XML_PROP_NONZERO,
+                       &def->iommufd) < 0) {
+        virReportError(VIR_ERR_XML_ERROR, "%s",
+                       _("The 'iommufd' attribute in <hostdev> element cannot be resolved."));
+        return -1;
+    }
+
     /* @type is passed in from the caller rather than read from the
      * xml document, because it is specified in different places for
      * different kinds of defs - it is an attribute of
@@ -26327,6 +26334,11 @@ virDomainHostdevDefFormat(virBuffer *buf,
             if (mdevsrc->ramfb != VIR_TRISTATE_SWITCH_ABSENT)
                 virBufferAsprintf(buf, " ramfb='%s'",
                                   virTristateSwitchTypeToString(mdevsrc->ramfb));
+        }
+
+        if (def->source.subsys.type == VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA &&
+            def->iommufd) {
+            virBufferAsprintf(buf, " iommufd='%u'", def->iommufd);
         }
 
     }

@@ -5023,11 +5023,18 @@ qemuBuildHostdevVDPADevProps(const virDomainDef *def,
 {
     g_autoptr(virJSONValue) props = NULL;
     virDomainHostdevSubsysVDPA *vdpasrc = &dev->source.subsys.u.vdpa;
+    g_autofree char *iommufd = NULL;
+
+    if (dev->iommufd) {
+        iommufd = g_strdup_printf("iommufd%u", dev->iommufd);
+    }
+
     if (virJSONValueObjectAdd(&props,
                               "s:driver", "vhost-vdpa-device-pci",
                               "s:id", dev->info->alias,
                               "s:vhostdev", vdpasrc->devpath,
                               "p:bootindex", dev->info->bootIndex,
+                              "S:iommufd", iommufd,
                               NULL) < 0)
         return NULL;
 
