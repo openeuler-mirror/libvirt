@@ -1100,6 +1100,14 @@ typedef enum {
      * Since: 8.5.0
      */
     VIR_MIGRATE_ZEROCOPY = (1 << 20),
+
+    /* Use return-path to control QEMU_MIGRATION_CAP_RETURN_PATH.
+     * When return-path is enabled, QEMU on the source host won't report completed
+     * migration until the destination QEMU sends a confirmation it successfully loaded
+     * all data.
+     * Since: 9.10.0
+     */
+    VIR_MIGRATE_RETURNPATH = (1 << 21),
 } virDomainMigrateFlags;
 
 

@@ -11010,6 +11010,10 @@ static const vshCmdOptDef opts_migrate[] = {
      .type = VSH_OT_BOOL,
      .help = N_("use zero-copy mechanism for migrating memory pages")
     },
+    {.name = "return-path",
+     .type = VSH_OT_BOOL,
+     .help = N_("use return-path to control QEMU_MIGRATION_CAP_RETURN_PATH")
+    },
     {.name = "migrateuri",
      .type = VSH_OT_STRING,
      .completer = virshCompleteEmpty,
@@ -11178,6 +11182,7 @@ doMigrate(void *opaque)
         { "tls", VIR_MIGRATE_TLS },
         { "parallel", VIR_MIGRATE_PARALLEL },
         { "suspend", VIR_MIGRATE_PAUSED },
+        { "return-path", VIR_MIGRATE_RETURNPATH },
     };
 
 #ifndef WIN32
