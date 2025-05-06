@@ -5023,11 +5023,18 @@ qemuBuildHostdevVDPADevProps(const virDomainDef *def,
 {
     g_autoptr(virJSONValue) props = NULL;
     virDomainHostdevSubsysVDPA *vdpasrc = &dev->source.subsys.u.vdpa;
+    g_autofree char *iommufd = NULL;
+
+    if (dev->iommufd) {
+        iommufd = g_strdup_printf("iommufd%u", dev->iommufd);
+    }
+
     if (virJSONValueObjectAdd(&props,
                               "s:driver", "vhost-vdpa-device-pci",
                               "s:id", dev->info->alias,
                               "s:vhostdev", vdpasrc->devpath,
                               "p:bootindex", dev->info->bootIndex,
+                              "S:iommufd", iommufd,
                               NULL) < 0)
         return NULL;
 
@@ -7447,6 +7454,29 @@ qemuBuildIOThreadCommandLine(virCommand *cmd,
     return 0;
 }
 
+static int
+qemuBuildIOMMUFDCommandLine(virCommand *cmd,
+                            const virDomainDef *def,
+                            virQEMUCaps *qemuCaps)
+{
+    size_t i;
+
+    /* The iommufd alias id starts at 1 */
+    for (i = 1; i <= def->iommufds; i++) {
+        g_autoptr(virJSONValue) props = NULL;
+        g_autofree char *alias = NULL;
+
+        alias = g_strdup_printf("iommufd%lu", i);
+
+        if (qemuMonitorCreateObjectProps(&props, "iommufd", alias, NULL) < 0)
+            return -1;
+
+        if (qemuBuildObjectCommandlineFromJSON(cmd, props, qemuCaps) < 0)
+            return -1;
+    }
+
+    return 0;
+}
 
 static int
 qemuBuildNumaCellCache(virCommand *cmd,
@@ -10511,6 +10541,9 @@ qemuBuildCommandLine(virDomainObj *vm,
         return NULL;
 
     if (qemuBuildIOThreadCommandLine(cmd, def, qemuCaps) < 0)
+        return NULL;
+
+    if (qemuBuildIOMMUFDCommandLine(cmd, def, qemuCaps) < 0)
         return NULL;
 
     if (virDomainNumaGetNodeCount(def->numa) &&

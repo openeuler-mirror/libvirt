@@ -6226,6 +6226,13 @@ virDomainHostdevDefParseXMLSubsys(xmlNodePtr node,
 
     model = virXMLPropString(node, "model");
 
+    if (virXMLPropUInt(node, "iommufd", 10, VIR_XML_PROP_NONZERO,
+                       &def->iommufd) < 0) {
+        virReportError(VIR_ERR_XML_ERROR, "%s",
+                       _("The 'iommufd' attribute in <hostdev> element cannot be resolved."));
+        return -1;
+    }
+
     /* @type is passed in from the caller rather than read from the
      * xml document, because it is specified in different places for
      * different kinds of defs - it is an attribute of
@@ -16003,6 +16010,24 @@ virDomainDefParseIOThreads(virDomainDef *def,
     return virDomainIOThreadIDDefArrayInit(def, iothreads);
 }
 
+static int
+virDomainDefParseIOMMUFDs(virDomainDef *def,
+                          xmlXPathContextPtr ctxt)
+{
+    unsigned int iommufds = 0;
+    g_autofree char *tmp = NULL;
+
+    tmp = virXPathString("string(./iommufds[1])", ctxt);
+    if (tmp && virStrToLong_uip(tmp, NULL, 10, &iommufds) < 0) {
+        virReportError(VIR_ERR_XML_ERROR,
+                       _("invalid iommufds count '%s'"), tmp);
+        return -1;
+    }
+
+    def->iommufds = iommufds;
+
+    return 0;
+}
 
 /* Parse the XML definition for a vcpupin
  *
@@ -18358,6 +18383,9 @@ virDomainDefTunablesParse(virDomainDef *def,
         return -1;
 
     if (virDomainDefParseIOThreads(def, ctxt) < 0)
+        return -1;
+
+    if (virDomainDefParseIOMMUFDs(def, ctxt) < 0)
         return -1;
 
     /* Extract cpu tunables. */
@@ -26308,6 +26336,11 @@ virDomainHostdevDefFormat(virBuffer *buf,
                                   virTristateSwitchTypeToString(mdevsrc->ramfb));
         }
 
+        if (def->source.subsys.type == VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA &&
+            def->iommufd) {
+            virBufferAsprintf(buf, " iommufd='%u'", def->iommufd);
+        }
+
     }
     virBufferAddLit(buf, ">\n");
     virBufferAdjustIndent(buf, 2);
@@ -27114,6 +27147,14 @@ virDomainDefIOThreadsFormat(virBuffer *buf,
     virDomainDefaultIOThreadDefFormat(buf, def);
 }
 
+static void
+virDomainDefIOMMUFDsFormat(virBuffer *buf,
+                           const virDomainDef *def)
+{
+    if (def->iommufds > 0) {
+        virBufferAsprintf(buf, "<iommufds>%zu</iommufds>\n", def->iommufds);
+    }
+}
 
 static void
 virDomainIOMMUDefFormat(virBuffer *buf,
@@ -27776,6 +27817,8 @@ virDomainDefFormatInternalSetRootName(virDomainDef *def,
         return -1;
 
     virDomainDefIOThreadsFormat(buf, def);
+
+    virDomainDefIOMMUFDsFormat(buf, def);
 
     if (virDomainCputuneDefFormat(buf, def, flags) < 0)
         return -1;

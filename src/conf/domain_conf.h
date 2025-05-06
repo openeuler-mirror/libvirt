@@ -384,6 +384,7 @@ struct _virDomainHostdevDef {
     bool missing;
     bool readonly;
     bool shareable;
+    unsigned int iommufd;
     virTristateBool writeFiltering;
     union {
         virDomainHostdevSubsys subsys;
@@ -3000,6 +3001,8 @@ struct _virDomainDef {
     virDomainIOThreadIDDef **iothreadids;
 
     virDomainDefaultIOThreadDef *defaultIOThread;
+
+    size_t iommufds;
 
     virDomainCputune cputune;
 
