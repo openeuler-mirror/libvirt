@@ -94,9 +94,6 @@ struct _virPCIDevice {
     bool          unbind_from_stub;
     bool          remove_slot;
     bool          reprobe;
-    
-    /* used by virtcca CoDA feature*/
-    bool          secure;
 };
 
 struct _virPCIDeviceList {
@@ -1378,56 +1375,6 @@ virPCIDeviceDetach(virPCIDevice *dev,
     }
 
     return 0;
-}
-
-int
-virtccaVirPCIDeviceDetach(virPCIDevice *_dev)
-{
-    int ret = 0;
-    virPCIDevice *dev = NULL;
-    size_t i, j;
-
-    /* Given bus number, there are 32 devices and 8 functions */
-    for (i = 0; i < 32; i++) {
-        for (j = 0; j < 8; j++) {
-            virPCIDeviceAddress devAddr = {.domain = _dev->address.domain,
-                                           .bus = _dev->address.bus,
-                                           .slot = i, .function = j};
-            g_autofree char *name = virPCIDeviceAddressAsString(&devAddr);
-            g_autofree char *path = g_strdup_printf(PCI_SYSFS "devices/%s/config", name);
-
-            if (!virFileExists(path))
-                continue;
-
-            if (!(dev = virPCIDeviceNew(&devAddr)))
-                continue;
-
-            virPCIDeviceSetStubDriverType(dev, VIR_PCI_STUB_DRIVER_VFIO);
-
-            if (virPCIDeviceBindToStub(dev) < 0) {
-                ret = -1;
-                goto cleanup;
-            }
-            virPCIDeviceFree(dev);
-        }
-    }
-    return ret;
-
-cleanup:
-    virPCIDeviceFree(dev);
-    return ret;
-}
-
-bool
-virtccaVirPCIDeviceGetSecure(virPCIDevice *dev)
-{
-    return dev->secure;
-}
-
-void
-virtccaVirPCIDeviceSetSecure(virPCIDevice *dev, bool secure)
-{
-    dev->secure = secure;
 }
 
 /*

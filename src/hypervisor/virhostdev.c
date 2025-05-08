@@ -707,8 +707,6 @@ virHostdevPreparePCIDevicesImpl(virHostdevManager *mgr,
          * shared across guests. Check if that's the case. */
         if (usesVFIO) {
             data.usesVFIO = true;
-            if (flags & VIR_HOSTDEV_SP_SECURE)
-                virtccaVirPCIDeviceSetSecure(pci, true);
             if (virPCIDeviceAddressIOMMUGroupIterate(devAddr,
                                                      virHostdevIsPCINodeDeviceUsed,
                                                      &data) < 0)
@@ -737,9 +735,6 @@ virHostdevPreparePCIDevicesImpl(virHostdevManager *mgr,
              * actual device going forward */
             VIR_DEBUG("Detaching managed PCI device %s",
                       virPCIDeviceGetName(pci));
-            if (virtccaVirPCIDeviceGetSecure(pci))
-                virtccaVirPCIDeviceDetach(pci);
-
             if (virPCIDeviceDetach(pci,
                                    mgr->activePCIHostdevs,
                                    mgr->inactivePCIHostdevs) < 0)

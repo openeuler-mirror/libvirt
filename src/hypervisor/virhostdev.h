@@ -38,7 +38,6 @@ typedef enum {
     VIR_HOSTDEV_SP_PCI               = (1 << 8), /* support pci passthrough */
     VIR_HOSTDEV_SP_USB               = (1 << 9), /* support usb passthrough */
     VIR_HOSTDEV_SP_SCSI              = (1 << 10), /* support scsi passthrough */
-    VIR_HOSTDEV_SP_SECURE            = (1 << 11), /* support secure dev passthrough */
 } virHostdevFlag;
 
 
