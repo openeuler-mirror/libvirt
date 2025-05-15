@@ -6407,7 +6407,8 @@ qemuBuildGlobalControllerCommandLine(virCommand *cmd,
     for (i = 0; i < def->ncontrollers; i++) {
         virDomainControllerDef *cont = def->controllers[i];
         if (cont->type == VIR_DOMAIN_CONTROLLER_TYPE_PCI &&
-            cont->opts.pciopts.pcihole64) {
+            cont->opts.pciopts.pcihole64 &&
+            (qemuDomainIsQ35(def) || qemuDomainIsI440FX(def))) {
             const char *hoststr = NULL;
 
             switch (cont->model) {
@@ -7302,6 +7303,18 @@ qemuBuildMachineCommandLine(virCommand *cmd,
     }
 
     qemuBuildMachineACPI(&buf, def, qemuCaps);
+
+    if (qemuDomainIsARMVirt(def)) {
+        for (i = 0; i < def->ncontrollers; i++) {
+            virDomainControllerDef *cont = def->controllers[i];
+            if (cont->type == VIR_DOMAIN_CONTROLLER_TYPE_PCI &&
+                cont->opts.pciopts.pcihole64) {
+                virBufferAsprintf(&buf, ",highmem-mmio-size=%lluK", cont->opts.pciopts.pcihole64size);
+                break;
+            }
+        }
+    }
+
     virCommandAddArgBuffer(cmd, &buf);
 
     return 0;
