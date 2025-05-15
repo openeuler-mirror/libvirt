@@ -704,6 +704,9 @@ VIR_ENUM_IMPL(virQEMUCaps,
 
               /* 455 */
               "cpu.kvm-vtimer-status", /* QEMU_CAPS_ARM_KVM_VTIMER_STATUS */
+
+              /* 475 */
+              "machine.virt.highmem-mmio-size", /* QEMU_CAPS_MACHINE_VIRT_HIGHMEM_MMIO_SIZE */
     );
 
 
@@ -1735,6 +1738,7 @@ static struct virQEMUCapsStringFlags virQEMUCapsMachinePropsPSeries[] = {
 
 static struct virQEMUCapsStringFlags virQEMUCapsMachinePropsVirt[] = {
     { "iommu", QEMU_CAPS_MACHINE_VIRT_IOMMU },
+    { "highmem-mmio-size", QEMU_CAPS_MACHINE_VIRT_HIGHMEM_MMIO_SIZE },
 };
 
 static struct virQEMUCapsStringFlags virQEMUCapsMachinePropsGeneric[] = {
