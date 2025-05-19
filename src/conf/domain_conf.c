@@ -8628,6 +8628,7 @@ virDomainHostdevDefParseXMLSubsys(xmlNodePtr node,
     virDomainHostdevSubsysSCSIVHostPtr scsihostsrc = &def->source.subsys.u.scsi_host;
     virDomainHostdevSubsysMediatedDevPtr mdevsrc = &def->source.subsys.u.mdev;
     g_autofree char *managed = NULL;
+    g_autofree char *migration = NULL;
     g_autofree char *sgio = NULL;
     g_autofree char *rawio = NULL;
     g_autofree char *backendStr = NULL;
@@ -8643,11 +8644,21 @@ virDomainHostdevDefParseXMLSubsys(xmlNodePtr node,
     if ((managed = virXMLPropString(node, "managed")) != NULL)
         ignore_value(virStringParseYesNo(managed, &def->managed));
 
+    migration = virXMLPropString(node, "migration");
     sgio = virXMLPropString(node, "sgio");
     rawio = virXMLPropString(node, "rawio");
     model = virXMLPropString(node, "model");
     display = virXMLPropString(node, "display");
     ramfb = virXMLPropString(node, "ramfb");
+
+    if (migration &&
+        (def->migration = virTristateSwitchTypeFromString(migration)) <= 0) {
+        virReportError(VIR_ERR_XML_ERROR,
+                       _("unknown value '%s' for <hostdev> attribute "
+                         "'migration'"),
+                       migration);
+        return -1;
+    }
 
     /* @type is passed in from the caller rather than read from the
      * xml document, because it is specified in different places for
@@ -28213,6 +28224,10 @@ virDomainHostdevDefFormat(virBufferPtr buf,
     if (def->mode == VIR_DOMAIN_HOSTDEV_MODE_SUBSYS) {
         virBufferAsprintf(buf, " managed='%s'",
                           def->managed ? "yes" : "no");
+
+        if (def->migration != VIR_TRISTATE_SWITCH_ABSENT)
+            virBufferAsprintf(buf, " migration='%s'",
+                              virTristateSwitchTypeToString(def->migration));
 
         if (def->source.subsys.type == VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_SCSI &&
             scsisrc->sgio)

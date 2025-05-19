@@ -1138,6 +1138,10 @@ qemuMigrationSrcIsAllowedHostdev(const virDomainDef *def)
                     continue;
                 }
 
+                if (hostdev->migration == VIR_TRISTATE_SWITCH_ON) {
+                    continue;
+                }
+
                 /* all other PCI hostdevs can't be migrated */
                 virReportError(VIR_ERR_OPERATION_UNSUPPORTED,
                                _("cannot migrate a domain with <hostdev mode='subsystem' type='%s'>"),
