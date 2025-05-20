@@ -4840,6 +4840,11 @@ qemuBuildPCIHostdevDevStr(const virDomainDef *def,
     switch ((virDomainHostdevSubsysPCIBackendType)backend) {
     case VIR_DOMAIN_HOSTDEV_PCI_BACKEND_VFIO:
         virBufferAddLit(&buf, "vfio-pci");
+
+        if (dev->migration == VIR_TRISTATE_SWITCH_ON) {
+            virBufferAsprintf(&buf, ",x-enable-migration=true");
+        }
+
         break;
 
     case VIR_DOMAIN_HOSTDEV_PCI_BACKEND_KVM:

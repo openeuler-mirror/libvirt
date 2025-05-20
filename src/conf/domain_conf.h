@@ -348,6 +348,7 @@ struct _virDomainHostdevDef {
 
     int mode; /* enum virDomainHostdevMode */
     int startupPolicy; /* enum virDomainStartupPolicy */
+    int migration;
     bool managed;
     bool missing;
     bool readonly;
