@@ -1286,7 +1286,8 @@ qemuBuildChrChardevReconnectStr(virBuffer *buf,
 
 static char *
 qemuBuildChardevStr(const virDomainChrSourceDef *dev,
-                    const char *charAlias)
+                    const char *charAlias,
+                    bool hasStratovirt)
 {
 
     qemuDomainChrSourcePrivate *chrSourcePriv = QEMU_DOMAIN_CHR_SOURCE_PRIVATE(dev);
@@ -1391,7 +1392,7 @@ qemuBuildChardevStr(const virDomainChrSourceDef *dev,
 
     case VIR_DOMAIN_CHR_TYPE_UNIX:
         virBufferAsprintf(&buf, "socket,id=%s", charAlias);
-        if (chrSourcePriv->directfd) {
+        if (chrSourcePriv->directfd && !hasStratovirt) {
             virBufferAsprintf(&buf, ",fd=%s", qemuFDPassDirectGetPath(chrSourcePriv->directfd));
         } else {
             virBufferAddLit(&buf, ",path=");
@@ -1544,7 +1545,7 @@ qemuBuildChardevCommand(virCommand *cmd,
 
     qemuFDPassTransferCommand(chrSourcePriv->logfd, cmd);
 
-    if (!(charstr = qemuBuildChardevStr(dev, charAlias)))
+    if (!(charstr = qemuBuildChardevStr(dev, charAlias, virQEMUCapsHasStratovirt(qemuCaps))))
         return -1;
 
     virCommandAddArgList(cmd, "-chardev", charstr, NULL);
