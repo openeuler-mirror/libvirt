@@ -310,6 +310,11 @@ qemuBuildMasterKeyCommandLine(virCommand *cmd,
     g_autofree char *path = NULL;
     g_autoptr(virJSONValue) props = NULL;
 
+    if (virQEMUCapsHasStratovirt(priv->qemuCaps)) {
+        VIR_INFO("secret object is not supported by Stratovirt");
+        return 0;
+    }
+
     if (!(alias = qemuDomainGetMasterKeyAlias()))
         return -1;
 
@@ -10639,7 +10644,9 @@ qemuBuildCommandLine(virDomainObj *vm,
     if (qemuBuildInputCommandLine(cmd, def, qemuCaps) < 0)
         return NULL;
 
-    if (qemuBuildAudioCommandLine(cmd, def) < 0)
+    /* audio device is not supported by stratovirt. */
+    if (!virQEMUCapsHasStratovirt(qemuCaps) &&
+        qemuBuildAudioCommandLine(cmd, def) < 0)
         return NULL;
 
     if (qemuBuildGraphicsCommandLine(cfg, cmd, def, qemuCaps) < 0)

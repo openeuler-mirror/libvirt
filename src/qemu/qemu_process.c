@@ -8215,7 +8215,9 @@ qemuProcessLaunch(virConnectPtr conn,
     if (qemuProcessSetupBalloon(vm, asyncJob) < 0)
         goto cleanup;
 
-    if (qemuProcessSetupDiskThrottling(vm, asyncJob) < 0)
+    /* disk throttling is not supported by stratovirt */
+    if (!virQEMUCapsHasStratovirt(priv->qemuCaps) &&
+        qemuProcessSetupDiskThrottling(vm, asyncJob) < 0)
         goto cleanup;
 
     /* Since CPUs were not started yet, the balloon could not return the memory

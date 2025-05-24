@@ -1573,7 +1573,8 @@ qemuMigrationCapsCheck(virDomainObj *vm,
         }
     }
 
-    if (!reconnect) {
+    /* the qmp "migrate-set-capabilities" is not supported by stratovirt */
+    if (!reconnect && !virQEMUCapsHasStratovirt(priv->qemuCaps)) {
         g_autoptr(virBitmap) migEvent = virBitmapNew(QEMU_MIGRATION_CAP_LAST);
 
         ignore_value(virBitmapSetBit(migEvent, QEMU_MIGRATION_CAP_EVENTS));
