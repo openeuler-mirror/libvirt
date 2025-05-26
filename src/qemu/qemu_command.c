@@ -1693,7 +1693,17 @@ qemuBuildDriveStr(virDomainDiskDef *disk)
     if (qemuBuildDriveSourceStr(disk, &opt) < 0)
         return NULL;
 
-    virBufferAsprintf(&opt, "if=sd,index=%d", virDiskNameToIndex(disk->dst));
+    if (!qemuDiskBusIsSD(disk->bus)) {
+        g_autofree char *drivealias = qemuAliasDiskDriveFromDisk(disk);
+        if (!drivealias)
+            return NULL;
+
+        virBufferAddLit(&opt, "if=none");
+        virBufferAsprintf(&opt, ",id=%s", drivealias);
+    } else {
+        virBufferAsprintf(&opt, "if=sd,index=%d",
+                          virDiskNameToIndex(disk->dst));
+    }
 
     if (disk->src->readonly)
         virBufferAddLit(&opt, ",readonly=on");
@@ -2177,7 +2187,8 @@ qemuBuildDiskSourceCommandLine(virCommand *cmd,
     if (virStorageSourceGetActualType(disk->src) == VIR_STORAGE_TYPE_VHOST_USER) {
         if (!(data = qemuBuildStorageSourceChainAttachPrepareChardev(disk)))
             return -1;
-    } else if (!qemuDiskBusIsSD(disk->bus)) {
+    } else if (!virQEMUCapsHasStratovirt(qemuCaps) &&
+        !qemuDiskBusIsSD(disk->bus)) {
         if (virStorageSourceIsEmpty(disk->src))
             return 0;
 
