@@ -2623,6 +2623,12 @@ qemuMigrationSrcBeginPhase(virQEMUDriver *driver,
         return NULL;
     }
 
+    if ((flags & VIR_MIGRATE_RETURNPATH) && (flags & VIR_MIGRATE_TUNNELLED)) {
+        virReportError(VIR_ERR_OPERATION_INVALID, "%s",
+                       _("VIR_MIGRATE_RETURNPATH and VIR_MIGRATE_TUNNELLED comflict and cannot be used at the same time"));
+        return NULL;
+    }
+
     if (flags & (VIR_MIGRATE_NON_SHARED_DISK | VIR_MIGRATE_NON_SHARED_INC)) {
         if (flags & VIR_MIGRATE_TUNNELLED) {
             virReportError(VIR_ERR_OPERATION_UNSUPPORTED, "%s",

@@ -62,6 +62,7 @@
      VIR_MIGRATE_NON_SHARED_SYNCHRONOUS_WRITES | \
      VIR_MIGRATE_POSTCOPY_RESUME | \
      VIR_MIGRATE_ZEROCOPY | \
+     VIR_MIGRATE_RETURNPATH | \
      0)
 
 /* All supported migration parameters and their types. */
