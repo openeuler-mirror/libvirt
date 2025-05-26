@@ -709,6 +709,7 @@ const char *virQEMUCapsGetBinary(virQEMUCaps *qemuCaps);
 virArch virQEMUCapsGetArch(virQEMUCaps *qemuCaps);
 unsigned int virQEMUCapsGetVersion(virQEMUCaps *qemuCaps);
 const char *virQEMUCapsGetPackage(virQEMUCaps *qemuCaps);
+bool virQEMUCapsHasStratovirt(virQEMUCaps *qemuCaps);
 
 virDomainCapsCPUModels *virQEMUCapsGetCPUModels(virQEMUCaps *qemuCaps,
                                                   virDomainVirtType type,

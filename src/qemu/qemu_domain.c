@@ -7918,6 +7918,7 @@ qemuDomainDiskGetTopNodename(virDomainDiskDef *disk)
  * qemuDomainDiskGetBackendAlias:
  * @disk: disk definition
  * @backendAlias: filled with the alias of the disk storage backend
+ * @hasStratovirt: binary has "StratoVirt" or not
  *
  * Returns the correct alias for the disk backend. This may be the alias of
  * -drive for legacy setup or the correct node name for -blockdev setups.
@@ -7929,11 +7930,12 @@ qemuDomainDiskGetTopNodename(virDomainDiskDef *disk)
  */
 int
 qemuDomainDiskGetBackendAlias(virDomainDiskDef *disk,
-                              char **backendAlias)
+                              char **backendAlias,
+                              bool hasStratovirt)
 {
     *backendAlias = NULL;
 
-    if (qemuDiskBusIsSD(disk->bus)) {
+    if (hasStratovirt || qemuDiskBusIsSD(disk->bus)) {
         if (!(*backendAlias = qemuAliasDiskDriveFromDisk(disk)))
             return -1;
 
@@ -11697,7 +11699,7 @@ qemuDomainSupportsCheckpointsBlockjobs(virDomainObj *vm)
  * qemuDomainInitializePflashStorageSource:
  *
  * This helper converts the specification of the source of the 'loader' in case
- * PFLASH is required to virStorageSources.
+ * PFLASH is required to virStorageSources in case Stratovirt is present.
  *
  * This helper is used in the intermediate state when we don't support full
  * backing chains for pflash drives in the XML.
@@ -11714,6 +11716,9 @@ qemuDomainInitializePflashStorageSource(virDomainObj *vm,
     qemuDomainObjPrivate *priv = vm->privateData;
     virDomainDef *def = vm->def;
     g_autoptr(virStorageSource) pflash0 = NULL;
+
+    if (virQEMUCapsHasStratovirt(priv->qemuCaps))
+        return 0;
 
     if (!virDomainDefHasOldStyleUEFI(def))
         return 0;

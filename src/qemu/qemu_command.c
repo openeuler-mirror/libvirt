@@ -310,6 +310,11 @@ qemuBuildMasterKeyCommandLine(virCommand *cmd,
     g_autofree char *path = NULL;
     g_autoptr(virJSONValue) props = NULL;
 
+    if (virQEMUCapsHasStratovirt(priv->qemuCaps)) {
+        VIR_INFO("secret object is not supported by Stratovirt");
+        return 0;
+    }
+
     if (!(alias = qemuDomainGetMasterKeyAlias()))
         return -1;
 
@@ -1281,7 +1286,8 @@ qemuBuildChrChardevReconnectStr(virBuffer *buf,
 
 static char *
 qemuBuildChardevStr(const virDomainChrSourceDef *dev,
-                    const char *charAlias)
+                    const char *charAlias,
+                    bool hasStratovirt)
 {
 
     qemuDomainChrSourcePrivate *chrSourcePriv = QEMU_DOMAIN_CHR_SOURCE_PRIVATE(dev);
@@ -1386,7 +1392,7 @@ qemuBuildChardevStr(const virDomainChrSourceDef *dev,
 
     case VIR_DOMAIN_CHR_TYPE_UNIX:
         virBufferAsprintf(&buf, "socket,id=%s", charAlias);
-        if (chrSourcePriv->directfd) {
+        if (chrSourcePriv->directfd && !hasStratovirt) {
             virBufferAsprintf(&buf, ",fd=%s", qemuFDPassDirectGetPath(chrSourcePriv->directfd));
         } else {
             virBufferAddLit(&buf, ",path=");
@@ -1539,7 +1545,7 @@ qemuBuildChardevCommand(virCommand *cmd,
 
     qemuFDPassTransferCommand(chrSourcePriv->logfd, cmd);
 
-    if (!(charstr = qemuBuildChardevStr(dev, charAlias)))
+    if (!(charstr = qemuBuildChardevStr(dev, charAlias, virQEMUCapsHasStratovirt(qemuCaps))))
         return -1;
 
     virCommandAddArgList(cmd, "-chardev", charstr, NULL);
@@ -1687,7 +1693,17 @@ qemuBuildDriveStr(virDomainDiskDef *disk)
     if (qemuBuildDriveSourceStr(disk, &opt) < 0)
         return NULL;
 
-    virBufferAsprintf(&opt, "if=sd,index=%d", virDiskNameToIndex(disk->dst));
+    if (!qemuDiskBusIsSD(disk->bus)) {
+        g_autofree char *drivealias = qemuAliasDiskDriveFromDisk(disk);
+        if (!drivealias)
+            return NULL;
+
+        virBufferAddLit(&opt, "if=none");
+        virBufferAsprintf(&opt, ",id=%s", drivealias);
+    } else {
+        virBufferAsprintf(&opt, "if=sd,index=%d",
+                          virDiskNameToIndex(disk->dst));
+    }
 
     if (disk->src->readonly)
         virBufferAddLit(&opt, ",readonly=on");
@@ -1872,7 +1888,7 @@ qemuBuildDiskDeviceProps(const virDomainDef *def,
     if (virStorageSourceGetActualType(disk->src) == VIR_STORAGE_TYPE_VHOST_USER) {
         chardev = qemuDomainGetVhostUserChrAlias(disk->info.alias);
     } else {
-        if (qemuDomainDiskGetBackendAlias(disk, &drive) < 0)
+        if (qemuDomainDiskGetBackendAlias(disk, &drive, virQEMUCapsHasStratovirt(qemuCaps)) < 0)
             return NULL;
     }
 
@@ -2171,7 +2187,8 @@ qemuBuildDiskSourceCommandLine(virCommand *cmd,
     if (virStorageSourceGetActualType(disk->src) == VIR_STORAGE_TYPE_VHOST_USER) {
         if (!(data = qemuBuildStorageSourceChainAttachPrepareChardev(disk)))
             return -1;
-    } else if (!qemuDiskBusIsSD(disk->bus)) {
+    } else if (!virQEMUCapsHasStratovirt(qemuCaps) &&
+        !qemuDiskBusIsSD(disk->bus)) {
         if (virStorageSourceIsEmpty(disk->src))
             return 0;
 
@@ -7059,7 +7076,8 @@ qemuBuildMachineCommandLine(virCommand *cmd,
         }
     }
 
-    if (virDomainDefHasOldStyleUEFI(def)) {
+    if (!virQEMUCapsHasStratovirt(qemuCaps) &&
+        virDomainDefHasOldStyleUEFI(def)) {
         if (priv->pflash0)
             virBufferAsprintf(&buf, ",pflash0=%s",
                               qemuBlockStorageSourceGetEffectiveNodename(priv->pflash0));
@@ -9519,10 +9537,53 @@ qemuBuildRedirdevCommandLine(virCommand *cmd,
 }
 
 
+static void
+qemuBuildDomainLoaderPflashCommandLine(virCommand *cmd,
+                                      virDomainLoaderDef *loader,
+                                      virQEMUCaps *qemuCaps)
+{
+    g_auto(virBuffer) buf = VIR_BUFFER_INITIALIZER;
+    int unit = 0;
+
+    if (loader->secure == VIR_TRISTATE_BOOL_YES) {
+        virCommandAddArgList(cmd,
+                             "-global",
+                             "driver=cfi.pflash01,property=secure,value=on",
+                             NULL);
+    }
+
+    /* with blockdev we instantiate the pflash when formatting -machine */
+    if (!virQEMUCapsHasStratovirt(qemuCaps))
+        return;
+
+    virBufferAddLit(&buf, "file=");
+    virQEMUBuildBufferEscapeComma(&buf, loader->path);
+    virBufferAsprintf(&buf, ",if=pflash,format=raw,unit=%d", unit);
+    unit++;
+
+    if (loader->readonly) {
+        virBufferAsprintf(&buf, ",readonly=%s",
+                          virTristateSwitchTypeToString(loader->readonly));
+    }
+
+    virCommandAddArg(cmd, "-drive");
+    virCommandAddArgBuffer(cmd, &buf);
+
+    if (loader->nvram) {
+        virBufferAddLit(&buf, "file=");
+        virQEMUBuildBufferEscapeComma(&buf, loader->nvram->path);
+        virBufferAsprintf(&buf, ",if=pflash,format=raw,unit=%d", unit);
+
+        virCommandAddArg(cmd, "-drive");
+        virCommandAddArgBuffer(cmd, &buf);
+    }
+}
+
 
 static void
 qemuBuildDomainLoaderCommandLine(virCommand *cmd,
-                                 virDomainDef *def)
+                                 virDomainDef *def,
+                                 virQEMUCaps *qemuCaps)
 {
     virDomainLoaderDef *loader = def->os.loader;
 
@@ -9536,12 +9597,7 @@ qemuBuildDomainLoaderCommandLine(virCommand *cmd,
         break;
 
     case VIR_DOMAIN_LOADER_TYPE_PFLASH:
-        if (loader->secure == VIR_TRISTATE_BOOL_YES) {
-            virCommandAddArgList(cmd,
-                                 "-global",
-                                 "driver=cfi.pflash01,property=secure,value=on",
-                                 NULL);
-        }
+        qemuBuildDomainLoaderPflashCommandLine(cmd, loader, qemuCaps);
         break;
 
     case VIR_DOMAIN_LOADER_TYPE_NONE:
@@ -10016,6 +10072,9 @@ qemuBuildPflashBlockdevCommandLine(virCommand *cmd,
     qemuDomainObjPrivate *priv = vm->privateData;
 
     if (!virDomainDefHasOldStyleUEFI(vm->def))
+        return 0;
+
+    if (virQEMUCapsHasStratovirt(priv->qemuCaps))
         return 0;
 
     if (priv->pflash0 &&
@@ -10532,7 +10591,7 @@ qemuBuildCommandLine(virDomainObj *vm,
     if (qemuBuildCpuCommandLine(cmd, driver, def, qemuCaps) < 0)
         return NULL;
 
-    qemuBuildDomainLoaderCommandLine(cmd, def);
+    qemuBuildDomainLoaderCommandLine(cmd, def, qemuCaps);
 
     if (qemuBuildMemCommandLine(cmd, def, qemuCaps, priv) < 0)
         return NULL;
@@ -10639,7 +10698,9 @@ qemuBuildCommandLine(virDomainObj *vm,
     if (qemuBuildInputCommandLine(cmd, def, qemuCaps) < 0)
         return NULL;
 
-    if (qemuBuildAudioCommandLine(cmd, def) < 0)
+    /* audio device is not supported by stratovirt. */
+    if (!virQEMUCapsHasStratovirt(qemuCaps) &&
+        qemuBuildAudioCommandLine(cmd, def) < 0)
         return NULL;
 
     if (qemuBuildGraphicsCommandLine(cfg, cmd, def, qemuCaps) < 0)

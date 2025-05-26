@@ -2120,6 +2120,12 @@ const char *virQEMUCapsGetPackage(virQEMUCaps *qemuCaps)
 }
 
 
+bool virQEMUCapsHasStratovirt(virQEMUCaps *qemuCaps)
+{
+    return !!strstr(qemuCaps->package, "StratoVirt");
+}
+
+
 bool virQEMUCapsGetKVMSupportsSecureGuest(virQEMUCaps *qemuCaps)
 {
     return qemuCaps->kvmSupportsSecureGuest;
