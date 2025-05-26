@@ -7076,7 +7076,8 @@ qemuBuildMachineCommandLine(virCommand *cmd,
         }
     }
 
-    if (virDomainDefHasOldStyleUEFI(def)) {
+    if (!virQEMUCapsHasStratovirt(qemuCaps) &&
+        virDomainDefHasOldStyleUEFI(def)) {
         if (priv->pflash0)
             virBufferAsprintf(&buf, ",pflash0=%s",
                               qemuBlockStorageSourceGetEffectiveNodename(priv->pflash0));
@@ -9536,10 +9537,53 @@ qemuBuildRedirdevCommandLine(virCommand *cmd,
 }
 
 
+static void
+qemuBuildDomainLoaderPflashCommandLine(virCommand *cmd,
+                                      virDomainLoaderDef *loader,
+                                      virQEMUCaps *qemuCaps)
+{
+    g_auto(virBuffer) buf = VIR_BUFFER_INITIALIZER;
+    int unit = 0;
+
+    if (loader->secure == VIR_TRISTATE_BOOL_YES) {
+        virCommandAddArgList(cmd,
+                             "-global",
+                             "driver=cfi.pflash01,property=secure,value=on",
+                             NULL);
+    }
+
+    /* with blockdev we instantiate the pflash when formatting -machine */
+    if (!virQEMUCapsHasStratovirt(qemuCaps))
+        return;
+
+    virBufferAddLit(&buf, "file=");
+    virQEMUBuildBufferEscapeComma(&buf, loader->path);
+    virBufferAsprintf(&buf, ",if=pflash,format=raw,unit=%d", unit);
+    unit++;
+
+    if (loader->readonly) {
+        virBufferAsprintf(&buf, ",readonly=%s",
+                          virTristateSwitchTypeToString(loader->readonly));
+    }
+
+    virCommandAddArg(cmd, "-drive");
+    virCommandAddArgBuffer(cmd, &buf);
+
+    if (loader->nvram) {
+        virBufferAddLit(&buf, "file=");
+        virQEMUBuildBufferEscapeComma(&buf, loader->nvram->path);
+        virBufferAsprintf(&buf, ",if=pflash,format=raw,unit=%d", unit);
+
+        virCommandAddArg(cmd, "-drive");
+        virCommandAddArgBuffer(cmd, &buf);
+    }
+}
+
 
 static void
 qemuBuildDomainLoaderCommandLine(virCommand *cmd,
-                                 virDomainDef *def)
+                                 virDomainDef *def,
+                                 virQEMUCaps *qemuCaps)
 {
     virDomainLoaderDef *loader = def->os.loader;
 
@@ -9553,12 +9597,7 @@ qemuBuildDomainLoaderCommandLine(virCommand *cmd,
         break;
 
     case VIR_DOMAIN_LOADER_TYPE_PFLASH:
-        if (loader->secure == VIR_TRISTATE_BOOL_YES) {
-            virCommandAddArgList(cmd,
-                                 "-global",
-                                 "driver=cfi.pflash01,property=secure,value=on",
-                                 NULL);
-        }
+        qemuBuildDomainLoaderPflashCommandLine(cmd, loader, qemuCaps);
         break;
 
     case VIR_DOMAIN_LOADER_TYPE_NONE:
@@ -10033,6 +10072,9 @@ qemuBuildPflashBlockdevCommandLine(virCommand *cmd,
     qemuDomainObjPrivate *priv = vm->privateData;
 
     if (!virDomainDefHasOldStyleUEFI(vm->def))
+        return 0;
+
+    if (virQEMUCapsHasStratovirt(priv->qemuCaps))
         return 0;
 
     if (priv->pflash0 &&
@@ -10549,7 +10591,7 @@ qemuBuildCommandLine(virDomainObj *vm,
     if (qemuBuildCpuCommandLine(cmd, driver, def, qemuCaps) < 0)
         return NULL;
 
-    qemuBuildDomainLoaderCommandLine(cmd, def);
+    qemuBuildDomainLoaderCommandLine(cmd, def, qemuCaps);
 
     if (qemuBuildMemCommandLine(cmd, def, qemuCaps, priv) < 0)
         return NULL;
