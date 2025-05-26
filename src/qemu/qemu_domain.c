@@ -7918,6 +7918,7 @@ qemuDomainDiskGetTopNodename(virDomainDiskDef *disk)
  * qemuDomainDiskGetBackendAlias:
  * @disk: disk definition
  * @backendAlias: filled with the alias of the disk storage backend
+ * @hasStratovirt: binary has "StratoVirt" or not
  *
  * Returns the correct alias for the disk backend. This may be the alias of
  * -drive for legacy setup or the correct node name for -blockdev setups.
@@ -7929,11 +7930,12 @@ qemuDomainDiskGetTopNodename(virDomainDiskDef *disk)
  */
 int
 qemuDomainDiskGetBackendAlias(virDomainDiskDef *disk,
-                              char **backendAlias)
+                              char **backendAlias,
+                              bool hasStratovirt)
 {
     *backendAlias = NULL;
 
-    if (qemuDiskBusIsSD(disk->bus)) {
+    if (hasStratovirt || qemuDiskBusIsSD(disk->bus)) {
         if (!(*backendAlias = qemuAliasDiskDriveFromDisk(disk)))
             return -1;
 
