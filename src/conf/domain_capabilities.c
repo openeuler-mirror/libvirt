@@ -88,6 +88,16 @@ virSGXCapabilitiesFree(virSGXCapability *cap)
 }
 
 
+void
+virVIRTCCACapabilitiesFree(virVIRTCCACapability *cap)
+{
+    if (!cap)
+        return;
+
+    g_free(cap);
+}
+
+
 static void
 virDomainCapsDispose(void *obj)
 {
@@ -101,6 +111,7 @@ virDomainCapsDispose(void *obj)
     virCPUDefFree(caps->cpu.hostModel);
     virSEVCapabilitiesFree(caps->sev);
     virSGXCapabilitiesFree(caps->sgx);
+    virVIRTCCACapabilitiesFree(caps->virtcca);
     g_free(caps->hyperv);
 
     values = &caps->os.loader.values;
@@ -707,6 +718,29 @@ virDomainCapsFeatureHypervFormat(virBuffer *buf,
     FORMAT_EPILOGUE(hyperv);
 }
 
+/**
+ * virDomainCapsFeatureVIRTCCAFormat:
+ * @buf: target buffer
+ * @virtcca: VIRTCCA features
+ *
+ * Format VIRTCCA features for inclusion in the domcapabilities XML.
+ *
+ * The resulting XML will look like
+ *
+ *   <virtcca supported='yes'/>
+ */
+static void
+virDomainCapsFeatureVIRTCCAFormat(virBuffer *buf,
+                              const virVIRTCCACapability *virtcca)
+{
+    if (!virtcca) {
+        virBufferAddLit(buf, "<virtcca supported='no'/>\n");
+        return;
+    }
+
+    virBufferAddLit(buf, "<virtcca supported='yes'/>\n");
+}
+
 static void
 virDomainCapsFormatFeatures(const virDomainCaps *caps,
                             virBuffer *buf)
@@ -728,6 +762,7 @@ virDomainCapsFormatFeatures(const virDomainCaps *caps,
     virDomainCapsFeatureSEVFormat(&childBuf, caps->sev);
     virDomainCapsFeatureSGXFormat(&childBuf, caps->sgx);
     virDomainCapsFeatureHypervFormat(&childBuf, caps->hyperv);
+    virDomainCapsFeatureVIRTCCAFormat(&childBuf, caps->virtcca);
 
     virXMLFormatElement(buf, "features", NULL, &childBuf);
 }

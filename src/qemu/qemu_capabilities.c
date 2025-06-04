@@ -699,6 +699,7 @@ VIR_ENUM_IMPL(virQEMUCaps,
               "run-with.async-teardown", /* QEMU_CAPS_RUN_WITH_ASYNC_TEARDOWN */
               "virtio-blk-vhost-vdpa", /* QEMU_CAPS_DEVICE_VIRTIO_BLK_VHOST_VDPA */
               "smp-clusters", /* QEMU_CAPS_SMP_CLUSTERS */
+              "tmm-guest", /* QEMU_CAPS_VIRTCCA */
     );
 
 
@@ -783,6 +784,8 @@ struct _virQEMUCaps {
     virSEVCapability *sevCapabilities;
 
     virSGXCapability *sgxCapabilities;
+
+    virVIRTCCACapability *virtccaCapabilities;
 
     virDomainCapsFeatureHyperv *hypervCapabilities;
 
@@ -1387,6 +1390,7 @@ struct virQEMUCapsStringFlags virQEMUCapsObjectTypes[] = {
     { "virtio-crypto-device", QEMU_CAPS_DEVICE_VIRTIO_CRYPTO },
     { "cryptodev-backend-lkcf", QEMU_CAPS_OBJECT_CRYPTO_LKCF },
     { "pvpanic-pci", QEMU_CAPS_DEVICE_PANIC_PCI },
+    { "tmm-guest", QEMU_CAPS_VIRTCCA },
 };
 
 
@@ -1911,6 +1915,25 @@ virQEMUCapsSGXInfoCopy(virSGXCapability **dst,
 
 
 static void
+virQEMUCapsVIRTCCAInfoCopy(virVIRTCCACapability **dst,
+                       virVIRTCCACapability *src)
+{
+    g_autoptr(virVIRTCCACapability) tmp = NULL;
+
+    if (!src) {
+        *dst = NULL;
+        return;
+    }
+
+    tmp = g_new0(virVIRTCCACapability, 1);
+
+    tmp->enabled = src->enabled;
+
+    *dst = g_steal_pointer(&tmp);
+}
+
+
+static void
 virQEMUCapsAccelCopyMachineTypes(virQEMUCapsAccel *dst,
                                  virQEMUCapsAccel *src)
 {
@@ -1985,6 +2008,9 @@ virQEMUCaps *virQEMUCapsNewCopy(virQEMUCaps *qemuCaps)
     if (virQEMUCapsGet(qemuCaps, QEMU_CAPS_SGX_EPC))
         virQEMUCapsSGXInfoCopy(&ret->sgxCapabilities, qemuCaps->sgxCapabilities);
 
+    if (virQEMUCapsGet(qemuCaps, QEMU_CAPS_VIRTCCA))
+        virQEMUCapsVIRTCCAInfoCopy(&ret->virtccaCapabilities, qemuCaps->virtccaCapabilities);
+
     ret->hypervCapabilities = g_memdup(qemuCaps->hypervCapabilities,
                                        sizeof(virDomainCapsFeatureHyperv));
 
@@ -2027,6 +2053,7 @@ void virQEMUCapsDispose(void *obj)
 
     virSEVCapabilitiesFree(qemuCaps->sevCapabilities);
     virSGXCapabilitiesFree(qemuCaps->sgxCapabilities);
+    virVIRTCCACapabilitiesFree(qemuCaps->virtccaCapabilities);
 
     g_free(qemuCaps->hypervCapabilities);
 
@@ -3485,6 +3512,31 @@ virQEMUCapsProbeQMPSGXCapabilities(virQEMUCaps *qemuCaps,
 }
 
 
+static int
+virQEMUCapsProbeQMPVIRTCCACapabilities(virQEMUCaps *qemuCaps,
+                                   qemuMonitor *mon)
+{
+    int rc = -1;
+    virVIRTCCACapability *caps = NULL;
+
+    if (!virQEMUCapsGet(qemuCaps, QEMU_CAPS_VIRTCCA))
+        return 0;
+
+    if ((rc = qemuMonitorGetVIRTCCACapabilities(mon, &caps)) < 0)
+        return -1;
+
+    /* VIRTCCA isn't actually supported */
+    if (rc == 0) {
+        virQEMUCapsClear(qemuCaps, QEMU_CAPS_VIRTCCA);
+        return 0;
+    }
+
+    virVIRTCCACapabilitiesFree(qemuCaps->virtccaCapabilities);
+    qemuCaps->virtccaCapabilities = caps;
+    return 0;
+}
+
+
 /*
  * Filter for features which should never be passed to QEMU. Either because
  * QEMU never supported them or they were dropped as they never did anything
@@ -4357,6 +4409,28 @@ virQEMUCapsParseSGXInfo(virQEMUCaps *qemuCaps,
 
 
 static int
+virQEMUCapsParseVIRTCCAInfo(virQEMUCaps *qemuCaps,
+                        xmlXPathContextPtr ctxt)
+{
+    g_autoptr(virVIRTCCACapability) virtcca = NULL;
+
+    if (!virQEMUCapsGet(qemuCaps, QEMU_CAPS_VIRTCCA))
+        return 0;
+
+    if (virXPathBoolean("boolean(./virtcca)", ctxt) == 0) {
+        virReportError(VIR_ERR_XML_ERROR, "%s",
+                       _("missing virtcca platform data in QEMU capabilities cache"));
+        return -1;
+    }
+
+    virtcca = g_new0(virVIRTCCACapability, 1);
+
+    qemuCaps->virtccaCapabilities = g_steal_pointer(&virtcca);
+    return 0;
+}
+
+
+static int
 virQEMUCapsParseHypervCapabilities(virQEMUCaps *qemuCaps,
                                    xmlXPathContextPtr ctxt)
 {
@@ -4682,6 +4756,9 @@ virQEMUCapsLoadCache(virArch hostArch,
     if (virQEMUCapsParseSGXInfo(qemuCaps, ctxt) < 0)
         return -1;
 
+    if (virQEMUCapsParseVIRTCCAInfo(qemuCaps, ctxt) < 0)
+        return -1;
+
     if (virQEMUCapsParseHypervCapabilities(qemuCaps, ctxt) < 0)
         return -1;
 
@@ -4911,6 +4988,14 @@ virQEMUCapsFormatSGXInfo(virQEMUCaps *qemuCaps,
 
 
 static void
+virQEMUCapsFormatVIRTCCAInfo(virBuffer *buf)
+{
+    virBufferAddLit(buf, "<virtcca>\n");
+    virBufferAddLit(buf, "</virtcca>\n");
+}
+
+
+static void
 virQEMUCapsFormatHypervCapabilities(virQEMUCaps *qemuCaps,
                                     virBuffer *buf)
 {
@@ -5017,6 +5102,9 @@ virQEMUCapsFormatCache(virQEMUCaps *qemuCaps)
 
     if (qemuCaps->sgxCapabilities)
         virQEMUCapsFormatSGXInfo(qemuCaps, &buf);
+
+    if (qemuCaps->virtccaCapabilities)
+        virQEMUCapsFormatVIRTCCAInfo(&buf);
 
     if (qemuCaps->hypervCapabilities)
         virQEMUCapsFormatHypervCapabilities(qemuCaps, &buf);
@@ -5571,6 +5659,8 @@ virQEMUCapsInitQMPMonitor(virQEMUCaps *qemuCaps,
     if (virQEMUCapsProbeQMPSEVCapabilities(qemuCaps, mon) < 0)
         return -1;
     if (virQEMUCapsProbeQMPSGXCapabilities(qemuCaps, mon) < 0)
+        return -1;
+    if (virQEMUCapsProbeQMPVIRTCCACapabilities(qemuCaps, mon) < 0)
         return -1;
 
     virQEMUCapsInitProcessCaps(qemuCaps);
@@ -6607,6 +6697,23 @@ virQEMUCapsFillDomainFeatureSEVCaps(virQEMUCaps *qemuCaps,
 }
 
 
+/**
+ * virQEMUCapsFillDomainFeatureVIRTCCACaps:
+ * @qemuCaps: QEMU capabilities
+ * @domCaps: domain capabilities
+ *
+ * Take the information about VIRTCCA capabilities that has been obtained
+ * using the 'query-virtcca-capabilities' QMP command and stored in @qemuCaps
+ * and convert it to a form suitable for @domCaps.
+ */
+static void
+virQEMUCapsFillDomainFeatureVIRTCCACaps(virQEMUCaps *qemuCaps,
+                                    virDomainCaps *domCaps)
+{
+    virQEMUCapsVIRTCCAInfoCopy(&domCaps->virtcca, qemuCaps->virtccaCapabilities);
+}
+
+
 static void
 virQEMUCapsFillDomainFeatureS390PVCaps(virQEMUCaps *qemuCaps,
                                        virDomainCaps *domCaps)
@@ -6706,6 +6813,7 @@ virQEMUCapsFillDomainCaps(virQEMUCaps *qemuCaps,
     virQEMUCapsFillDomainFeatureSGXCaps(qemuCaps, domCaps);
     virQEMUCapsFillDomainFeatureHypervCaps(qemuCaps, domCaps);
     virQEMUCapsFillDomainDeviceCryptoCaps(qemuCaps, crypto);
+    virQEMUCapsFillDomainFeatureVIRTCCACaps(qemuCaps, domCaps);
 
     return 0;
 }
