@@ -119,5 +119,6 @@
     <!-- Phytium-based CPU models -->
     <include filename='arm_FT-2000plus.xml'/>
     <include filename='arm_Tengyun-S2500.xml'/>
+	<include filename='arm_Tengyun-S5000C.xml'/>
   </arch>
 </cpus>
