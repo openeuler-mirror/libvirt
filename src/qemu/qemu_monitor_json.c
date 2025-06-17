@@ -6139,6 +6139,51 @@ qemuMonitorJSONGetSGXCapabilities(qemuMonitor *mon,
 }
 
 
+/**
+ * qemuMonitorJSONGetVIRTCCACapabilities:
+ * @mon: qemu monitor object
+ * @capabilities: pointer to pointer to a VIRTCCA capability structure to be filled
+ *
+ * Returns: -1 on error,
+ *          0 if VIRTCCA is not supported, and
+ *          1 if VIRTCCA is supported on the platform.
+ */
+int
+qemuMonitorJSONGetVIRTCCACapabilities(qemuMonitor *mon,
+                                  virVIRTCCACapability **capabilities)
+{
+    g_autoptr(virJSONValue) cmd = NULL;
+    g_autoptr(virJSONValue) reply = NULL;
+    g_autoptr(virVIRTCCACapability) capability = NULL;
+    virJSONValue *caps;
+
+    *capabilities = NULL;
+    capability = g_new0(virVIRTCCACapability, 1);
+
+    if (!(cmd = qemuMonitorJSONMakeCommand("query-virtcca-capabilities", NULL)))
+        return -1;
+
+    if (qemuMonitorJSONCommand(mon, cmd, &reply) < 0)
+        return -1;
+
+    /* QEMU not support VIRTCCA */
+    if (qemuMonitorJSONCheckError(cmd, reply) < 0)
+        return 0;
+
+    caps = virJSONValueObjectGetObject(reply, "return");
+
+    if (virJSONValueObjectGetBoolean(caps, "enabled", &capability->enabled) < 0) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                       _("query-virtcca-capabilities reply was missing 'enabled' field"));
+        return -1;
+    }
+
+    *capabilities = g_steal_pointer(&capability);
+
+    return 1;
+}
+
+
 static virJSONValue *
 qemuMonitorJSONBuildInetSocketAddress(const char *host,
                                       const char *port)

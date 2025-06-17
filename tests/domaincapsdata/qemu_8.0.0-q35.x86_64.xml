@@ -281,5 +281,6 @@
         <value>avic</value>
       </enum>
     </hyperv>
+    <virtcca supported='no'/>
   </features>
 </domainCapabilities>

@@ -317,6 +317,9 @@
       <optional>
         <ref name="hyperv"/>
       </optional>
+      <optional>
+        <ref name="virtcca"/>
+      </optional>
     </element>
   </define>
 
@@ -427,6 +430,12 @@
     <element name="hyperv">
       <ref name="supported"/>
       <ref name="enum"/>
+    </element>
+  </define>
+
+  <define name="virtcca">
+    <element name="virtcca">
+      <ref name="supported"/>
     </element>
   </define>
 

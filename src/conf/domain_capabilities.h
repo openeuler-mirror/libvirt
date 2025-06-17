@@ -231,6 +231,11 @@ struct _virSGXCapability {
     virSGXSection *sgxSections;
 };
 
+typedef struct _virVIRTCCACapability virVIRTCCACapability;
+struct _virVIRTCCACapability {
+    bool enabled;
+};
+
 STATIC_ASSERT_ENUM(VIR_DOMAIN_CRYPTO_MODEL_LAST);
 STATIC_ASSERT_ENUM(VIR_DOMAIN_CRYPTO_TYPE_LAST);
 STATIC_ASSERT_ENUM(VIR_DOMAIN_CRYPTO_BACKEND_LAST);
@@ -284,6 +289,7 @@ struct _virDomainCaps {
     virSEVCapability *sev;
     virSGXCapability *sgx;
     virDomainCapsFeatureHyperv *hyperv;
+    virVIRTCCACapability *virtcca;
     /* add new domain features here */
 
     virTristateBool features[VIR_DOMAIN_CAPS_FEATURE_LAST];
@@ -339,3 +345,8 @@ void
 virSGXCapabilitiesFree(virSGXCapability *capabilities);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(virSGXCapability, virSGXCapabilitiesFree);
+
+void
+virVIRTCCACapabilitiesFree(virVIRTCCACapability *capabilities);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(virVIRTCCACapability, virVIRTCCACapabilitiesFree);
