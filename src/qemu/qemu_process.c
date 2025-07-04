@@ -2636,9 +2636,11 @@ qemuProcessSetupPid(virDomainObj *vm,
                 virDomainCgroupSetupCpusetCpus(cgroup, use_cpumask) < 0)
                 goto cleanup;
 
-            if (mem_mask && virCgroupSetCpusetMems(cgroup, mem_mask) < 0)
-                goto cleanup;
-
+            if (!vm->def->sec ||
+                vm->def->sec->sectype != VIR_DOMAIN_LAUNCH_SECURITY_CVM) {
+                if (mem_mask && virCgroupSetCpusetMems(cgroup, mem_mask) < 0)
+                    goto cleanup;
+            }
         }
 
         if (virDomainCgroupSetupVcpuBW(cgroup, period, quota) < 0)
