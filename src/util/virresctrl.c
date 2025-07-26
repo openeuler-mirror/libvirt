@@ -309,6 +309,10 @@ struct _virResctrlAllocPerType {
     /* Mask for each cache */
     virBitmap **masks;
     size_t nmasks;
+
+    /* cache id map for each cache */
+    unsigned int **cache_ids;
+    size_t ncache_ids;
 };
 
 struct _virResctrlAllocPerLevel {
@@ -394,8 +398,12 @@ virResctrlAllocDispose(void *obj)
             for (k = 0; k < type->nmasks; k++)
                 virBitmapFree(type->masks[k]);
 
+            for (k = 0; k < type->ncache_ids; k++)
+                g_free(type->cache_ids[k]);
+
             g_free(type->sizes);
             g_free(type->masks);
+            g_free(type->cache_ids);
             g_free(type);
         }
         g_free(level->types);
@@ -1521,7 +1529,7 @@ virResctrlAllocFormatCache(virResctrlAlloc *alloc,
                 if (!mask_str)
                     return -1;
 
-                virBufferAsprintf(buf, "%u=%s;", cache, mask_str);
+                virBufferAsprintf(buf, "%u=%s;", *a_type->cache_ids[cache], mask_str);
                 VIR_FREE(mask_str);
             }
 
@@ -1553,11 +1561,56 @@ virResctrlAllocFormat(virResctrlAlloc *alloc)
 
 
 static int
+virResctrlAllocParseProcessCacheId(virResctrlInfo *resctrl,
+                                   virResctrlAlloc *alloc,
+                                   unsigned int level,
+                                   virCacheType type,
+                                   char *cache,
+                                   unsigned int node_id)
+{
+    unsigned int cache_id = 0;
+    virResctrlAllocPerType *a_type = NULL;
+
+    if (virStrToLong_uip(cache, NULL, 10, &cache_id) < 0) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Invalid cache id '%1$s'"), cache);
+        return -1;
+    }
+
+    if (!resctrl ||
+        level >= resctrl->nlevels ||
+        !resctrl->levels[level]) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Missing or inconsistent resctrl info for level '%1$u'"),
+                       level);
+        return -1;
+    }
+
+    a_type = virResctrlAllocGetType(alloc, level, type);
+    if (!a_type)
+        return -1;
+
+    if (a_type->ncache_ids <= node_id) {
+        VIR_EXPAND_N(a_type->cache_ids, a_type->ncache_ids,
+                     node_id - a_type->ncache_ids + 1);
+    }
+
+    if (!a_type->cache_ids[node_id])
+        a_type->cache_ids[node_id] = g_new0(unsigned int, 1);
+
+    *(a_type->cache_ids[node_id]) = cache_id;
+
+    return 0;
+}
+
+
+static int
 virResctrlAllocParseProcessCache(virResctrlInfo *resctrl,
                                  virResctrlAlloc *alloc,
                                  unsigned int level,
                                  virCacheType type,
-                                 char *cache)
+                                 char *cache,
+                                 unsigned int node_id)
 {
     char *tmp = strchr(cache, '=');
     unsigned int cache_id = 0;
@@ -1568,6 +1621,10 @@ virResctrlAllocParseProcessCache(virResctrlInfo *resctrl,
 
     *tmp = '\0';
     tmp++;
+
+    if (virResctrlAllocParseProcessCacheId(resctrl, alloc, level, type, cache, node_id) < 0) {
+        return -1;
+    }
 
     if (virStrToLong_uip(cache, NULL, 10, &cache_id) < 0) {
         virReportError(VIR_ERR_INTERNAL_ERROR,
@@ -1591,7 +1648,7 @@ virResctrlAllocParseProcessCache(virResctrlInfo *resctrl,
 
     virBitmapShrink(mask, resctrl->levels[level]->types[type]->bits);
 
-    if (virResctrlAllocUpdateMask(alloc, level, type, cache_id, mask) < 0)
+    if (virResctrlAllocUpdateMask(alloc, level, type, node_id, mask) < 0)
         return -1;
 
     return 0;
@@ -1607,6 +1664,7 @@ virResctrlAllocParseCacheLine(virResctrlInfo *resctrl,
     GStrv next;
     char *tmp = NULL;
     unsigned int level = 0;
+    unsigned int node_id = 0;
     int type = -1;
 
     /* For no reason there can be spaces */
@@ -1643,8 +1701,8 @@ virResctrlAllocParseCacheLine(virResctrlInfo *resctrl,
     if (!caches)
         return 0;
 
-    for (next = caches; *next; next++) {
-        if (virResctrlAllocParseProcessCache(resctrl, alloc, level, type, *next) < 0)
+    for (next = caches; *next; next++, node_id++) {
+        if (virResctrlAllocParseProcessCache(resctrl, alloc, level, type, *next, node_id) < 0)
             return -1;
     }
 
@@ -2071,7 +2129,7 @@ virResctrlAllocCopyMemBW(virResctrlAlloc *dst,
 
 
 static int
-virResctrlAllocCopyMasks(virResctrlAlloc *dst,
+virResctrlAllocCopyCache(virResctrlAlloc *dst,
                          virResctrlAlloc *src)
 {
     unsigned int level = 0;
@@ -2100,6 +2158,17 @@ virResctrlAllocCopyMasks(virResctrlAlloc *dst,
 
                 if (mask && virResctrlAllocUpdateMask(dst, level, type, cache, mask) < 0)
                     return -1;
+            }
+
+            if (s_type->ncache_ids > d_type->ncache_ids)
+                VIR_EXPAND_N(d_type->cache_ids, d_type->ncache_ids,
+                             s_type->ncache_ids - d_type->ncache_ids);
+
+            for (cache = 0; cache < s_type->ncache_ids; cache++) {
+                if (d_type->cache_ids[cache])
+                    continue;
+                d_type->cache_ids[cache] = g_new0(unsigned int, 1);
+                *d_type->cache_ids[cache] = *s_type->cache_ids[cache];
             }
         }
     }
@@ -2133,7 +2202,7 @@ virResctrlAllocAssign(virResctrlInfo *resctrl,
     if (virResctrlAllocMemoryBandwidth(resctrl, alloc) < 0)
         return -1;
 
-    if (virResctrlAllocCopyMasks(alloc, alloc_default) < 0)
+    if (virResctrlAllocCopyCache(alloc, alloc_default) < 0)
         return -1;
 
     if (virResctrlAllocCopyMemBW(alloc, alloc_default) < 0)
