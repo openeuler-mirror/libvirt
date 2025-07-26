@@ -27,6 +27,7 @@ typedef enum {
     VIR_CACHE_TYPE_BOTH,
     VIR_CACHE_TYPE_CODE,
     VIR_CACHE_TYPE_DATA,
+    VIR_CACHE_TYPE_PRIORITY,
 
     VIR_CACHE_TYPE_LAST
 } virCacheType;
