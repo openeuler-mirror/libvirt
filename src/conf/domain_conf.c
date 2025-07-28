@@ -17680,10 +17680,15 @@ virDomainCachetuneDefParseCache(xmlXPathContextPtr ctxt,
                        VIR_XML_PROP_REQUIRED, &type) < 0)
         return -1;
 
-    if (virParseScaledValue("./@size", "./@unit",
-                            ctxt, &size, 1024,
-                            ULLONG_MAX, true) < 0)
+    if (type == VIR_CACHE_TYPE_PRIORITY) {
+        if (virXMLPropULongLong(node, "size", 10, VIR_XML_PROP_REQUIRED, &size) < 0)
+            return -1;
+    } else {
+        if (virParseScaledValue("./@size", "./@unit",
+            ctxt, &size, 1024,
+            ULLONG_MAX, true) < 0)
         return -1;
+    }
 
     if (virResctrlAllocSetCacheSize(alloc, level, type, cache, size) < 0)
         return -1;
@@ -26749,11 +26754,19 @@ virDomainCachetuneDefFormatHelper(unsigned int level,
     virBuffer *buf = opaque;
     unsigned long long short_size = virFormatIntPretty(size, &unit);
 
-    virBufferAsprintf(buf,
-                      "<cache id='%u' level='%u' type='%s' "
-                      "size='%llu' unit='%s'/>\n",
-                      cache, level, virCacheTypeToString(type),
-                      short_size, unit);
+    if (type == VIR_CACHE_TYPE_PRIORITY) {
+        virBufferAsprintf(buf,
+                          "<cache id='%u' level='%u' type='%s' "
+                          "size='%llu'/>\n",
+                          cache, level, virCacheTypeToString(type),
+                          size);
+    } else {
+        virBufferAsprintf(buf,
+                        "<cache id='%u' level='%u' type='%s' "
+                        "size='%llu' unit='%s'/>\n",
+                        cache, level, virCacheTypeToString(type),
+                        short_size, unit);
+    }
 
     return 0;
 }

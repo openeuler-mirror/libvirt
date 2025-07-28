@@ -1184,6 +1184,15 @@ virResctrlAllocCheckCollision(virResctrlAlloc *alloc,
     if (!a_level)
         return false;
 
+    if (type == VIR_CACHE_TYPE_PRIORITY) {
+        a_type = a_level->types[VIR_CACHE_TYPE_PRIORITY];
+
+        if (a_type && a_type->nsizes > cache && a_type->sizes[cache])
+            return true;
+
+        return false;
+    }
+
     a_type = a_level->types[VIR_CACHE_TYPE_BOTH];
 
     /* If there is an allocation for type 'both', there can be no other
@@ -2330,14 +2339,28 @@ virResctrlAllocAssign(virResctrlInfo *resctrl,
                     if (!a_type->sizes[cache])
                         continue;
 
-                    if (!a_type->priorities[cache]) {
+                    if (a_type->npriorities == 0) {
                         virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
                             _("Cache level %1$d does not support tuning for scope type '%2$s'"),
                             level, virCacheTypeToString(type));
                         return -1;
                     }
 
-                    *a_type->priorities[cache] = *a_type->sizes[cache];
+                    if (a_type->npriorities <= cache || !a_type->priorities[cache]) {
+                        virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                            _("Cache id %1$d does not exist for level %2$d"),
+                            cache, level);
+                        return -1;
+                    }
+
+                    if (*(a_type->sizes[cache]) > 3) {
+                        virReportError(VIR_ERR_XML_ERROR,
+                                       _("Cache level %1$d id %2$d priority value just support 0-3"),
+                                       level, cache);
+                        return -1;
+                    }
+
+                    *(a_type->priorities[cache]) = *(a_type->sizes[cache]);
                 }
                 continue;
             }
