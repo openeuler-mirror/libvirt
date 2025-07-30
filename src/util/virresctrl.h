@@ -32,8 +32,18 @@ typedef enum {
     VIR_CACHE_TYPE_LAST
 } virCacheType;
 
+typedef enum {
+    VIR_MEMORY_TYPE_BANDWIDTH,
+    VIR_MEMORY_TYPE_HARDLIMIT,
+    VIR_MEMORY_TYPE_PRIORITY,
+    VIR_MEMORY_TYPE_MIN_BANDWIDTH,
+
+    VIR_MEMORY_TYPE_LAST
+} virMemoryType;
+
 VIR_ENUM_DECL(virCache);
 VIR_ENUM_DECL(virCacheKernel);
+VIR_ENUM_DECL(virMemory);
 
 typedef enum {
     VIR_RESCTRL_MONITOR_TYPE_UNSUPPORT,
@@ -142,8 +152,9 @@ virResctrlAllocForeachCache(virResctrlAlloc *alloc,
 
 int
 virResctrlAllocSetMemoryBandwidth(virResctrlAlloc *alloc,
+                                  virMemoryType type,
                                   unsigned int id,
-                                  unsigned int memory_bandwidth);
+                                  unsigned int value);
 
 int
 virResctrlAllocForeachMemory(virResctrlAlloc *alloc,

@@ -18247,7 +18247,7 @@ virDomainMemorytuneDefParseMemory(xmlXPathContextPtr ctxt,
                        &bandwidth) < 0)
         return -1;
 
-    if (virResctrlAllocSetMemoryBandwidth(alloc, id, bandwidth) < 0)
+    if (virResctrlAllocSetMemoryBandwidth(alloc, VIR_MEMORY_TYPE_BANDWIDTH, id, bandwidth) < 0)
         return -1;
 
     return 0;
