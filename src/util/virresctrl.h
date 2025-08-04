@@ -129,7 +129,8 @@ typedef int virResctrlAllocForeachCacheCallback(unsigned int level,
                                                 void *opaque);
 
 typedef int virResctrlAllocForeachMemoryCallback(unsigned int id,
-                                                 unsigned int size,
+                                                 unsigned int *types,
+                                                 unsigned int *values,
                                                  void *opaque);
 
 virResctrlAlloc *

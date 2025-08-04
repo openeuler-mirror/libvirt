@@ -1185,6 +1185,11 @@
                   <attribute name="bandwidth">
                     <ref name="unsignedInt"/>
                   </attribute>
+                  <optional>
+                    <attribute name="hardlimit">
+                      <ref name="unsignedInt"/>
+                    </attribute>
+                  </optional>
                 </element>
                 <element name="monitor">
                   <attribute name="vcpus">
