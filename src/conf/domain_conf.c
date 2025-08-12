@@ -18238,6 +18238,7 @@ virDomainMemorytuneDefParseMemory(xmlXPathContextPtr ctxt,
     unsigned int id;
     unsigned int bandwidth;
     unsigned int hard_limit = UINT_MAX;
+    unsigned int priority = UINT_MAX;
 
     ctxt->node = node;
 
@@ -18256,6 +18257,13 @@ virDomainMemorytuneDefParseMemory(xmlXPathContextPtr ctxt,
 
     if (hard_limit != UINT_MAX &&
         virResctrlAllocSetMemoryBandwidth(alloc, VIR_MEMORY_TYPE_HARDLIMIT, id, hard_limit) < 0)
+        return -1;
+
+    if (virXMLPropUIntDefault(node, "priority", 10, 0, &priority, UINT_MAX) < 0)
+        return -1;
+
+    if (priority != UINT_MAX &&
+        virResctrlAllocSetMemoryBandwidth(alloc, VIR_MEMORY_TYPE_PRIORITY, id, priority) < 0)
         return -1;
 
     return 0;

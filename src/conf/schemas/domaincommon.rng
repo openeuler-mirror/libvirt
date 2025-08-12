@@ -1190,6 +1190,11 @@
                       <ref name="unsignedInt"/>
                     </attribute>
                   </optional>
+                  <optional>
+                    <attribute name="priority">
+                      <ref name="unsignedInt"/>
+                    </attribute>
+                  </optional>
                 </element>
                 <element name="monitor">
                   <attribute name="vcpus">

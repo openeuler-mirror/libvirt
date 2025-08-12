@@ -1400,20 +1400,34 @@ virResctrlAllocSetMemoryBandwidth(virResctrlAlloc *alloc,
     virResctrlAllocMemBW *mem_bw = alloc->mem_bw;
     virResctrlAllocMemPerType *a_type = NULL;
 
-    if (type == VIR_MEMORY_TYPE_HARDLIMIT) {
-        if (value > 1) {
-            virReportError(VIR_ERR_XML_ERROR, "%s",
-                        _("Memory Bandwidth hard limit value just support 0 or 1."));
+    switch (type) {
+        case VIR_MEMORY_TYPE_BANDWIDTH:
+            if (value > 100) {
+                virReportError(VIR_ERR_XML_ERROR, "%s",
+                               _("Memory Bandwidth value exceeding 100 is invalid."));
+                return -1;
+            }
+            break;
+        case VIR_MEMORY_TYPE_HARDLIMIT:
+            if (value > 1) {
+                virReportError(VIR_ERR_XML_ERROR, "%s",
+                               _("Memory Bandwidth hard limit value just support 0 or 1."));
+                return -1;
+            }
+            break;
+        case VIR_MEMORY_TYPE_PRIORITY:
+            if (value > 7) {
+                virReportError(VIR_ERR_XML_ERROR, "%s",
+                               _("Memory Bandwidth priority value just support 0-7."));
+                return -1;
+            }
+            break;
+        case VIR_MEMORY_TYPE_MIN_BANDWIDTH:
+        case VIR_MEMORY_TYPE_LAST:
+        default:
+            virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                           _("Invalid memory bandwidth type."));
             return -1;
-        }
-    }
-
-    if (type == VIR_MEMORY_TYPE_BANDWIDTH) {
-        if (value > 100) {
-            virReportError(VIR_ERR_XML_ERROR, "%s",
-                        _("Memory Bandwidth value exceeding 100 is invalid."));
-            return -1;
-        }
     }
 
     if (!mem_bw) {
