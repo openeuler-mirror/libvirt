@@ -17680,10 +17680,15 @@ virDomainCachetuneDefParseCache(xmlXPathContextPtr ctxt,
                        VIR_XML_PROP_REQUIRED, &type) < 0)
         return -1;
 
-    if (virParseScaledValue("./@size", "./@unit",
-                            ctxt, &size, 1024,
-                            ULLONG_MAX, true) < 0)
+    if (type == VIR_CACHE_TYPE_PRIORITY) {
+        if (virXMLPropULongLong(node, "size", 10, VIR_XML_PROP_REQUIRED, &size) < 0)
+            return -1;
+    } else {
+        if (virParseScaledValue("./@size", "./@unit",
+            ctxt, &size, 1024,
+            ULLONG_MAX, true) < 0)
         return -1;
+    }
 
     if (virResctrlAllocSetCacheSize(alloc, level, type, cache, size) < 0)
         return -1;
@@ -18232,6 +18237,8 @@ virDomainMemorytuneDefParseMemory(xmlXPathContextPtr ctxt,
     VIR_XPATH_NODE_AUTORESTORE(ctxt)
     unsigned int id;
     unsigned int bandwidth;
+    unsigned int hard_limit = UINT_MAX;
+    unsigned int priority = UINT_MAX;
 
     ctxt->node = node;
 
@@ -18242,7 +18249,21 @@ virDomainMemorytuneDefParseMemory(xmlXPathContextPtr ctxt,
                        &bandwidth) < 0)
         return -1;
 
-    if (virResctrlAllocSetMemoryBandwidth(alloc, id, bandwidth) < 0)
+    if (virResctrlAllocSetMemoryBandwidth(alloc, VIR_MEMORY_TYPE_BANDWIDTH, id, bandwidth) < 0)
+        return -1;
+
+    if (virXMLPropUIntDefault(node, "hardlimit", 10, 0, &hard_limit, UINT_MAX) < 0)
+        return -1;
+
+    if (hard_limit != UINT_MAX &&
+        virResctrlAllocSetMemoryBandwidth(alloc, VIR_MEMORY_TYPE_HARDLIMIT, id, hard_limit) < 0)
+        return -1;
+
+    if (virXMLPropUIntDefault(node, "priority", 10, 0, &priority, UINT_MAX) < 0)
+        return -1;
+
+    if (priority != UINT_MAX &&
+        virResctrlAllocSetMemoryBandwidth(alloc, VIR_MEMORY_TYPE_PRIORITY, id, priority) < 0)
         return -1;
 
     return 0;
@@ -26749,11 +26770,19 @@ virDomainCachetuneDefFormatHelper(unsigned int level,
     virBuffer *buf = opaque;
     unsigned long long short_size = virFormatIntPretty(size, &unit);
 
-    virBufferAsprintf(buf,
-                      "<cache id='%u' level='%u' type='%s' "
-                      "size='%llu' unit='%s'/>\n",
-                      cache, level, virCacheTypeToString(type),
-                      short_size, unit);
+    if (type == VIR_CACHE_TYPE_PRIORITY) {
+        virBufferAsprintf(buf,
+                          "<cache id='%u' level='%u' type='%s' "
+                          "size='%llu'/>\n",
+                          cache, level, virCacheTypeToString(type),
+                          size);
+    } else {
+        virBufferAsprintf(buf,
+                        "<cache id='%u' level='%u' type='%s' "
+                        "size='%llu' unit='%s'/>\n",
+                        cache, level, virCacheTypeToString(type),
+                        short_size, unit);
+    }
 
     return 0;
 }
@@ -26833,14 +26862,21 @@ virDomainCachetuneDefFormat(virBuffer *buf,
 
 static int
 virDomainMemorytuneDefFormatHelper(unsigned int id,
-                                   unsigned int bandwidth,
+                                   unsigned int *types,
+                                   unsigned int *values,
                                    void *opaque)
 {
     virBuffer *buf = opaque;
+    size_t i;
 
-    virBufferAsprintf(buf,
-                      "<node id='%u' bandwidth='%u'/>\n",
-                      id, bandwidth);
+    virBufferAsprintf(buf, "<node id='%u'", id);
+    for (i = 0; i < VIR_MEMORY_TYPE_LAST; i++) {
+        if (types[i] == VIR_MEMORY_TYPE_LAST)
+            continue;
+
+        virBufferAsprintf(buf, " %s='%u'", virMemoryTypeToString(types[i]), values[i]);
+    }
+    virBufferAddLit(buf, "/>\n");
     return 0;
 }
 

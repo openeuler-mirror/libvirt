@@ -26,3 +26,10 @@
 
 virResctrlAlloc *
 virResctrlAllocGetUnused(virResctrlInfo *resctrl);
+
+virResctrlAlloc *
+virResctrlAllocGetDefault(virResctrlInfo *resctrl);
+
+int
+virResctrlAllocCopyCacheProperties(virResctrlAlloc *dst,
+                                   virResctrlAlloc *src);

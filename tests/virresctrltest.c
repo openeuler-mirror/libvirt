@@ -21,6 +21,7 @@ test_virResctrlGetUnused(const void *opaque)
     g_autofree char *system_dir = NULL;
     g_autofree char *resctrl_dir = NULL;
     g_autoptr(virResctrlAlloc) alloc = NULL;
+    g_autoptr(virResctrlAlloc) default_alloc = NULL;
     g_autofree char *schemata_str = NULL;
     g_autofree char *schemata_file = NULL;
     g_autoptr(virCaps) caps = NULL;
@@ -44,6 +45,10 @@ test_virResctrlGetUnused(const void *opaque)
     }
 
     alloc = virResctrlAllocGetUnused(caps->host.resctrl);
+    default_alloc = virResctrlAllocGetDefault(caps->host.resctrl);
+
+    if (virResctrlAllocCopyCacheProperties(alloc, default_alloc) < 0)
+        return -1;
 
     virFileWrapperClearPrefixes();
 

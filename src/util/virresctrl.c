@@ -60,6 +60,7 @@ VIR_ENUM_IMPL(virCacheKernel,
               "Unified",
               "Instruction",
               "Data",
+              "Priority",
 );
 
 /* Cache name mapping for our XML naming. */
@@ -68,6 +69,7 @@ VIR_ENUM_IMPL(virCache,
               "both",
               "code",
               "data",
+              "priority",
 );
 
 /* Cache name mapping for resctrl interface naming. */
@@ -77,6 +79,24 @@ VIR_ENUM_IMPL(virResctrl,
               "",
               "CODE",
               "DATA",
+              "PRI",
+);
+
+VIR_ENUM_IMPL(virMemory,
+              VIR_MEMORY_TYPE_LAST,
+              "bandwidth",
+              "hardlimit",
+              "priority",
+              "minbandwidth",
+);
+
+VIR_ENUM_DECL(virResctrlMemory);
+VIR_ENUM_IMPL(virResctrlMemory,
+              VIR_MEMORY_TYPE_LAST,
+              "",
+              "HDL",
+              "PRI",
+              "MIN",
 );
 
 /* Monitor feature name prefix mapping for monitor naming */
@@ -102,6 +122,8 @@ typedef struct _virResctrlInfoMongrp virResctrlInfoMongrp;
 typedef struct _virResctrlAllocPerType virResctrlAllocPerType;
 
 typedef struct _virResctrlAllocPerLevel virResctrlAllocPerLevel;
+
+typedef struct _virResctrlAllocMemPerType virResctrlAllocMemPerType;
 
 typedef struct _virResctrlAllocMemBW virResctrlAllocMemBW;
 
@@ -309,6 +331,14 @@ struct _virResctrlAllocPerType {
     /* Mask for each cache */
     virBitmap **masks;
     size_t nmasks;
+
+    /* cache id map for each cache */
+    unsigned int **cache_ids;
+    size_t ncache_ids;
+
+    /* priority for each cahe */
+    unsigned long long **priorities;
+    size_t npriorities;
 };
 
 struct _virResctrlAllocPerLevel {
@@ -322,9 +352,18 @@ struct _virResctrlAllocPerLevel {
  * Since it can have several last level caches in a NUMA system, it is
  * also represented as a nested sparse arrays as virRestrlAllocPerLevel.
  */
+struct _virResctrlAllocMemPerType {
+    unsigned int **values;
+    size_t nvalues;
+
+    unsigned int **user_values;
+    size_t nuser_values;
+};
+
 struct _virResctrlAllocMemBW {
-    unsigned int **bandwidths;
-    size_t nbandwidths;
+    virResctrlAllocMemPerType **types; /* Indexed with enum virMemoryType */
+    /* There is no `ntypes` member variable as it is always allocated for
+     * VIR_MEMORY_TYPE_LAST number of items */  
 };
 
 struct _virResctrlAlloc {
@@ -394,8 +433,16 @@ virResctrlAllocDispose(void *obj)
             for (k = 0; k < type->nmasks; k++)
                 virBitmapFree(type->masks[k]);
 
+            for (k = 0; k < type->ncache_ids; k++)
+                g_free(type->cache_ids[k]);
+
+            for (k = 0; k < type->npriorities; k++)
+                g_free(type->priorities[k]);
+
             g_free(type->sizes);
             g_free(type->masks);
+            g_free(type->cache_ids);
+            g_free(type->priorities);
             g_free(type);
         }
         g_free(level->types);
@@ -404,9 +451,24 @@ virResctrlAllocDispose(void *obj)
 
     if (alloc->mem_bw) {
         virResctrlAllocMemBW *mem_bw = alloc->mem_bw;
-        for (i = 0; i < mem_bw->nbandwidths; i++)
-            g_free(mem_bw->bandwidths[i]);
-        g_free(alloc->mem_bw->bandwidths);
+
+        for (i = 0; i < VIR_MEMORY_TYPE_LAST; i++) {
+            virResctrlAllocMemPerType *type = mem_bw->types[i];
+
+            if (!type)
+                continue;
+
+            for (j = 0; j < type->nvalues; j++)
+                g_free(type->values[j]);
+
+            for (j = 0; j < type->nuser_values; j++)
+                g_free(type->user_values[j]);
+
+            g_free(type->values);
+            g_free(type->user_values);
+            g_free(type);
+        }
+        g_free(mem_bw->types);
         g_free(alloc->mem_bw);
     }
 
@@ -1085,6 +1147,28 @@ virResctrlAllocGetType(virResctrlAlloc *alloc,
 }
 
 
+static virResctrlAllocMemPerType *
+virResctrlAllocGetMemType(virResctrlAlloc *alloc,
+                          virMemoryType type)
+{
+    virResctrlAllocMemBW *mem_bw = NULL;
+
+    if (!alloc->mem_bw)
+        alloc->mem_bw = g_new0(virResctrlAllocMemBW, 1);
+
+    mem_bw = alloc->mem_bw;
+
+    if (!mem_bw->types) {
+        mem_bw->types = g_new0(virResctrlAllocMemPerType *, VIR_MEMORY_TYPE_LAST);
+    }
+
+    if (!mem_bw->types[type])
+        mem_bw->types[type] = g_new0(virResctrlAllocMemPerType, 1);
+
+    return mem_bw->types[type];
+}
+
+
 static int
 virResctrlAllocUpdateMask(virResctrlAlloc *alloc,
                           unsigned int level,
@@ -1135,6 +1219,41 @@ virResctrlAllocUpdateSize(virResctrlAlloc *alloc,
 }
 
 
+static int
+virResctrlAllocUpdateMBValue(virResctrlAlloc *alloc)
+{
+    virResctrlAllocMemBW *mem_bw = alloc->mem_bw;
+    virResctrlAllocMemPerType *a_type = NULL;
+    unsigned int type = 0;
+    unsigned int id = 0;
+
+    if (!mem_bw || !mem_bw->types)
+        return 0;
+
+    for (type = 0; type < VIR_MEMORY_TYPE_LAST; type++) {
+        a_type = mem_bw->types[type];
+        if (!a_type)
+            continue;
+
+        for (id = 0; id < a_type->nuser_values; id++) {
+            if (!a_type->user_values[id])
+                continue;
+
+            if (a_type->nvalues <= id || !a_type->values[id]) {
+                virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                               _("Node %1$u memory bandwidth does not support tuning for scope type '%2$s'"),
+                               id, virMemoryTypeToString(type));
+                return -1;
+            }
+
+            *(a_type->values[id]) = *(a_type->user_values[id]);
+        }
+    }
+
+    return 0;
+}
+
+
 /*
  * Check if there is an allocation for this level/type/cache already.  Called
  * before updating the structure.  VIR_CACHE_TYPE_BOTH collides with any type,
@@ -1164,6 +1283,15 @@ virResctrlAllocCheckCollision(virResctrlAlloc *alloc,
 
     if (!a_level)
         return false;
+
+    if (type == VIR_CACHE_TYPE_PRIORITY) {
+        a_type = a_level->types[VIR_CACHE_TYPE_PRIORITY];
+
+        if (a_type && a_type->nsizes > cache && a_type->sizes[cache])
+            return true;
+
+        return false;
+    }
 
     a_type = a_level->types[VIR_CACHE_TYPE_BOTH];
 
@@ -1255,24 +1383,51 @@ virResctrlAllocForeachCache(virResctrlAlloc *alloc,
 
 /* virResctrlAllocSetMemoryBandwidth
  * @alloc: Pointer to an active allocation
+ * @type: type of memory bandwidth to be set
  * @id: node id of MBA to be set
- * @memory_bandwidth: new memory bandwidth value
+ * @value: new memory bandwidth type value
  *
- * Set the @memory_bandwidth for the node @id entry in the @alloc.
+ * Set the @value for the node @id entry in the @alloc.
  *
  * Returns 0 on success, -1 on failure with error message set.
  */
 int
 virResctrlAllocSetMemoryBandwidth(virResctrlAlloc *alloc,
+                                  virMemoryType type,
                                   unsigned int id,
-                                  unsigned int memory_bandwidth)
+                                  unsigned int value)
 {
     virResctrlAllocMemBW *mem_bw = alloc->mem_bw;
+    virResctrlAllocMemPerType *a_type = NULL;
 
-    if (memory_bandwidth > 100) {
-        virReportError(VIR_ERR_XML_ERROR, "%s",
-                       _("Memory Bandwidth value exceeding 100 is invalid."));
-        return -1;
+    switch (type) {
+        case VIR_MEMORY_TYPE_BANDWIDTH:
+            if (value > 100) {
+                virReportError(VIR_ERR_XML_ERROR, "%s",
+                               _("Memory Bandwidth value exceeding 100 is invalid."));
+                return -1;
+            }
+            break;
+        case VIR_MEMORY_TYPE_HARDLIMIT:
+            if (value > 1) {
+                virReportError(VIR_ERR_XML_ERROR, "%s",
+                               _("Memory Bandwidth hard limit value just support 0 or 1."));
+                return -1;
+            }
+            break;
+        case VIR_MEMORY_TYPE_PRIORITY:
+            if (value > 7) {
+                virReportError(VIR_ERR_XML_ERROR, "%s",
+                               _("Memory Bandwidth priority value just support 0-7."));
+                return -1;
+            }
+            break;
+        case VIR_MEMORY_TYPE_MIN_BANDWIDTH:
+        case VIR_MEMORY_TYPE_LAST:
+        default:
+            virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                           _("Invalid memory bandwidth type."));
+            return -1;
     }
 
     if (!mem_bw) {
@@ -1280,19 +1435,25 @@ virResctrlAllocSetMemoryBandwidth(virResctrlAlloc *alloc,
         alloc->mem_bw = mem_bw;
     }
 
-    if (mem_bw->nbandwidths <= id)
-        VIR_EXPAND_N(mem_bw->bandwidths, mem_bw->nbandwidths,
-                     id - mem_bw->nbandwidths + 1);
+    a_type = virResctrlAllocGetMemType(alloc, type);
+    if (!a_type)
+        return -1;
 
-    if (mem_bw->bandwidths[id]) {
+    if (a_type->nuser_values <= id)
+        VIR_EXPAND_N(a_type->user_values, a_type->nuser_values,
+                     id - a_type->nuser_values + 1);
+
+    if (a_type->user_values[id]) {
         virReportError(VIR_ERR_XML_ERROR,
-                       _("Memory Bandwidth already defined for node %1$u"),
+                       _("Memory Bandwidth type '%1$s' already defined for node %2$u"),
+                       virMemoryTypeToString(type),
                        id);
         return -1;
     }
 
-    mem_bw->bandwidths[id] = g_new0(unsigned int, 1);
-    *(mem_bw->bandwidths[id]) = memory_bandwidth;
+    a_type->user_values[id] = g_new0(unsigned int, 1);
+    *(a_type->user_values[id]) = value;
+
     return 0;
 }
 
@@ -1312,18 +1473,40 @@ virResctrlAllocForeachMemory(virResctrlAlloc *alloc,
                              virResctrlAllocForeachMemoryCallback cb,
                              void *opaque)
 {
-    size_t i = 0;
+    unsigned int i, type;
     virResctrlAllocMemBW *mem_bw;
+    g_autofree unsigned int *types = NULL;
+    g_autofree unsigned int *values = NULL;
 
     if (!alloc || !alloc->mem_bw)
         return 0;
 
     mem_bw = alloc->mem_bw;
-    for (i = 0; i < mem_bw->nbandwidths; i++) {
-        if (mem_bw->bandwidths[i]) {
-            if (cb(i, *mem_bw->bandwidths[i], opaque) < 0)
-                return -1;
+
+    if (!mem_bw->types)
+        return 0;
+
+    if (!mem_bw->types[VIR_MEMORY_TYPE_BANDWIDTH])
+        return 0;
+
+    types = g_new0(unsigned int, VIR_MEMORY_TYPE_LAST);
+    values = g_new0(unsigned int, VIR_MEMORY_TYPE_LAST);
+
+    for (i = 0; i < mem_bw->types[VIR_MEMORY_TYPE_BANDWIDTH]->nuser_values; i++) {
+        if (!mem_bw->types[VIR_MEMORY_TYPE_BANDWIDTH]->user_values[i])
+            continue;
+
+        for (type = 0; type < VIR_MEMORY_TYPE_LAST; type++) {
+            virResctrlAllocMemPerType *a_type = mem_bw->types[type];
+            if (!a_type || a_type->nuser_values <= i || !a_type->user_values[i]) {
+                types[type] = VIR_MEMORY_TYPE_LAST;
+                continue;
+            }
+
+            types[type] = type;
+            values[type] = *(a_type->user_values[i]);
         }
+        cb(i, types, values, opaque);
     }
 
     return 0;
@@ -1380,22 +1563,26 @@ static int
 virResctrlAllocMemoryBandwidthFormat(virResctrlAlloc *alloc,
                                      virBuffer *buf)
 {
-    size_t i;
+    unsigned int i, type;
 
     if (!alloc->mem_bw)
         return 0;
 
-    virBufferAddLit(buf, "MB:");
+    for (type = 0; type < VIR_MEMORY_TYPE_LAST; type++) {
+        virResctrlAllocMemPerType *a_type = alloc->mem_bw->types[type];
+        if (!a_type)
+            continue;
 
-    for (i = 0; i < alloc->mem_bw->nbandwidths; i++) {
-        if (alloc->mem_bw->bandwidths[i]) {
-            virBufferAsprintf(buf, "%zd=%u;", i,
-                              *(alloc->mem_bw->bandwidths[i]));
+        virBufferAsprintf(buf, "MB%s:", virResctrlMemoryTypeToString(type));
+
+        for (i = 0; i < a_type->nvalues; i++) {
+            virBufferAsprintf(buf, "%u=%u;", i, *(a_type->values[i]));
         }
+
+        virBufferTrim(buf, ";");
+        virBufferAddChar(buf, '\n');
     }
 
-    virBufferTrim(buf, ";");
-    virBufferAddChar(buf, '\n');
     return 0;
 }
 
@@ -1403,11 +1590,13 @@ virResctrlAllocMemoryBandwidthFormat(virResctrlAlloc *alloc,
 static int
 virResctrlAllocParseProcessMemoryBandwidth(virResctrlInfo *resctrl,
                                            virResctrlAlloc *alloc,
+                                           virMemoryType type,
                                            char *mem_bw)
 {
-    unsigned int bandwidth;
+    unsigned int value;
     unsigned int id;
     char *tmp = NULL;
+    virResctrlAllocMemPerType *a_type = NULL;
 
     tmp = strchr(mem_bw, '=');
     if (!tmp)
@@ -1420,26 +1609,32 @@ virResctrlAllocParseProcessMemoryBandwidth(virResctrlInfo *resctrl,
                        _("Invalid node id %1$u "), id);
         return -1;
     }
-    if (virStrToLong_uip(tmp, NULL, 10, &bandwidth) < 0) {
+    if (virStrToLong_uip(tmp, NULL, 10, &value) < 0) {
         virReportError(VIR_ERR_INTERNAL_ERROR,
-                       _("Invalid bandwidth %1$u"), bandwidth);
+                       _("Invalid MB%1$s value %2$u"),
+                       virResctrlMemoryTypeToString(type), value);
         return -1;
     }
-    if (bandwidth < resctrl->membw_info->min_bandwidth ||
+    if ((type == VIR_MEMORY_TYPE_BANDWIDTH && value < resctrl->membw_info->min_bandwidth) ||
         id > resctrl->membw_info->max_id) {
         virReportError(VIR_ERR_INTERNAL_ERROR,
                        _("Missing or inconsistent resctrl info for memory bandwidth node '%1$u'"),
                        id);
         return -1;
     }
-    if (alloc->mem_bw->nbandwidths <= id) {
-        VIR_EXPAND_N(alloc->mem_bw->bandwidths, alloc->mem_bw->nbandwidths,
-                     id - alloc->mem_bw->nbandwidths + 1);
-    }
-    if (!alloc->mem_bw->bandwidths[id])
-        alloc->mem_bw->bandwidths[id] = g_new0(unsigned int, 1);
 
-    *(alloc->mem_bw->bandwidths[id]) = bandwidth;
+    a_type = virResctrlAllocGetMemType(alloc, type);
+    if (!a_type)
+        return -1;
+
+    if (a_type->nvalues <= id) {
+        VIR_EXPAND_N(a_type->values, a_type->nvalues,
+                     id - a_type->nvalues + 1);
+    }
+    if (!a_type->values[id])
+        a_type->values[id] = g_new0(unsigned int, 1);
+
+    *(a_type->values[id]) = value;
     return 0;
 }
 
@@ -1455,6 +1650,7 @@ virResctrlAllocParseMemoryBandwidthLine(virResctrlInfo *resctrl,
     g_auto(GStrv) mbs = NULL;
     GStrv next;
     char *tmp = NULL;
+    int type = -1;
 
     /* For no reason there can be spaces */
     virSkipSpaces((const char **) &line);
@@ -1476,11 +1672,19 @@ virResctrlAllocParseMemoryBandwidthLine(virResctrlInfo *resctrl,
     tmp = strchr(line, ':');
     if (!tmp)
         return 0;
+    *tmp = '\0';
     tmp++;
+
+    type = virResctrlMemoryTypeFromString(line + 2);
+    if (type < 0) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Cannot parse resctrl schemata line '%1$s'"), line);
+        return -1;
+    }
 
     mbs = g_strsplit(tmp, ";", 0);
     for (next = mbs; *next; next++) {
-        if (virResctrlAllocParseProcessMemoryBandwidth(resctrl, alloc, *next) < 0)
+        if (virResctrlAllocParseProcessMemoryBandwidth(resctrl, alloc, type, *next) < 0)
             return -1;
     }
 
@@ -1510,19 +1714,25 @@ virResctrlAllocFormatCache(virResctrlAlloc *alloc,
 
             virBufferAsprintf(buf, "L%u%s:", level, virResctrlTypeToString(type));
 
-            for (cache = 0; cache < a_type->nmasks; cache++) {
-                virBitmap *mask = a_type->masks[cache];
-                char *mask_str = NULL;
+            if (type == VIR_CACHE_TYPE_PRIORITY) {
+                for (cache = 0; cache < a_type->npriorities; cache++) {
+                    virBufferAsprintf(buf, "%u=%llu;", *(a_type->cache_ids[cache]), *(a_type->priorities[cache]));
+                }
+            } else {
+                for (cache = 0; cache < a_type->nmasks; cache++) {
+                    virBitmap *mask = a_type->masks[cache];
+                    char *mask_str = NULL;
 
-                if (!mask)
-                    continue;
+                    if (!mask)
+                        continue;
 
-                mask_str = virBitmapToString(mask);
-                if (!mask_str)
-                    return -1;
+                    mask_str = virBitmapToString(mask);
+                    if (!mask_str)
+                        return -1;
 
-                virBufferAsprintf(buf, "%u=%s;", cache, mask_str);
-                VIR_FREE(mask_str);
+                    virBufferAsprintf(buf, "%u=%s;", *(a_type->cache_ids[cache]), mask_str);
+                    VIR_FREE(mask_str);
+                }
             }
 
             virBufferTrim(buf, ";");
@@ -1553,14 +1763,93 @@ virResctrlAllocFormat(virResctrlAlloc *alloc)
 
 
 static int
+virResctrlAllocParseProcessCacheId(virResctrlInfo *resctrl,
+                                   virResctrlAlloc *alloc,
+                                   unsigned int level,
+                                   virCacheType type,
+                                   char *cache,
+                                   unsigned int node_id)
+{
+    unsigned int cache_id = 0;
+    virResctrlAllocPerType *a_type = NULL;
+
+    if (virStrToLong_uip(cache, NULL, 10, &cache_id) < 0) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Invalid cache id '%1$s'"), cache);
+        return -1;
+    }
+
+    if (!resctrl ||
+        level >= resctrl->nlevels ||
+        !resctrl->levels[level]) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Missing or inconsistent resctrl info for level '%1$u'"),
+                       level);
+        return -1;
+    }
+
+    a_type = virResctrlAllocGetType(alloc, level, type);
+    if (!a_type)
+        return -1;
+
+    if (a_type->ncache_ids <= node_id) {
+        VIR_EXPAND_N(a_type->cache_ids, a_type->ncache_ids,
+                     node_id - a_type->ncache_ids + 1);
+    }
+
+    if (!a_type->cache_ids[node_id])
+        a_type->cache_ids[node_id] = g_new0(unsigned int, 1);
+
+    *(a_type->cache_ids[node_id]) = cache_id;
+
+    return 0;
+}
+
+
+static int
+virResctrlAllocParseProcessCachePriority(virResctrlAlloc *alloc,
+                                         unsigned int level,
+                                         virCacheType type,
+                                         char *value,
+                                         unsigned int node_id)
+{
+    unsigned int priority = 0;
+    virResctrlAllocPerType *a_type = NULL;
+
+    if (virStrToLong_uip(value, NULL, 10, &priority) < 0) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Invalid priority '%1$s'"), value);
+        return -1;
+    }
+
+    a_type = virResctrlAllocGetType(alloc, level, type);
+
+    if (!a_type)
+        return -1;
+
+    if (a_type->npriorities <= node_id) {
+        VIR_EXPAND_N(a_type->priorities, a_type->npriorities,
+                     node_id - a_type->npriorities + 1);
+    }
+
+    if (!a_type->priorities[node_id])
+        a_type->priorities[node_id] = g_new0(unsigned long long, 1);
+
+    *(a_type->priorities[node_id]) = priority;
+
+    return 0;
+}
+
+
+static int
 virResctrlAllocParseProcessCache(virResctrlInfo *resctrl,
                                  virResctrlAlloc *alloc,
                                  unsigned int level,
                                  virCacheType type,
-                                 char *cache)
+                                 char *cache,
+                                 unsigned int node_id)
 {
     char *tmp = strchr(cache, '=');
-    unsigned int cache_id = 0;
     g_autoptr(virBitmap) mask = NULL;
 
     if (!tmp)
@@ -1569,10 +1858,12 @@ virResctrlAllocParseProcessCache(virResctrlInfo *resctrl,
     *tmp = '\0';
     tmp++;
 
-    if (virStrToLong_uip(cache, NULL, 10, &cache_id) < 0) {
-        virReportError(VIR_ERR_INTERNAL_ERROR,
-                       _("Invalid cache id '%1$s'"), cache);
+    if (virResctrlAllocParseProcessCacheId(resctrl, alloc, level, type, cache, node_id) < 0) {
         return -1;
+    }
+
+    if (type == VIR_CACHE_TYPE_PRIORITY) {
+        return virResctrlAllocParseProcessCachePriority(alloc, level, type, tmp, node_id);
     }
 
     mask = virBitmapNewString(tmp);
@@ -1591,7 +1882,7 @@ virResctrlAllocParseProcessCache(virResctrlInfo *resctrl,
 
     virBitmapShrink(mask, resctrl->levels[level]->types[type]->bits);
 
-    if (virResctrlAllocUpdateMask(alloc, level, type, cache_id, mask) < 0)
+    if (virResctrlAllocUpdateMask(alloc, level, type, node_id, mask) < 0)
         return -1;
 
     return 0;
@@ -1607,6 +1898,7 @@ virResctrlAllocParseCacheLine(virResctrlInfo *resctrl,
     GStrv next;
     char *tmp = NULL;
     unsigned int level = 0;
+    unsigned int node_id = 0;
     int type = -1;
 
     /* For no reason there can be spaces */
@@ -1643,8 +1935,8 @@ virResctrlAllocParseCacheLine(virResctrlInfo *resctrl,
     if (!caches)
         return 0;
 
-    for (next = caches; *next; next++) {
-        if (virResctrlAllocParseProcessCache(resctrl, alloc, level, type, *next) < 0)
+    for (next = caches; *next; next++, node_id++) {
+        if (virResctrlAllocParseProcessCache(resctrl, alloc, level, type, *next, node_id) < 0)
             return -1;
     }
 
@@ -1704,7 +1996,7 @@ virResctrlAllocGetGroup(virResctrlInfo *resctrl,
 }
 
 
-static virResctrlAlloc *
+virResctrlAlloc *
 virResctrlAllocGetDefault(virResctrlInfo *resctrl)
 {
     virResctrlAlloc *ret = NULL;
@@ -1792,14 +2084,19 @@ virResctrlAllocNewFromInfo(virResctrlInfo *info)
 
     /* set default free memory bandwidth to 100% */
     if (info->membw_info) {
+        virResctrlAllocMemPerType *type = NULL;
         ret->mem_bw = g_new0(virResctrlAllocMemBW, 1);
 
-        VIR_EXPAND_N(ret->mem_bw->bandwidths, ret->mem_bw->nbandwidths,
+        type = virResctrlAllocGetMemType(ret, VIR_MEMORY_TYPE_BANDWIDTH);
+        if (!type)
+            return NULL;
+
+        VIR_EXPAND_N(type->values, type->nvalues,
                      info->membw_info->max_id + 1);
 
-        for (i = 0; i < ret->mem_bw->nbandwidths; i++) {
-            ret->mem_bw->bandwidths[i] = g_new0(unsigned int, 1);
-            *(ret->mem_bw->bandwidths[i]) = 100;
+        for (i = 0; i < type->nvalues; i++) {
+            type->values[i] = g_new0(unsigned int, 1);
+            *(type->values[i]) = 100;
         }
     }
 
@@ -2010,21 +2307,21 @@ virResctrlAllocMemoryBandwidth(virResctrlInfo *resctrl,
         return -1;
     }
 
-    for (i = 0; i < mem_bw_alloc->nbandwidths; i++) {
-        if (!mem_bw_alloc->bandwidths[i])
+    for (i = 0; i < mem_bw_alloc->types[VIR_MEMORY_TYPE_BANDWIDTH]->nuser_values; i++) {
+        if (!mem_bw_alloc->types[VIR_MEMORY_TYPE_BANDWIDTH]->user_values[i])
             continue;
 
-        if (*(mem_bw_alloc->bandwidths[i]) % mem_bw_info->bandwidth_granularity) {
+        if (*(mem_bw_alloc->types[VIR_MEMORY_TYPE_BANDWIDTH]->user_values[i]) % mem_bw_info->bandwidth_granularity) {
             virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
                            _("Memory Bandwidth allocation of size %1$u is not divisible by granularity %2$u"),
-                           *(mem_bw_alloc->bandwidths[i]),
+                           *(mem_bw_alloc->types[VIR_MEMORY_TYPE_BANDWIDTH]->user_values[i]),
                            mem_bw_info->bandwidth_granularity);
             return -1;
         }
-        if (*(mem_bw_alloc->bandwidths[i]) < mem_bw_info->min_bandwidth) {
+        if (*(mem_bw_alloc->types[VIR_MEMORY_TYPE_BANDWIDTH]->user_values[i]) < mem_bw_info->min_bandwidth) {
             virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
                            _("Memory Bandwidth allocation of size %1$u is smaller than the minimum allowed allocation %2$u"),
-                           *(mem_bw_alloc->bandwidths[i]),
+                           *(mem_bw_alloc->types[VIR_MEMORY_TYPE_BANDWIDTH]->user_values[i]),
                            mem_bw_info->min_bandwidth);
             return -1;
         }
@@ -2044,26 +2341,86 @@ virResctrlAllocCopyMemBW(virResctrlAlloc *dst,
                          virResctrlAlloc *src)
 {
     size_t i = 0;
-    virResctrlAllocMemBW *dst_bw = NULL;
+    unsigned int type = 0;
     virResctrlAllocMemBW *src_bw = src->mem_bw;
 
     if (!src->mem_bw)
         return 0;
 
-    if (!dst->mem_bw)
-        dst->mem_bw = g_new0(virResctrlAllocMemBW, 1);
+    for (type = 0; type < VIR_MEMORY_TYPE_LAST; type++) {
+        virResctrlAllocMemPerType *s_type = src_bw->types[type];
+        virResctrlAllocMemPerType *d_type = NULL;
 
-    dst_bw = dst->mem_bw;
-
-    if (src_bw->nbandwidths > dst_bw->nbandwidths)
-        VIR_EXPAND_N(dst_bw->bandwidths, dst_bw->nbandwidths,
-                     src_bw->nbandwidths - dst_bw->nbandwidths);
-
-    for (i = 0; i < src_bw->nbandwidths; i++) {
-        if (dst_bw->bandwidths[i])
+        if (!s_type)
             continue;
-        dst_bw->bandwidths[i] = g_new0(unsigned int, 1);
-        *dst_bw->bandwidths[i] = *src_bw->bandwidths[i];
+
+        d_type = virResctrlAllocGetMemType(dst, type);
+        if (!d_type)
+            return -1;
+
+        if (s_type->nvalues > d_type->nvalues)
+            VIR_EXPAND_N(d_type->values, d_type->nvalues,
+                         s_type->nvalues - d_type->nvalues);
+
+        for (i = 0; i < s_type->nvalues; i++) {
+            if (d_type->values[i])
+                continue;
+            d_type->values[i] = g_new0(unsigned int, 1);
+            *(d_type->values[i]) = *(s_type->values[i]);
+        }
+    }
+
+    return 0;
+}
+
+
+int
+virResctrlAllocCopyCacheProperties(virResctrlAlloc *dst,
+                                   virResctrlAlloc *src)
+{
+    unsigned int level = 0;
+
+    for (level = 0; level < src->nlevels; level++) {
+        virResctrlAllocPerLevel *s_level = src->levels[level];
+        unsigned int type = 0;
+
+        if (!s_level)
+            continue;
+
+        for (type = 0; type < VIR_CACHE_TYPE_LAST; type++) {
+            virResctrlAllocPerType *s_type = s_level->types[type];
+            virResctrlAllocPerType *d_type = NULL;
+            unsigned int cache = 0;
+
+            if (!s_type)
+                continue;
+
+            d_type = virResctrlAllocGetType(dst, level, type);
+            if (!d_type)
+                return -1;
+
+            if (s_type->ncache_ids > d_type->ncache_ids)
+                VIR_EXPAND_N(d_type->cache_ids, d_type->ncache_ids,
+                             s_type->ncache_ids - d_type->ncache_ids);
+
+            for (cache = 0; cache < s_type->ncache_ids; cache++) {
+                if (d_type->cache_ids[cache])
+                    continue;
+                d_type->cache_ids[cache] = g_new0(unsigned int, 1);
+                *(d_type->cache_ids[cache]) = *(s_type->cache_ids[cache]);
+            }
+
+            if (s_type->npriorities > d_type->npriorities)
+                VIR_EXPAND_N(d_type->priorities, d_type->npriorities,
+                             s_type->npriorities - d_type->npriorities);
+
+            for (cache = 0; cache < s_type->npriorities; cache++) {
+                if (d_type->priorities[cache])
+                    continue;
+                d_type->priorities[cache] = g_new0(long long unsigned int, 1);
+                *(d_type->priorities[cache]) = *(s_type->priorities[cache]);
+            }
+        }
     }
 
     return 0;
@@ -2071,7 +2428,7 @@ virResctrlAllocCopyMemBW(virResctrlAlloc *dst,
 
 
 static int
-virResctrlAllocCopyMasks(virResctrlAlloc *dst,
+virResctrlAllocCopyCache(virResctrlAlloc *dst,
                          virResctrlAlloc *src)
 {
     unsigned int level = 0;
@@ -2104,7 +2461,7 @@ virResctrlAllocCopyMasks(virResctrlAlloc *dst,
         }
     }
 
-    return 0;
+    return virResctrlAllocCopyCacheProperties(dst, src);
 }
 
 
@@ -2133,10 +2490,13 @@ virResctrlAllocAssign(virResctrlInfo *resctrl,
     if (virResctrlAllocMemoryBandwidth(resctrl, alloc) < 0)
         return -1;
 
-    if (virResctrlAllocCopyMasks(alloc, alloc_default) < 0)
+    if (virResctrlAllocCopyCache(alloc, alloc_default) < 0)
         return -1;
 
     if (virResctrlAllocCopyMemBW(alloc, alloc_default) < 0)
+        return -1;
+
+    if (virResctrlAllocUpdateMBValue(alloc) < 0)
         return -1;
 
     for (level = 0; level < alloc->nlevels; level++) {
@@ -2164,6 +2524,37 @@ virResctrlAllocAssign(virResctrlInfo *resctrl,
 
             if (!a_type)
                 continue;
+
+            if (type == VIR_CACHE_TYPE_PRIORITY) {
+                for (cache = 0; cache < a_type->nsizes; cache++) {
+                    if (!a_type->sizes[cache])
+                        continue;
+
+                    if (a_type->npriorities == 0) {
+                        virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                            _("Cache level %1$d does not support tuning for scope type '%2$s'"),
+                            level, virCacheTypeToString(type));
+                        return -1;
+                    }
+
+                    if (a_type->npriorities <= cache || !a_type->priorities[cache]) {
+                        virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                            _("Cache id %1$d does not exist for level %2$d"),
+                            cache, level);
+                        return -1;
+                    }
+
+                    if (*(a_type->sizes[cache]) > 3) {
+                        virReportError(VIR_ERR_XML_ERROR,
+                                       _("Cache level %1$d id %2$d priority value just support 0-3"),
+                                       level, cache);
+                        return -1;
+                    }
+
+                    *(a_type->priorities[cache]) = *(a_type->sizes[cache]);
+                }
+                continue;
+            }
 
             if (!f_type) {
                 virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
