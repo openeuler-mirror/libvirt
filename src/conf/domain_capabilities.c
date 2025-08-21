@@ -741,6 +741,19 @@ virDomainCapsFeatureVIRTCCAFormat(virBuffer *buf,
     virBufferAddLit(buf, "<virtcca supported='yes'/>\n");
 }
 
+
+static void
+virDomainCapsLaunchSecurityFormat(virBuffer *buf,
+                                  const virDomainCapsLaunchSecurity *launchSecurity)
+{
+    FORMAT_PROLOGUE(launchSecurity);
+
+    ENUM_PROCESS(launchSecurity, sectype, virDomainLaunchSecurityTypeToString);
+
+    FORMAT_EPILOGUE(launchSecurity);
+}
+
+
 static void
 virDomainCapsFormatFeatures(const virDomainCaps *caps,
                             virBuffer *buf)
@@ -763,6 +776,7 @@ virDomainCapsFormatFeatures(const virDomainCaps *caps,
     virDomainCapsFeatureSGXFormat(&childBuf, caps->sgx);
     virDomainCapsFeatureHypervFormat(&childBuf, caps->hyperv);
     virDomainCapsFeatureVIRTCCAFormat(&childBuf, caps->virtcca);
+    virDomainCapsLaunchSecurityFormat(&childBuf, &caps->launchSecurity);
 
     virXMLFormatElement(buf, "features", NULL, &childBuf);
 }
