@@ -885,6 +885,9 @@ virQEMUCapsGetSEVCapabilities(virQEMUCaps *qemuCaps);
 virSGXCapability *
 virQEMUCapsGetSGXCapabilities(virQEMUCaps *qemuCaps);
 
+virCCACapability *
+virQEMUCapsGetCCACapabilities(virQEMUCaps *qemuCaps);
+
 bool
 virQEMUCapsGetKVMSupportsSecureGuest(virQEMUCaps *qemuCaps) G_NO_INLINE;
 
