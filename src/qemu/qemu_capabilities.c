@@ -700,6 +700,7 @@ VIR_ENUM_IMPL(virQEMUCaps,
               "virtio-blk-vhost-vdpa", /* QEMU_CAPS_DEVICE_VIRTIO_BLK_VHOST_VDPA */
               "smp-clusters", /* QEMU_CAPS_SMP_CLUSTERS */
               "tmm-guest", /* QEMU_CAPS_VIRTCCA */
+              "rme-guest", /* QEMU_CAPS_CCA_GUEST */
     );
 
 
@@ -786,6 +787,8 @@ struct _virQEMUCaps {
     virSGXCapability *sgxCapabilities;
 
     virVIRTCCACapability *virtccaCapabilities;
+
+    virCCACapability *ccaCapabilities;
 
     virDomainCapsFeatureHyperv *hypervCapabilities;
 
@@ -1391,6 +1394,7 @@ struct virQEMUCapsStringFlags virQEMUCapsObjectTypes[] = {
     { "cryptodev-backend-lkcf", QEMU_CAPS_OBJECT_CRYPTO_LKCF },
     { "pvpanic-pci", QEMU_CAPS_DEVICE_PANIC_PCI },
     { "tmm-guest", QEMU_CAPS_VIRTCCA },
+    { "rme-guest", QEMU_CAPS_CCA_GUEST },
 };
 
 
