@@ -266,6 +266,7 @@
     <async-teardown supported='yes'/>
     <sev supported='no'/>
     <sgx supported='no'/>
+    <cca supported='no'/>
     <hyperv supported='yes'>
       <enum name='features'>
         <value>relaxed</value>

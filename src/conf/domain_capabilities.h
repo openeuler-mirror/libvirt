@@ -302,6 +302,7 @@ struct _virDomainCaps {
     virDomainCapsFeatureGIC gic;
     virSEVCapability *sev;
     virSGXCapability *sgx;
+    virCCACapability *cca;
     virDomainCapsFeatureHyperv *hyperv;
     virVIRTCCACapability *virtcca;
     virDomainCapsLaunchSecurity launchSecurity;
@@ -365,3 +366,8 @@ void
 virVIRTCCACapabilitiesFree(virVIRTCCACapability *capabilities);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(virVIRTCCACapability, virVIRTCCACapabilitiesFree);
+
+void
+virCCACapabilitiesFree(virCCACapability *capabilities);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(virCCACapability, virCCACapabilitiesFree);

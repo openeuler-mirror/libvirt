@@ -14,6 +14,7 @@
   <features>
     <sev supported='no'/>
     <sgx supported='no'/>
+    <cca supported='no'/>
     <virtcca supported='no'/>
   </features>
 </domainCapabilities>
