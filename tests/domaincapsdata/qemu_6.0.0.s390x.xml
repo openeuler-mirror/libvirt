@@ -274,5 +274,10 @@
     <sev supported='no'/>
     <sgx supported='no'/>
     <virtcca supported='no'/>
+    <launchSecurity supported='yes'>
+      <enum name='sectype'>
+        <value>s390-pv</value>
+      </enum>
+    </launchSecurity>
   </features>
 </domainCapabilities>
