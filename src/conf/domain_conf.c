@@ -3413,6 +3413,8 @@ virDomainHostdevDefNew(void)
 
     def->info = g_new0(virDomainDeviceInfo, 1);
 
+    def->numa.node = -1;
+
     return def;
 }
 
@@ -6207,6 +6209,7 @@ virDomainHostdevDefParseXMLSubsys(xmlNodePtr node,
 {
     xmlNodePtr sourcenode;
     xmlNodePtr driver_node = NULL;
+    xmlNodePtr numa_node = NULL;
     virDomainHostdevSubsysPCI *pcisrc = &def->source.subsys.u.pci;
     virDomainHostdevSubsysSCSI *scsisrc = &def->source.subsys.u.scsi;
     virDomainHostdevSubsysSCSIVHost *scsihostsrc = &def->source.subsys.u.scsi_host;
@@ -6328,6 +6331,13 @@ virDomainHostdevDefParseXMLSubsys(xmlNodePtr node,
                            VIR_XML_PROP_NONZERO,
                            &pcisrc->backend) < 0)
             return -1;
+
+        if ((numa_node = virXPathNode("./numa", ctxt))) {
+            if (virXMLPropInt(numa_node, "node", 10, VIR_XML_PROP_NONE,
+                              &def->numa.node, 0) < 0) {
+                return -1;
+            }
+        }
 
         break;
 
@@ -16905,6 +16915,53 @@ virDomainDefMaybeAddHostdevSCSIcontroller(virDomainDef *def)
     return 0;
 }
 
+static int
+virDomainDefMaybeAddHostdevPxbcontroller(virDomainDef *def,
+                                         virDomainHostdevDef *hostdev)
+{
+    virDomainControllerDef *pxbCont;
+    virDomainControllerDef *pxbRootPort;
+    int tnode = hostdev->numa.node;
+    int nnode = virDomainNumaGetNodeCount(def->numa);
+
+    if (hostdev->numa.node < 0) {
+        return 0;
+    }
+
+    if (tnode >= nnode) {
+        virReportError(VIR_ERR_XML_ERROR,
+                       _("Invalid host device target numa node[%d]"), tnode);
+        return -1;
+    }
+
+    if (!(pxbCont = virDomainControllerDefNew(VIR_DOMAIN_CONTROLLER_TYPE_PCI))) {
+        return -1;
+    }
+    pxbCont->idx = virDomainControllerFindUnusedIndex(def, VIR_DOMAIN_CONTROLLER_TYPE_PCI);
+    pxbCont->model = VIR_DOMAIN_CONTROLLER_MODEL_PCIE_EXPANDER_BUS;
+    pxbCont->opts.pciopts.numaNode = tnode;
+    pxbCont->opts.pciopts.modelName = VIR_DOMAIN_CONTROLLER_PCI_MODEL_NAME_PXB_PCIE;
+    VIR_APPEND_ELEMENT_COPY(def->controllers, def->ncontrollers, pxbCont);
+
+    if (!(pxbRootPort = virDomainControllerDefNew(VIR_DOMAIN_CONTROLLER_TYPE_PCI))) {
+        return -1;
+    }
+    pxbRootPort->idx = virDomainControllerFindUnusedIndex(def, VIR_DOMAIN_CONTROLLER_TYPE_PCI);
+    pxbRootPort->model = VIR_DOMAIN_CONTROLLER_MODEL_PCIE_ROOT_PORT;
+    pxbRootPort->opts.pciopts.modelName = VIR_DOMAIN_CONTROLLER_PCI_MODEL_NAME_PCIE_ROOT_PORT;
+    pxbRootPort->info.type = VIR_DOMAIN_DEVICE_ADDRESS_TYPE_PCI;
+    pxbRootPort->info.addr.pci.bus = pxbCont->idx;
+    pxbRootPort->info.addr.pci.slot = 0U;
+    pxbRootPort->info.addr.pci.function = 0U;
+    VIR_APPEND_ELEMENT_COPY(def->controllers, def->ncontrollers, pxbRootPort);
+
+    hostdev->info->type = VIR_DOMAIN_DEVICE_ADDRESS_TYPE_PCI;
+    hostdev->info->addr.pci.bus = pxbRootPort->idx;
+    hostdev->info->addr.pci.slot = 0U;
+    hostdev->info->addr.pci.function = 0U;
+
+    return 0;
+}
 
 static int
 virDomainLoaderDefParseXMLNvram(virDomainLoaderDef *loader,
@@ -19226,6 +19283,9 @@ virDomainDefParseXML(xmlXPathContextPtr ctxt,
          * load the controller during hostdev hotplug.
          */
         if (virDomainDefMaybeAddHostdevSCSIcontroller(def) < 0)
+            return NULL;
+
+        if (virDomainDefMaybeAddHostdevPxbcontroller(def, hostdev) < 0)
             return NULL;
     }
     VIR_FREE(nodes);
