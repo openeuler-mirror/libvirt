@@ -1195,6 +1195,11 @@
                       <ref name="unsignedInt"/>
                     </attribute>
                   </optional>
+                  <optional>
+                    <attribute name="min_bandwidth">
+                      <ref name="unsignedInt"/>
+                    </attribute>
+                  </optional>
                 </element>
                 <element name="monitor">
                   <attribute name="vcpus">

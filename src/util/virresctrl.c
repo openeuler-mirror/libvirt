@@ -87,7 +87,7 @@ VIR_ENUM_IMPL(virMemory,
               "bandwidth",
               "hardlimit",
               "priority",
-              "minbandwidth",
+              "min_bandwidth",
 );
 
 VIR_ENUM_DECL(virResctrlMemory);
@@ -1423,6 +1423,12 @@ virResctrlAllocSetMemoryBandwidth(virResctrlAlloc *alloc,
             }
             break;
         case VIR_MEMORY_TYPE_MIN_BANDWIDTH:
+            if (value > 100) {
+                virReportError(VIR_ERR_XML_ERROR, "%s",
+                               _("Memory Bandwidth min_bandwidth value exceeding 100 is invalid."));
+                return -1;
+            }
+            break;
         case VIR_MEMORY_TYPE_LAST:
         default:
             virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
