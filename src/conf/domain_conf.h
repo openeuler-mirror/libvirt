@@ -380,6 +380,7 @@ struct _virDomainHostdevDef {
 
     virDomainHostdevMode mode;
     virDomainStartupPolicy startupPolicy;
+    virDomainDeviceNuma numa;
     bool managed;
     bool missing;
     bool readonly;

@@ -169,6 +169,11 @@ struct _virDomainDeviceInfo {
     bool isolationGroupLocked;
 };
 
+typedef struct _virDomainDeviceNuma virDomainDeviceNuma;
+struct _virDomainDeviceNuma {
+    int node;
+};
+
 void virDomainDeviceInfoClear(virDomainDeviceInfo *info);
 void virDomainDeviceInfoFree(virDomainDeviceInfo *info);
 
