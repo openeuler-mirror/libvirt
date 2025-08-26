@@ -1327,6 +1327,8 @@ qemuValidateDomainDef(const virDomainDef *def,
             break;
         case VIR_DOMAIN_LAUNCH_SECURITY_CVM:
             break;
+        case VIR_DOMAIN_LAUNCH_SECURITY_CCA:
+            break;
         case VIR_DOMAIN_LAUNCH_SECURITY_NONE:
         case VIR_DOMAIN_LAUNCH_SECURITY_LAST:
             virReportEnumRangeError(virDomainLaunchSecurity, def->sec->sectype);

@@ -165,6 +165,14 @@ struct _virDomainCapsFeatureHyperv {
     virDomainCapsEnum features; /* Info about supported virDomainHyperv features */
 };
 
+STATIC_ASSERT_ENUM(VIR_DOMAIN_LAUNCH_SECURITY_LAST);
+typedef struct _virDomainCapsLaunchSecurity virDomainCapsLaunchSecurity;
+struct _virDomainCapsLaunchSecurity {
+    virTristateBool supported;
+    virDomainCapsEnum sectype; /* Info about supported virDomainLaunchSecurity */
+};
+
+
 typedef enum {
     VIR_DOMCAPS_CPU_USABLE_UNKNOWN,
     VIR_DOMCAPS_CPU_USABLE_YES,
@@ -236,6 +244,12 @@ struct _virVIRTCCACapability {
     bool enabled;
 };
 
+typedef struct _virCCACapability virCCACapability;
+struct _virCCACapability {
+    size_t nCcaMeasurementAlgo;
+    char **ccaMeasurementAlgo;
+};
+
 STATIC_ASSERT_ENUM(VIR_DOMAIN_CRYPTO_MODEL_LAST);
 STATIC_ASSERT_ENUM(VIR_DOMAIN_CRYPTO_TYPE_LAST);
 STATIC_ASSERT_ENUM(VIR_DOMAIN_CRYPTO_BACKEND_LAST);
@@ -288,8 +302,10 @@ struct _virDomainCaps {
     virDomainCapsFeatureGIC gic;
     virSEVCapability *sev;
     virSGXCapability *sgx;
+    virCCACapability *cca;
     virDomainCapsFeatureHyperv *hyperv;
     virVIRTCCACapability *virtcca;
+    virDomainCapsLaunchSecurity launchSecurity;
     /* add new domain features here */
 
     virTristateBool features[VIR_DOMAIN_CAPS_FEATURE_LAST];
@@ -350,3 +366,8 @@ void
 virVIRTCCACapabilitiesFree(virVIRTCCACapability *capabilities);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(virVIRTCCACapability, virVIRTCCACapabilitiesFree);
+
+void
+virCCACapabilitiesFree(virCCACapability *capabilities);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(virCCACapability, virCCACapabilitiesFree);

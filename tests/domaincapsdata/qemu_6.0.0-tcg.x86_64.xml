@@ -274,6 +274,12 @@
       <maxESGuests>450</maxESGuests>
     </sev>
     <sgx supported='no'/>
+    <cca supported='no'/>
     <virtcca supported='no'/>
+    <launchSecurity supported='yes'>
+      <enum name='sectype'>
+        <value>sev</value>
+      </enum>
+    </launchSecurity>
   </features>
 </domainCapabilities>

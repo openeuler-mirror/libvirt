@@ -679,6 +679,7 @@ typedef enum { /* virQEMUCapsFlags grouping marker for syntax-check */
     QEMU_CAPS_DEVICE_VIRTIO_BLK_VHOST_VDPA, /* virtio-blk-vhost-vdpa block driver */
     QEMU_CAPS_SMP_CLUSTERS, /* -smp clusters= */
     QEMU_CAPS_VIRTCCA, /* tmm-guest */
+    QEMU_CAPS_CCA_GUEST, /* -object rme-guest */
 
     QEMU_CAPS_LAST /* this must always be the last item */
 } virQEMUCapsFlags;
@@ -856,6 +857,9 @@ void virQEMUCapsFillDomainDeviceChannelCaps(virQEMUCaps *qemuCaps,
 void virQEMUCapsFillDomainDeviceCryptoCaps(virQEMUCaps *qemuCaps,
                                            virDomainCapsDeviceCrypto *crypto);
 
+void virQEMUCapsFillDomainLaunchSecurity(virQEMUCaps *qemuCaps,
+                                         virDomainCapsLaunchSecurity *launchSecurity);
+
 bool virQEMUCapsGuestIsNative(virArch host,
                               virArch guest);
 
@@ -880,6 +884,9 @@ virQEMUCapsGetSEVCapabilities(virQEMUCaps *qemuCaps);
 
 virSGXCapability *
 virQEMUCapsGetSGXCapabilities(virQEMUCaps *qemuCaps);
+
+virCCACapability *
+virQEMUCapsGetCCACapabilities(virQEMUCaps *qemuCaps);
 
 bool
 virQEMUCapsGetKVMSupportsSecureGuest(virQEMUCaps *qemuCaps) G_NO_INLINE;

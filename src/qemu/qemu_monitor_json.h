@@ -169,6 +169,10 @@ qemuMonitorJSONGetSEVCapabilities(qemuMonitor *mon,
                                   virSEVCapability **capabilities);
 
 int
+qemuMonitorJSONGetCCACapabilities(qemuMonitor *mon,
+                                  virCCACapability **capabilities);
+
+int
 qemuMonitorJSONGetVIRTCCACapabilities(qemuMonitor *mon,
                                   virVIRTCCACapability **capabilities);
 
