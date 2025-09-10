@@ -56,3 +56,4 @@ Also=virtlockd.socket
 Also=virtlogd.socket
 Also=libvirtd.socket
 Also=libvirtd-ro.socket
+Also=libvirtd-admin.socket
