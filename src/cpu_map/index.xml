@@ -75,6 +75,7 @@
     <!-- Hygon CPU models -->
     <include filename='x86_Dhyana.xml'/>
     <include filename='x86_Dharma.xml'/>
+    <include filename='x86_Chengdu.xml'/>
   </arch>
 
   <arch name='ppc64'>
