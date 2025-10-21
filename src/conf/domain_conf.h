@@ -381,6 +381,7 @@ struct _virDomainHostdevDef {
     virDomainHostdevMode mode;
     virDomainStartupPolicy startupPolicy;
     virDomainDeviceNuma numa;
+    virTristateSwitch migration;
     bool managed;
     bool missing;
     bool readonly;

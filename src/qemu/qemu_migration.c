@@ -1332,6 +1332,10 @@ qemuMigrationSrcIsAllowedHostdev(const virDomainDef *def)
                     continue;
                 }
 
+                if (hostdev->migration == VIR_TRISTATE_SWITCH_ON) {
+                    continue;
+                }
+
                 /* all other PCI hostdevs can't be migrated */
                 if (hostdev->parentnet) {
                     virDomainNetType actualType = virDomainNetGetActualType(hostdev->parentnet);
