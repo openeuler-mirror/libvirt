@@ -61,6 +61,8 @@ VIR_ENUM_IMPL(virCacheKernel,
               "Instruction",
               "Data",
               "Priority",
+              "Min",
+              "Max",
 );
 
 /* Cache name mapping for our XML naming. */
@@ -70,6 +72,8 @@ VIR_ENUM_IMPL(virCache,
               "code",
               "data",
               "priority",
+              "min",
+              "max",
 );
 
 /* Cache name mapping for resctrl interface naming. */
@@ -80,6 +84,8 @@ VIR_ENUM_IMPL(virResctrl,
               "CODE",
               "DATA",
               "PRI",
+              "MIN",
+              "MAX",
 );
 
 VIR_ENUM_IMPL(virMemory,
@@ -336,9 +342,9 @@ struct _virResctrlAllocPerType {
     unsigned int **cache_ids;
     size_t ncache_ids;
 
-    /* priority for each cahe */
-    unsigned long long **priorities;
-    size_t npriorities;
+    /* value for each cahe */
+    unsigned long long **values;
+    size_t nvalues;
 };
 
 struct _virResctrlAllocPerLevel {
@@ -436,13 +442,13 @@ virResctrlAllocDispose(void *obj)
             for (k = 0; k < type->ncache_ids; k++)
                 g_free(type->cache_ids[k]);
 
-            for (k = 0; k < type->npriorities; k++)
-                g_free(type->priorities[k]);
+            for (k = 0; k < type->nvalues; k++)
+                g_free(type->values[k]);
 
             g_free(type->sizes);
             g_free(type->masks);
             g_free(type->cache_ids);
-            g_free(type->priorities);
+            g_free(type->values);
             g_free(type);
         }
         g_free(level->types);
@@ -1720,9 +1726,11 @@ virResctrlAllocFormatCache(virResctrlAlloc *alloc,
 
             virBufferAsprintf(buf, "L%u%s:", level, virResctrlTypeToString(type));
 
-            if (type == VIR_CACHE_TYPE_PRIORITY) {
-                for (cache = 0; cache < a_type->npriorities; cache++) {
-                    virBufferAsprintf(buf, "%u=%llu;", *(a_type->cache_ids[cache]), *(a_type->priorities[cache]));
+            if (type == VIR_CACHE_TYPE_PRIORITY ||
+                type == VIR_CACHE_TYPE_MIN ||
+                type == VIR_CACHE_TYPE_MAX) {
+                for (cache = 0; cache < a_type->nvalues; cache++) {
+                    virBufferAsprintf(buf, "%u=%llu;", *(a_type->cache_ids[cache]), *(a_type->values[cache]));
                 }
             } else {
                 for (cache = 0; cache < a_type->nmasks; cache++) {
@@ -1740,7 +1748,6 @@ virResctrlAllocFormatCache(virResctrlAlloc *alloc,
                     VIR_FREE(mask_str);
                 }
             }
-
             virBufferTrim(buf, ";");
             virBufferAddChar(buf, '\n');
         }
@@ -1813,18 +1820,19 @@ virResctrlAllocParseProcessCacheId(virResctrlInfo *resctrl,
 
 
 static int
-virResctrlAllocParseProcessCachePriority(virResctrlAlloc *alloc,
+virResctrlAllocParseProcessCacheValue(virResctrlAlloc *alloc,
                                          unsigned int level,
                                          virCacheType type,
-                                         char *value,
+                                         char *valueStr,
                                          unsigned int node_id)
 {
-    unsigned int priority = 0;
+    unsigned int value = 0;
     virResctrlAllocPerType *a_type = NULL;
 
-    if (virStrToLong_uip(value, NULL, 10, &priority) < 0) {
+    if (virStrToLong_uip(valueStr, NULL, 10, &value) < 0) {
         virReportError(VIR_ERR_INTERNAL_ERROR,
-                       _("Invalid priority '%1$s'"), value);
+                       _("Invalid value '%1$s' for cache type '%2$s'"),
+                       valueStr, virCacheTypeToString(type));
         return -1;
     }
 
@@ -1833,15 +1841,15 @@ virResctrlAllocParseProcessCachePriority(virResctrlAlloc *alloc,
     if (!a_type)
         return -1;
 
-    if (a_type->npriorities <= node_id) {
-        VIR_EXPAND_N(a_type->priorities, a_type->npriorities,
-                     node_id - a_type->npriorities + 1);
+    if (a_type->nvalues <= node_id) {
+        VIR_EXPAND_N(a_type->values, a_type->nvalues,
+                     node_id - a_type->nvalues + 1);
     }
 
-    if (!a_type->priorities[node_id])
-        a_type->priorities[node_id] = g_new0(unsigned long long, 1);
+    if (!a_type->values[node_id])
+        a_type->values[node_id] = g_new0(unsigned long long, 1);
 
-    *(a_type->priorities[node_id]) = priority;
+    *(a_type->values[node_id]) = value;
 
     return 0;
 }
@@ -1868,8 +1876,10 @@ virResctrlAllocParseProcessCache(virResctrlInfo *resctrl,
         return -1;
     }
 
-    if (type == VIR_CACHE_TYPE_PRIORITY) {
-        return virResctrlAllocParseProcessCachePriority(alloc, level, type, tmp, node_id);
+    if (type == VIR_CACHE_TYPE_PRIORITY ||
+        type == VIR_CACHE_TYPE_MIN ||
+        type == VIR_CACHE_TYPE_MAX) {
+        return virResctrlAllocParseProcessCacheValue(alloc, level, type, tmp, node_id);
     }
 
     mask = virBitmapNewString(tmp);
@@ -2416,15 +2426,15 @@ virResctrlAllocCopyCacheProperties(virResctrlAlloc *dst,
                 *(d_type->cache_ids[cache]) = *(s_type->cache_ids[cache]);
             }
 
-            if (s_type->npriorities > d_type->npriorities)
-                VIR_EXPAND_N(d_type->priorities, d_type->npriorities,
-                             s_type->npriorities - d_type->npriorities);
+            if (s_type->nvalues > d_type->nvalues)
+                VIR_EXPAND_N(d_type->values, d_type->nvalues,
+                             s_type->nvalues - d_type->nvalues);
 
-            for (cache = 0; cache < s_type->npriorities; cache++) {
-                if (d_type->priorities[cache])
+            for (cache = 0; cache < s_type->nvalues; cache++) {
+                if (d_type->values[cache])
                     continue;
-                d_type->priorities[cache] = g_new0(long long unsigned int, 1);
-                *(d_type->priorities[cache]) = *(s_type->priorities[cache]);
+                d_type->values[cache] = g_new0(long long unsigned int, 1);
+                *(d_type->values[cache]) = *(s_type->values[cache]);
             }
         }
     }
@@ -2531,33 +2541,49 @@ virResctrlAllocAssign(virResctrlInfo *resctrl,
             if (!a_type)
                 continue;
 
-            if (type == VIR_CACHE_TYPE_PRIORITY) {
+            if (type == VIR_CACHE_TYPE_PRIORITY ||
+                type == VIR_CACHE_TYPE_MIN ||
+                type == VIR_CACHE_TYPE_MAX) {
                 for (cache = 0; cache < a_type->nsizes; cache++) {
                     if (!a_type->sizes[cache])
                         continue;
 
-                    if (a_type->npriorities == 0) {
+                    if (a_type->nvalues == 0) {
                         virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
-                            _("Cache level %1$d does not support tuning for scope type '%2$s'"),
-                            level, virCacheTypeToString(type));
+                                       _("Cache level %1$d does not support tuning for scope type '%2$s'"),
+                                       level, virCacheTypeToString(type));
                         return -1;
                     }
 
-                    if (a_type->npriorities <= cache || !a_type->priorities[cache]) {
+                    if (a_type->nvalues <= cache || !a_type->values[cache]) {
                         virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
-                            _("Cache id %1$d does not exist for level %2$d"),
-                            cache, level);
+                                       _("Cache id %1$d does not exist for level %2$d"),
+                                       cache, level);
                         return -1;
                     }
 
-                    if (*(a_type->sizes[cache]) > 3) {
+                    if (type == VIR_CACHE_TYPE_PRIORITY && *(a_type->sizes[cache]) > 3) {
                         virReportError(VIR_ERR_XML_ERROR,
                                        _("Cache level %1$d id %2$d priority value just support 0-3"),
                                        level, cache);
                         return -1;
                     }
 
-                    *(a_type->priorities[cache]) = *(a_type->sizes[cache]);
+                    if (type == VIR_CACHE_TYPE_MIN && *(a_type->sizes[cache]) > 100) {
+                        virReportError(VIR_ERR_XML_ERROR,
+                                       _("Cache level %1$d id %2$d min value exceeding 100 is invalid"),
+                                       level, cache);
+                        return -1;
+                    }
+
+                    if (type == VIR_CACHE_TYPE_MAX && *(a_type->sizes[cache]) > 100) {
+                        virReportError(VIR_ERR_XML_ERROR,
+                                       _("Cache level %1$d id %2$d max value exceeding 100 is invalid"),
+                                       level, cache);
+                        return -1;
+                    }
+
+                    *(a_type->values[cache]) = *(a_type->sizes[cache]);
                 }
                 continue;
             }
