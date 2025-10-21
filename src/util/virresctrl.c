@@ -1290,8 +1290,10 @@ virResctrlAllocCheckCollision(virResctrlAlloc *alloc,
     if (!a_level)
         return false;
 
-    if (type == VIR_CACHE_TYPE_PRIORITY) {
-        a_type = a_level->types[VIR_CACHE_TYPE_PRIORITY];
+    if (type == VIR_CACHE_TYPE_PRIORITY ||
+        type == VIR_CACHE_TYPE_MIN ||
+        type == VIR_CACHE_TYPE_MAX) {
+        a_type = a_level->types[type];
 
         if (a_type && a_type->nsizes > cache && a_type->sizes[cache])
             return true;
