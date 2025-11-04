@@ -1148,6 +1148,8 @@
                       <value>code</value>
                       <value>data</value>
                       <value>priority</value>
+                      <value>min</value>
+                      <value>max</value>
                     </choice>
                   </attribute>
                   <attribute name="size">
