@@ -105,6 +105,7 @@ struct _virDomainNuma {
 
         virNumaCache *caches;
         size_t ncaches;
+        char *prop;
     } *mem_nodes;           /* guest node configuration */
     size_t nmem_nodes;
 
@@ -162,7 +163,7 @@ virDomainNumatuneNodeParseXML(virDomainNuma *numa,
         virDomainNumaNode *mem_node = NULL;
         xmlNodePtr cur_node = nodes[i];
         g_autofree char *tmp = NULL;
-
+        char *proportion = NULL;
         if (virXMLPropUInt(cur_node, "cellid", 10, VIR_XML_PROP_REQUIRED,
                            &cellid) < 0)
             return -1;
@@ -187,6 +188,13 @@ virDomainNumatuneNodeParseXML(virDomainNuma *numa,
                                   VIR_XML_PROP_NONE, &mem_node->mode,
                                   VIR_DOMAIN_NUMATUNE_MEM_STRICT) < 0)
             return -1;
+
+        proportion = virXMLPropString(cur_node, "proportion");
+        if (proportion != NULL) {
+            numa->mem_nodes[cellid].prop = proportion;
+            continue;
+        }
+        numa->mem_nodes[cellid].prop = NULL;
 
         tmp = virXMLPropString(cur_node, "nodeset");
         if (!tmp) {
@@ -278,6 +286,7 @@ virDomainNumatuneFormatXML(virBuffer *buf,
     const char *tmp = NULL;
     char *nodeset = NULL;
     bool nodesetSpecified = false;
+    bool properBindSpecified = false;
     size_t i = 0;
 
     if (!numatune)
@@ -290,7 +299,14 @@ virDomainNumatuneFormatXML(virBuffer *buf,
         }
     }
 
-    if (!nodesetSpecified && !numatune->memory.specified)
+    for (i = 0; i < numatune->nmem_nodes; i++) {
+        if (numatune->mem_nodes[i].prop != NULL) {
+            properBindSpecified = true;
+            break;
+        }
+    }
+
+    if (!nodesetSpecified && !numatune->memory.specified && !properBindSpecified)
         return 0;
 
     virBufferAddLit(buf, "<numatune>\n");
@@ -313,6 +329,12 @@ virDomainNumatuneFormatXML(virBuffer *buf,
 
     for (i = 0; i < numatune->nmem_nodes; i++) {
         virDomainNumaNode *mem_node = &numatune->mem_nodes[i];
+        if (mem_node->prop != NULL) {
+            virBufferAsprintf(buf,
+                          "<memnode cellid='%zu' proportion='%s'/>\n",
+                          i,
+                          mem_node->prop);
+        }
 
         if (!mem_node->nodeset)
             continue;
@@ -350,6 +372,9 @@ virDomainNumaFree(virDomainNuma *numa)
             g_free(numa->mem_nodes[i].distances);
 
         g_free(numa->mem_nodes[i].caches);
+        if (numa->mem_nodes[i].prop != NULL) {
+            g_free(numa->mem_nodes[i].prop);
+        }
     }
     g_free(numa->mem_nodes);
 
@@ -1463,6 +1488,13 @@ virDomainNumaGetNodeDiscard(virDomainNuma *numa,
                             size_t node)
 {
     return numa->mem_nodes[node].discard;
+}
+
+
+char *
+virDomainNumaGetNodeProportion(virDomainNuma *numa, size_t node)
+{
+    return numa->mem_nodes[node].prop;
 }
 
 
