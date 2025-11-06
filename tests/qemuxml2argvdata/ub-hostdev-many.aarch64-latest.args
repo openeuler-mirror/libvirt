@@ -1,0 +1,55 @@
+LC_ALL=C \
+PATH=/bin \
+HOME=/var/lib/libvirt/qemu/domain--1-ub-vhostdev-many \
+USER=test \
+LOGNAME=test \
+XDG_DATA_HOME=/var/lib/libvirt/qemu/domain--1-ub-vhostdev-many/.local/share \
+XDG_CACHE_HOME=/var/lib/libvirt/qemu/domain--1-ub-vhostdev-many/.cache \
+XDG_CONFIG_HOME=/var/lib/libvirt/qemu/domain--1-ub-vhostdev-many/.config \
+/usr/bin/qemu-system-aarch64 \
+-name guest=ub-vhostdev-many,debug-threads=on \
+-S \
+-object '{"qom-type":"secret","id":"masterKey0","format":"raw","file":"/var/lib/libvirt/qemu/domain--1-ub-vhostdev-many/master-key.aes"}' \
+-blockdev '{"driver":"file","filename":"/efi.fd","node-name":"libvirt-pflash0-storage","auto-read-only":true,"discard":"unmap"}' \
+-blockdev '{"node-name":"libvirt-pflash0-format","read-only":false,"driver":"raw","file":"libvirt-pflash0-storage"}' \
+-machine virt,usb=off,gic-version=3,dump-guest-core=off,memory-backend=mach-virt.ram,pflash0=libvirt-pflash0-format \
+-accel kvm \
+-cpu host \
+-m size=1048576k \
+-object '{"qom-type":"memory-backend-ram","id":"mach-virt.ram","size":1073741824}' \
+-overcommit mem-lock=off \
+-smp 1,sockets=1,cores=1,threads=1 \
+-object '{"qom-type":"iommufd","id":"iommufd1"}' \
+-object '{"qom-type":"iommufd","id":"iommufd2"}' \
+-uuid 0c7da38a-634b-4e7e-bd46-4cf65b101619 \
+-display none \
+-no-user-config \
+-nodefaults \
+-chardev socket,id=charmonitor,fd=1729,server=on,wait=off \
+-mon chardev=charmonitor,id=monitor,mode=control \
+-rtc base=utc \
+-no-shutdown \
+-boot strict=on \
+-kernel /aarch64.kernel \
+-initrd /aarch64.initrd \
+-append 'rdinit=init console=ttyAMA0 earlycon=pl011,0x9000000 acpi=on' \
+-device '{"driver":"ubc","id":"ubc.1","guid":"cc08-a000-0-2-000000-0000000000000000","eid":1,"portnum":16}' \
+-audiodev '{"id":"audio1","driver":"none"}' \
+-device '{"driver":"vfio-ub","host":"cc08-a000-0-2-000000-0000000000000001","id":"hostdev0","guid":"cc08-a000-0-2-000000-0000000000000001","eid":3,"portnum":1,"port0":"ubc.1:0","iommufd":"iommufd1"}' \
+-device '{"driver":"vfio-ub","host":"cc08-a000-0-2-000000-0000000000000002","id":"hostdev1","guid":"cc08-a000-0-2-000000-0000000000000002","eid":4,"portnum":1,"port0":"ubc.1:1","iommufd":"iommufd1"}' \
+-device '{"driver":"vfio-ub","host":"cc08-a000-0-2-000000-0000000000000003","id":"hostdev2","guid":"cc08-a000-0-2-000000-0000000000000003","eid":5,"portnum":1,"port0":"ubc.1:2","iommufd":"iommufd1"}' \
+-device '{"driver":"vfio-ub","host":"cc08-a000-0-2-000000-0000000000000004","id":"hostdev3","guid":"cc08-a000-0-2-000000-0000000000000004","eid":6,"portnum":1,"port0":"ubc.1:3","iommufd":"iommufd1"}' \
+-device '{"driver":"vfio-ub","host":"cc08-a000-0-2-000000-0000000000000005","id":"hostdev4","guid":"cc08-a000-0-2-000000-0000000000000005","eid":7,"portnum":1,"port0":"ubc.1:4","iommufd":"iommufd1"}' \
+-device '{"driver":"vfio-ub","host":"cc08-a000-0-2-000000-0000000000000006","id":"hostdev5","guid":"cc08-a000-0-2-000000-0000000000000006","eid":8,"portnum":1,"port0":"ubc.1:5","iommufd":"iommufd1"}' \
+-device '{"driver":"vfio-ub","host":"cc08-a000-0-2-000000-0000000000000007","id":"hostdev6","guid":"cc08-a000-0-2-000000-0000000000000007","eid":9,"portnum":1,"port0":"ubc.1:6","iommufd":"iommufd1"}' \
+-device '{"driver":"vfio-ub","host":"cc08-a000-0-2-000000-0000000000000008","id":"hostdev7","guid":"cc08-a000-0-2-000000-0000000000000008","eid":10,"portnum":1,"port0":"ubc.1:7","iommufd":"iommufd1"}' \
+-device '{"driver":"vfio-ub","host":"cc08-a000-0-2-000000-0000000000000009","id":"hostdev8","guid":"cc08-a000-0-2-000000-0000000000000009","eid":11,"portnum":1,"port0":"ubc.1:8","iommufd":"iommufd1"}' \
+-device '{"driver":"vfio-ub","host":"cc08-a000-0-2-000000-0000000000000010","id":"hostdev9","guid":"cc08-a000-0-2-000000-0000000000000010","eid":12,"portnum":1,"port0":"ubc.1:9","iommufd":"iommufd1"}' \
+-device '{"driver":"vfio-ub","host":"cc08-a000-0-2-000000-0000000000000011","id":"hostdev10","guid":"cc08-a000-0-2-000000-0000000000000011","eid":13,"portnum":1,"port0":"ubc.1:10","iommufd":"iommufd1"}' \
+-device '{"driver":"vfio-ub","host":"cc08-a000-0-2-000000-0000000000000012","id":"hostdev11","guid":"cc08-a000-0-2-000000-0000000000000012","eid":14,"portnum":1,"port0":"ubc.1:11","iommufd":"iommufd1"}' \
+-device '{"driver":"vfio-ub","host":"cc08-a000-0-2-000000-0000000000000013","id":"hostdev12","guid":"cc08-a000-0-2-000000-0000000000000013","eid":15,"portnum":1,"port0":"ubc.1:12","iommufd":"iommufd1"}' \
+-device '{"driver":"vfio-ub","host":"cc08-a000-0-2-000000-0000000000000014","id":"hostdev13","guid":"cc08-a000-0-2-000000-0000000000000014","eid":16,"portnum":1,"port0":"ubc.1:13","iommufd":"iommufd1"}' \
+-device '{"driver":"vfio-ub","host":"cc08-a000-0-2-000000-0000000000000015","id":"hostdev14","guid":"cc08-a000-0-2-000000-0000000000000015","eid":17,"portnum":1,"port0":"ubc.1:14","iommufd":"iommufd1"}' \
+-device '{"driver":"vfio-ub","host":"cc08-a000-0-2-000000-0000000000000016","id":"hostdev15","guid":"cc08-a000-0-2-000000-0000000000000016","eid":18,"portnum":1,"port0":"ubc.1:15","iommufd":"iommufd1"}' \
+-sandbox on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny \
+-msg timestamp=on

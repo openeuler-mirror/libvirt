@@ -1,0 +1,29 @@
+<domain type='kvm'>
+  <name>ub-ummu</name>
+  <uuid>0c7da38a-634b-4e7e-bd46-4cf65b101619</uuid>
+  <memory unit='KiB'>1048576</memory>
+  <currentMemory unit='KiB'>1048576</currentMemory>
+  <vcpu placement='static'>1</vcpu>
+  <iommufds>2</iommufds>
+  <os>
+    <type arch='aarch64' machine='virt'>hvm</type>
+    <loader type='pflash'>/efi.fd</loader>
+    <kernel>/aarch64.kernel</kernel>
+    <initrd>/aarch64.initrd</initrd>
+    <cmdline>rdinit=init console=ttyAMA0 earlycon=pl011,0x9000000 acpi=on</cmdline>
+    <boot dev='hd'/>
+  </os>
+  <features>
+    <acpi/>
+    <gic version='3'/>
+  </features>
+  <cpu mode='host-passthrough' check='none'/>
+  <clock offset='utc'/>
+  <on_poweroff>destroy</on_poweroff>
+  <on_reboot>restart</on_reboot>
+  <on_crash>restart</on_crash>
+  <devices>
+    <emulator>/usr/bin/qemu-system-aarch64</emulator>
+    <iommu model='ummu'/>
+  </devices>
+</domain>

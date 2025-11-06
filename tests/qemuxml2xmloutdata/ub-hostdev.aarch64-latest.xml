@@ -1,0 +1,44 @@
+<domain type='kvm'>
+  <name>ub-hostdev</name>
+  <uuid>0c7da38a-634b-4e7e-bd46-4cf65b101619</uuid>
+  <memory unit='KiB'>1048576</memory>
+  <currentMemory unit='KiB'>1048576</currentMemory>
+  <vcpu placement='static'>1</vcpu>
+  <iommufds>2</iommufds>
+  <os>
+    <type arch='aarch64' machine='virt'>hvm</type>
+    <loader type='pflash'>/efi.fd</loader>
+    <kernel>/aarch64.kernel</kernel>
+    <initrd>/aarch64.initrd</initrd>
+    <cmdline>rdinit=init console=ttyAMA0 earlycon=pl011,0x9000000 acpi=on</cmdline>
+    <boot dev='hd'/>
+  </os>
+  <features>
+    <acpi/>
+    <gic version='3'/>
+  </features>
+  <cpu mode='host-passthrough' check='none'/>
+  <clock offset='utc'/>
+  <on_poweroff>destroy</on_poweroff>
+  <on_reboot>restart</on_reboot>
+  <on_crash>restart</on_crash>
+  <devices>
+    <emulator>/usr/bin/qemu-system-aarch64</emulator>
+    <controller type='ub' index='1' model='ubc'>
+      <ports num='16'/>
+      <address type='ub' eid='0x1' guid='cc08-a000-0-2-000000-0000000000000001'/>
+    </controller>
+    <controller type='pci' index='0' model='pcie-root'/>
+    <audio id='1' type='none'/>
+    <hostdev mode='subsystem' type='ub' managed='yes'>
+      <driver name='vfio'/>
+      <source>
+        <address guid='cc08-a000-0-2-000000-0000000000000002'/>
+      </source>
+      <ports num='1'>
+        <port index='0' teid='0x1' tport='0'/>
+      </ports>
+      <address type='ub' eid='0x3' guid='cc08-a000-0-2-000000-0000000000000002'/>
+    </hostdev>
+  </devices>
+</domain>
