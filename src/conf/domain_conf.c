@@ -22480,6 +22480,34 @@ virDomainDefParse(const char *xmlStr,
     return def;
 }
 
+virDomainDef *
+virDomainDefIDsParseString(const char *xmlStr,
+                           unsigned int flags)
+{
+    g_autoptr(virDomainDef) def = NULL;
+    g_autoptr(xmlDoc) xml = NULL;
+    g_autoptr(xmlXPathContext) ctxt = NULL;
+    bool uuid_generated = false;
+    int keepBlanksDefault = xmlKeepBlanksDefault(0);
+
+    if (!(xml = virXMLParse(NULL, xmlStr, _("(domain_definition)"))))
+        goto cleanup;
+
+    def = virDomainDefNew();
+    if (!def)
+        goto cleanup;
+
+    if (virDomainDefParseIDs(def, ctxt, flags, &uuid_generated) < 0)
+        goto cleanup;
+
+    if (uuid_generated)
+        memset(def->uuid, 0, VIR_UUID_BUFLEN);
+
+ cleanup:
+    xmlKeepBlanksDefault(keepBlanksDefault);
+    return g_steal_pointer(&def);
+}
+
 virDomainDefPtr
 virDomainDefParseString(const char *xmlStr,
                         virDomainXMLOptionPtr xmlopt,
