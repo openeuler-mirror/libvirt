@@ -78,7 +78,9 @@ qemuSaveImageOpen(virQEMUDriver *driver,
                   bool bypass_cache,
                   virFileWrapperFd **wrapperFd,
                   bool open_write,
-                  bool unlink_corrupt)
+                  bool unlink_corrupt,
+                  virConnectPtr conn,
+                  int (*ensureACL)(virConnectPtr, virDomainDef *))
     ATTRIBUTE_NONNULL(3) ATTRIBUTE_NONNULL(4);
 
 int
