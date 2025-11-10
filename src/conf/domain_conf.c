@@ -6235,6 +6235,10 @@ virDomainHostdevDefParseXMLSubsys(xmlNodePtr node,
 
     model = virXMLPropString(node, "model");
 
+    if (virXMLPropTristateSwitch(node, "migration", VIR_XML_PROP_NONE,
+                                 &def->migration) < 0)
+        return -1;
+
     if (virXMLPropUInt(node, "iommufd", 10, VIR_XML_PROP_NONZERO,
                        &def->iommufd) < 0) {
         virReportError(VIR_ERR_XML_ERROR, "%s",
@@ -26423,6 +26427,10 @@ virDomainHostdevDefFormat(virBuffer *buf,
     if (def->mode == VIR_DOMAIN_HOSTDEV_MODE_SUBSYS) {
         virBufferAsprintf(buf, " managed='%s'",
                           def->managed ? "yes" : "no");
+
+        if (def->migration != VIR_TRISTATE_SWITCH_ABSENT)
+            virBufferAsprintf(buf, " migration='%s'",
+                              virTristateSwitchTypeToString(def->migration));
 
         if (def->source.subsys.type == VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_SCSI &&
             scsisrc->sgio)

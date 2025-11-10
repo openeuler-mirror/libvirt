@@ -4777,6 +4777,7 @@ qemuBuildPCIHostdevDevProps(const virDomainDef *def,
                               "s:id", dev->info->alias,
                               "p:bootindex", dev->info->effectiveBootIndex,
                               "S:failover_pair_id", failover_pair_id,
+                              "S:enable-migration", qemuOnOffAuto(dev->migration),
                               NULL) < 0)
         return NULL;
 
