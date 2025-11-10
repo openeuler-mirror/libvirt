@@ -1407,6 +1407,7 @@ VIR_ENUM_IMPL(virDomainMemoryAllocation,
               "none",
               "immediate",
               "ondemand",
+              "hugepage-ondemand",
 );
 
 VIR_ENUM_IMPL(virDomainLoader,

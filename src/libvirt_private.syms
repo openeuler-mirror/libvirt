@@ -925,6 +925,7 @@ virDomainNumaGetNodeDistance;
 virDomainNumaGetNodeInitiator;
 virDomainNumaGetNodeMemoryAccessMode;
 virDomainNumaGetNodeMemorySize;
+virDomainNumaGetNodeProportion;
 virDomainNumaHasHMAT;
 virDomainNumaNew;
 virDomainNumaNodeDistanceIsUsingDefaults;

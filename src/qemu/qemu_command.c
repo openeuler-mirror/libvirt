@@ -3413,6 +3413,11 @@ qemuBuildMemoryBackendProps(virJSONValue **backendProps,
         } else if (useHugepage) {
             if (qemuGetDomainHupageMemPath(priv->driver, def, pagesize, &memPath) < 0)
                 return -1;
+
+            if (def->mem.allocation == VIR_DOMAIN_MEMORY_ALLOCATION_HUGEPAGE_ONDEMAND) {
+                prealloc = false;
+                virJSONValueObjectAppendBoolean(props, "reserve", 0);
+            }
         } else {
             /* We can have both pagesize and mem source. If that's the case,
              * prefer hugepages as those are more specific. */
@@ -7687,10 +7692,18 @@ qemuBuildNumaCommandLine(virQEMUDriverConfig *cfg,
     nodemask = g_new0(virBitmap *, ncells);
 
     for (i = 0; i < ncells; i++) {
+        char *prop = NULL;
         if ((rc = qemuBuildMemoryCellBackendProps(def, cfg, i, priv,
                                                   &nodeBackends[i],
                                                   &nodemask[i])) < 0)
             goto cleanup;
+
+        prop = virDomainNumaGetNodeProportion(def->numa, i);
+        if (prop != NULL) {
+            if (virJSONValueObjectPrependString(nodeBackends[i], "host-nodes-propertion", prop) < 0) {
+                goto cleanup;
+            }
+        }
 
         if (rc == 0)
             needBackend = true;

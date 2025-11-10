@@ -507,6 +507,7 @@ typedef enum {
     VIR_DOMAIN_MEMORY_ALLOCATION_NONE = 0,  /* No memory allocation defined */
     VIR_DOMAIN_MEMORY_ALLOCATION_IMMEDIATE, /* Memory allocation is set as immediate */
     VIR_DOMAIN_MEMORY_ALLOCATION_ONDEMAND,  /* Memory allocation is set as ondemand */
+    VIR_DOMAIN_MEMORY_ALLOCATION_HUGEPAGE_ONDEMAND, /* Hugepage allocation is set as ondemand */
 
     VIR_DOMAIN_MEMORY_ALLOCATION_LAST,
 } virDomainMemoryAllocation;

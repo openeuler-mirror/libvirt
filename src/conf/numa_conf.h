@@ -136,6 +136,10 @@ virDomainMemoryAccess virDomainNumaGetNodeMemoryAccessMode(virDomainNuma *numa,
 virTristateBool virDomainNumaGetNodeDiscard(virDomainNuma *numa,
                                             size_t node)
     ATTRIBUTE_NONNULL(1);
+
+char *virDomainNumaGetNodeProportion(virDomainNuma *numa, size_t node)
+    ATTRIBUTE_NONNULL(1);
+
 unsigned long long virDomainNumaGetNodeMemorySize(virDomainNuma *numa,
                                                   size_t node)
     ATTRIBUTE_NONNULL(1);
