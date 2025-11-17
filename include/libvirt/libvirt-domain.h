@@ -1108,6 +1108,13 @@ typedef enum {
      * Since: 9.10.0
      */
     VIR_MIGRATE_RETURNPATH = (1 << 21),
+
+    /* Use one-copy mechanism for migrating memory pages. For QEMU/KVM this
+     * means QEMU will pause source vm and send all dirty pages to dest by once.
+     *
+     * Since: 9.10.0
+     */
+    VIR_MIGRATE_ONECOPY = (1 << 22),
 } virDomainMigrateFlags;
 
 

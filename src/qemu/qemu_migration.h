@@ -63,6 +63,7 @@
      VIR_MIGRATE_POSTCOPY_RESUME | \
      VIR_MIGRATE_ZEROCOPY | \
      VIR_MIGRATE_RETURNPATH | \
+     VIR_MIGRATE_ONECOPY | \
      0)
 
 /* All supported migration parameters and their types. */

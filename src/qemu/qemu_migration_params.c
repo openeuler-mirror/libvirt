@@ -99,6 +99,7 @@ VIR_ENUM_IMPL(qemuMigrationCapability,
               "dirty-bitmaps",
               "return-path",
               "zero-copy-send",
+              "onecopy",
 );
 
 
@@ -195,6 +196,11 @@ static const qemuMigrationParamsFlagMapItem qemuMigrationParamsFlagMap[] = {
      VIR_MIGRATE_RETURNPATH,
      QEMU_MIGRATION_CAP_RETURN_PATH,
      QEMU_MIGRATION_SOURCE | QEMU_MIGRATION_DESTINATION},
+
+    {QEMU_MIGRATION_FLAG_REQUIRED,
+     VIR_MIGRATE_ONECOPY,
+     QEMU_MIGRATION_CAP_ONECOPY,
+     QEMU_MIGRATION_SOURCE},
 };
 
 /* Translation from VIR_MIGRATE_PARAM_* typed parameters to

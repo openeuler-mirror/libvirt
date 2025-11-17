@@ -11133,6 +11133,10 @@ static const vshCmdOptDef opts_migrate[] = {
      .type = VSH_OT_INT,
      .help = N_("compress level for zstd compression")
     },
+    {.name = "onecopy",
+     .type = VSH_OT_BOOL,
+     .help = N_("enable one-copy migration")
+    },
     {.name = NULL}
 };
 
@@ -11183,6 +11187,7 @@ doMigrate(void *opaque)
         { "parallel", VIR_MIGRATE_PARALLEL },
         { "suspend", VIR_MIGRATE_PAUSED },
         { "return-path", VIR_MIGRATE_RETURNPATH },
+        { "onecopy", VIR_MIGRATE_ONECOPY },
     };
 
 #ifndef WIN32

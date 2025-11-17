@@ -2229,6 +2229,8 @@ qemuMigrationDstCheckProtocol(virQEMUCaps *qemuCaps,
             return -1;
         }
     } else if (!STRPREFIX(migrateFrom, "tcp") &&
+               !STRPREFIX(migrateFrom, "hcom") &&
+               !STRPREFIX(migrateFrom, "urma") &&
                !STRPREFIX(migrateFrom, "exec") &&
                !STRPREFIX(migrateFrom, "fd") &&
                !STRPREFIX(migrateFrom, "unix") &&
@@ -3790,6 +3792,8 @@ qemuMigrationDstPrepareDirect(virQEMUDriver *driver,
         }
 
         if (STRNEQ(uri->scheme, "tcp") &&
+            STRNEQ(uri->scheme, "hcom") &&
+            STRNEQ(uri->scheme, "urma") &&
             STRNEQ(uri->scheme, "rdma") &&
             STRNEQ(uri->scheme, "unix")) {
             virReportError(VIR_ERR_ARGUMENT_UNSUPPORTED,
@@ -5206,7 +5210,10 @@ qemuMigrationSrcPerformNative(virQEMUDriver *driver,
         /* RDMA and multi-fd migration requires QEMU to connect to the destination
          * itself.
          */
-        if (STREQ(uribits->scheme, "rdma") || (flags & VIR_MIGRATE_PARALLEL))
+        if (STREQ(uribits->scheme, "rdma") ||
+            STREQ(uribits->scheme, "hcom") ||
+            STREQ(uribits->scheme, "urma") ||
+            (flags & VIR_MIGRATE_PARALLEL))
             spec.destType = MIGRATION_DEST_HOST;
         else
             spec.destType = MIGRATION_DEST_CONNECT_HOST;
