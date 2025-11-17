@@ -195,6 +195,9 @@ qemuAssignDeviceControllerAlias(virDomainDef *domainDef,
             controller->info.alias = g_strdup("scsi");
             return;
         }
+    } else if (controller->type == VIR_DOMAIN_CONTROLLER_TYPE_UB) {
+        controller->info.alias = g_strdup_printf("ubc.%d", controller->info.addr.ub.eid);
+        return;
     }
     /* all other controllers use the default ${type}${index} naming
      * scheme for alias/id.

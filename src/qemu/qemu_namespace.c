@@ -343,6 +343,9 @@ qemuDomainSetupHostdev(virDomainObj *vm,
         (!hotplug || !qemuDomainNeedsVFIO(vm->def)))
         *paths = g_slist_prepend(*paths, g_strdup(QEMU_DEV_VFIO));
 
+    if (hostdev->iommufd)
+        *paths = g_slist_prepend(*paths, g_strdup(QEMU_DEV_IOMMUFD));
+
     return 0;
 }
 

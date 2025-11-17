@@ -415,6 +415,7 @@ VIR_ENUM_IMPL(virDomainController,
               "pci",
               "xenbus",
               "isa",
+              "ub",
 );
 
 VIR_ENUM_IMPL(virDomainControllerModelPCI,
@@ -429,6 +430,12 @@ VIR_ENUM_IMPL(virDomainControllerModelPCI,
               "pcie-switch-downstream-port",
               "pci-expander-bus",
               "pcie-expander-bus",
+);
+
+VIR_ENUM_DECL(virDomainControllerModelUB);
+VIR_ENUM_IMPL(virDomainControllerModelUB,
+              VIR_DOMAIN_CONTROLLER_MODEL_UB_LAST,
+              "ubc",
 );
 
 VIR_ENUM_IMPL(virDomainControllerPCIModelName,
@@ -1054,6 +1061,7 @@ VIR_ENUM_IMPL(virDomainHostdevSubsys,
               "scsi_host",
               "mdev",
               "vdpa",
+              "ub",
 );
 
 VIR_ENUM_IMPL(virDomainHostdevSubsysPCIBackend,
@@ -1062,6 +1070,12 @@ VIR_ENUM_IMPL(virDomainHostdevSubsysPCIBackend,
               "kvm",
               "vfio",
               "xen",
+);
+
+VIR_ENUM_IMPL(virDomainHostdevSubsysUBBackend,
+              VIR_DOMAIN_HOSTDEV_UB_BACKEND_TYPE_LAST,
+              "default",
+              "vfio",
 );
 
 VIR_ENUM_IMPL(virDomainHostdevSubsysSCSIProtocol,
@@ -1337,6 +1351,7 @@ VIR_ENUM_IMPL(virDomainIOMMUModel,
               "intel",
               "smmuv3",
               "virtio",
+              "ummu",
 );
 
 VIR_ENUM_IMPL(virDomainVsockModel,
@@ -2508,6 +2523,7 @@ virDomainControllerDefNew(virDomainControllerType type)
     case VIR_DOMAIN_CONTROLLER_TYPE_SATA:
     case VIR_DOMAIN_CONTROLLER_TYPE_CCID:
     case VIR_DOMAIN_CONTROLLER_TYPE_ISA:
+    case VIR_DOMAIN_CONTROLLER_TYPE_UB:
     case VIR_DOMAIN_CONTROLLER_TYPE_LAST:
         break;
     }
@@ -2653,6 +2669,9 @@ virDomainHostdevDefClear(virDomainHostdevDef *def)
             break;
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
             VIR_FREE(def->source.subsys.u.vdpa.devpath);
+            break;
+        case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB:
+            VIR_FREE(def->source.subsys.u.ub.addr.guidStr);
             break;
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_USB:
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_MDEV:
@@ -4065,6 +4084,9 @@ void virDomainDefFree(virDomainDef *def)
 
     xmlFreeNode(def->metadata);
 
+    virUBBitmapAllocatorFree(def->ubgs_allocator);
+    virUBBitmapAllocatorFree(def->ubeid_allocator);
+
     g_free(def);
 }
 
@@ -5341,6 +5363,44 @@ virDomainVirtioOptionsFormat(virBuffer *buf,
     }
 }
 
+static void
+virDomainUBBusInstanceFormat(virBuffer *buf,
+                             const virDomainDeviceInfo *info)
+{
+    g_auto(virBuffer) childBuf = VIR_BUFFER_INIT_CHILD(buf);
+
+    if (info->busInstance.guidStr == NULL) {
+        return;
+    }
+
+    virBufferAsprintf(&childBuf, "<businstance guid='%s'/>\n", info->busInstance.guidStr);
+    virXMLFormatElement(buf, "source", NULL, &childBuf);
+}
+
+static void
+virDomainUBDevicePortInfoFormat(virBuffer *buf,
+                                const virDomainDeviceInfo *info)
+{
+    unsigned int i;
+    g_auto(virBuffer) attrBuf = VIR_BUFFER_INITIALIZER;
+    g_auto(virBuffer) childBuf = VIR_BUFFER_INIT_CHILD(buf);
+
+    virBufferAsprintf(&attrBuf, " num='%u'", info->udevPort.num);
+    if (info->udevPort.ports == NULL) {
+        virXMLFormatElement(buf, "ports", &attrBuf, NULL);
+        return;
+    }
+
+    for (i = 0; i < info->udevPort.num; i++) {
+        if (info->udevPort.ports[i].status != UB_DEVICE_PORT_STATUS_LINK_UP)
+            continue;
+
+        virBufferAsprintf(&childBuf, "<port index='%u' teid='0x%x' tport='%u'/>\n",
+                          i, info->udevPort.ports[i].teid, info->udevPort.ports[i].tport);
+    }
+
+    virXMLFormatElement(buf, "ports", &attrBuf, &childBuf);
+}
 
 static void ATTRIBUTE_NONNULL(2)
 virDomainDeviceInfoFormat(virBuffer *buf,
@@ -5423,6 +5483,15 @@ virDomainDeviceInfoFormat(virBuffer *buf,
                               info->addr.pci.zpci.fid.value);
         }
         break;
+
+    case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_UB: {
+        virDomainUBBusInstanceFormat(buf, info);
+        virDomainUBDevicePortInfoFormat(buf, info);
+        virBufferAsprintf(&attrBuf, " eid='0x%x' guid='%s'",
+                          info->addr.ub.eid,
+                          info->addr.ub.guidStr);
+        break;
+    }
 
     case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_DRIVE:
         virBufferAsprintf(&attrBuf, " controller='%d' bus='%d' target='%d' unit='%d'",
@@ -5587,6 +5656,11 @@ virDomainDeviceAddressParseXML(xmlNodePtr address,
             return -1;
         break;
 
+    case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_UB:
+        if (virUBDeviceAddressParseXML(address, &info->addr.ub) < 0)
+            return -1;
+        break;
+
     case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_DRIVE:
         if (virDomainDeviceDriveAddressParseXML(address, &info->addr.drive) < 0)
             return -1;
@@ -5656,6 +5730,128 @@ virDomainDeviceAliasIsUserAlias(const char *aliasStr)
     return aliasStr && STRPREFIX(aliasStr, USER_ALIAS_PREFIX);
 }
 
+static int
+virDomainUBDevicePortsParseXML(xmlXPathContextPtr ctxt,
+                               virDomainDeviceInfo *info, bool is_ctrlr)
+{
+    xmlNodePtr ubPort = NULL;
+    g_autofree xmlNodePtr *ports = NULL;
+    int n, i;
+    unsigned int index;
+
+    if (!(ubPort = virXPathNode("./ports", ctxt))) {
+        return 0;
+    }
+
+    if (virXMLPropUInt(ubPort, "num", 0, VIR_XML_PROP_NONNEGATIVE, &info->udevPort.num) < 0)
+        return -1;
+
+    if (info->udevPort.num > UB_DEVICE_MAX_PORT_NUM ||
+        info->udevPort.num == 0) {
+        virReportError(VIR_ERR_XML_ERROR,
+                       _("ub expect num port is [1, %d]"),
+                       UB_DEVICE_MAX_PORT_NUM);
+        return -1;
+    }
+
+    if ((n = virXPathNodeSet("./ports/port", ctxt, &ports)) < 0)
+        return -1;
+
+    if (is_ctrlr && n > 0) {
+        virReportError(VIR_ERR_XML_ERROR,
+                       _("dont support config ub port info in ub controller\n"));
+        return -1;
+    }
+
+    /* port topo info not configed in ub controller */
+    if (is_ctrlr)
+        return 0;
+
+    if (n > info->udevPort.num) {
+        virReportError(VIR_ERR_XML_ERROR,
+                       _("unexpect configed port entry(%d) bigger than configed port num(%d)"),
+                       n, info->udevPort.num);
+        return -1;
+    }
+
+    /* be freed in virDomainDeviceInfoClearUdevPort */
+    info->udevPort.ports = g_malloc0(sizeof(virUBDevicePortInfo) * info->udevPort.num);
+    if (!info->udevPort.ports) {
+        return -1;
+    }
+
+    for (i = 0; i < n; i++) {
+        if (virXMLPropUInt(ports[i], "index", 0, VIR_XML_PROP_NONNEGATIVE, &index) < 0)
+            goto cleanup;
+
+        if (index >= info->udevPort.num) {
+            virReportError(VIR_ERR_XML_ERROR,
+                           _("expect index(%d) < configed port num(%d)"),
+                           index, info->udevPort.num);
+            goto cleanup;
+        }
+
+        if (virXMLPropUInt(ports[i], "teid", 0, VIR_XML_PROP_NONNEGATIVE,
+                           &info->udevPort.ports[index].teid) < 0)
+            goto cleanup;
+
+        if (virXMLPropUInt(ports[i], "tport", 0, VIR_XML_PROP_NONNEGATIVE,
+                           &info->udevPort.ports[index].tport) < 0)
+            goto cleanup;
+
+        info->udevPort.ports[index].status = UB_DEVICE_PORT_STATUS_LINK_UP;
+    }
+
+    return 0;
+
+cleanup:
+    VIR_FREE(info->udevPort.ports);
+
+    return -1;
+}
+
+static int
+virDomainUBControllerBusInstanceParseXml(xmlXPathContextPtr ctxt,
+                                         virDomainDeviceInfo *info)
+{
+    xmlNodePtr source = NULL;
+    g_autofree xmlNodePtr *bus_instance = NULL;
+    int n;
+
+    if (!(source = virXPathNode("./source", ctxt))) {
+        return 0;
+    }
+
+    if ((n = virXPathNodeSet("./source/businstance", ctxt, &bus_instance)) < 0) {
+        return -1;
+    }
+
+    if (n == 0) {
+        virReportError(VIR_ERR_XML_ERROR,
+                       _("missing sub <businstance> element in ub controller <source> element\n"));
+        return -1;
+    }
+
+    if (n > 1) {
+        virReportError(VIR_ERR_XML_ERROR,
+                       _("multile businstance configed, just support config one businstance\n"));
+        return -1;
+    }
+
+    info->busInstance.guidStr = virXMLPropString(bus_instance[0], "guid");
+    if (!info->busInstance.guidStr) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                       _("missing guid in <businstance> element\n"));
+        return -1;
+    }
+
+    if (virUBDeviceGetGuidFromStr(&info->busInstance.guid, info->busInstance.guidStr) < 0) {
+        VIR_FREE(info->busInstance.guidStr);
+        return -1;
+    }
+
+    return 0;
+}
 
 static int
 virDomainDeviceInfoParseXML(virDomainXMLOption *xmlopt,
@@ -5724,7 +5920,6 @@ virDomainDeviceInfoParseXML(virDomainXMLOption *xmlopt,
     if ((address = virXPathNode("./address", ctxt)) &&
         virDomainDeviceAddressParseXML(address, info) < 0)
         goto cleanup;
-
 
     ret = 0;
  cleanup:
@@ -6206,6 +6401,32 @@ virDomainHostdevSubsysVDPADefParseXML(xmlNodePtr sourcenode,
 }
 
 static int
+virDomainHostdevSubsysUBDefParseXML(xmlXPathContextPtr ctxt,
+		                    virDomainHostdevDef *def)
+{
+    xmlNodePtr node = NULL;
+    virUBDeviceAddress *addr = &def->source.subsys.u.ub.addr;
+
+    if (!(node = virXPathNode("./source/address", ctxt))) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                       _("miss source/address element in ub hostdev"));
+    }
+
+    /* be freed in virDomainHostdevDefClear */
+    addr->guidStr = virXMLPropString(node, "guid");
+    if (!addr->guidStr) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+		       _("missing guid in <address> element"));
+	    return -1;
+    }
+
+    if (virUBDeviceGetGuidFromStr(&addr->guid, addr->guidStr) < 0)
+        return -1;
+
+    return 0;
+}
+
+static int
 virDomainHostdevDefParseXMLSubsys(xmlNodePtr node,
                                   xmlXPathContextPtr ctxt,
                                   virDomainHostdevSubsysType type,
@@ -6217,6 +6438,7 @@ virDomainHostdevDefParseXMLSubsys(xmlNodePtr node,
     xmlNodePtr driver_node = NULL;
     xmlNodePtr numa_node = NULL;
     virDomainHostdevSubsysPCI *pcisrc = &def->source.subsys.u.pci;
+    virDomainHostdevSubsysUB *ubsrc = &def->source.subsys.u.ub;
     virDomainHostdevSubsysSCSI *scsisrc = &def->source.subsys.u.scsi;
     virDomainHostdevSubsysSCSIVHost *scsihostsrc = &def->source.subsys.u.scsi_host;
     virDomainHostdevSubsysMediatedDev *mdevsrc = &def->source.subsys.u.mdev;
@@ -6373,6 +6595,17 @@ virDomainHostdevDefParseXMLSubsys(xmlNodePtr node,
         if (virDomainHostdevSubsysVDPADefParseXML(sourcenode, def) < 0) {
             return -1;
         }
+        break;
+    case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB:
+        if (virDomainHostdevSubsysUBDefParseXML(ctxt, def) < 0)
+            return -1;
+
+        driver_node = virXPathNode("./driver", ctxt);
+        if (virXMLPropEnum(driver_node, "name",
+                           virDomainHostdevSubsysUBBackendTypeFromString,
+                           VIR_XML_PROP_NONZERO,
+                           &ubsrc->backend) < 0)
+            return -1;
         break;
 
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_LAST:
@@ -8388,6 +8621,8 @@ virDomainControllerModelTypeFromString(const virDomainControllerDef *def,
         return virDomainControllerModelVirtioSerialTypeFromString(model);
     case VIR_DOMAIN_CONTROLLER_TYPE_ISA:
         return virDomainControllerModelISATypeFromString(model);
+    case VIR_DOMAIN_CONTROLLER_TYPE_UB:
+        return virDomainControllerModelUBTypeFromString(model);
     case VIR_DOMAIN_CONTROLLER_TYPE_FDC:
     case VIR_DOMAIN_CONTROLLER_TYPE_SATA:
     case VIR_DOMAIN_CONTROLLER_TYPE_CCID:
@@ -8416,6 +8651,8 @@ virDomainControllerModelTypeToString(virDomainControllerDef *def,
         return virDomainControllerModelVirtioSerialTypeToString(model);
     case VIR_DOMAIN_CONTROLLER_TYPE_ISA:
         return virDomainControllerModelISATypeToString(model);
+    case VIR_DOMAIN_CONTROLLER_TYPE_UB:
+        return virDomainControllerModelUBTypeToString(model);
     case VIR_DOMAIN_CONTROLLER_TYPE_FDC:
     case VIR_DOMAIN_CONTROLLER_TYPE_SATA:
     case VIR_DOMAIN_CONTROLLER_TYPE_CCID:
@@ -8425,7 +8662,6 @@ virDomainControllerModelTypeToString(virDomainControllerDef *def,
     }
     return NULL;
 }
-
 
 static virDomainControllerDef *
 virDomainControllerDefParseXML(virDomainXMLOption *xmlopt,
@@ -8636,6 +8872,7 @@ virDomainControllerDefParseXML(virDomainXMLOption *xmlopt,
             def->opts.pciopts.numaNode = numaNode;
 
         break;
+
     case VIR_DOMAIN_CONTROLLER_TYPE_XENBUS: {
         if (virXMLPropInt(node, "maxGrantFrames", 10, VIR_XML_PROP_NONNEGATIVE,
                           &def->opts.xenbusopts.maxGrantFrames,
@@ -8648,7 +8885,15 @@ virDomainControllerDefParseXML(virDomainXMLOption *xmlopt,
             return NULL;
         break;
     }
+    case VIR_DOMAIN_CONTROLLER_TYPE_UB: {
+        if (virDomainUBDevicePortsParseXML(ctxt, &def->info, true) < 0)
+            return NULL;
 
+        if (virDomainUBControllerBusInstanceParseXml(ctxt, &def->info) < 0)
+            return NULL;
+
+        break;
+    }
     case VIR_DOMAIN_CONTROLLER_TYPE_IDE:
     case VIR_DOMAIN_CONTROLLER_TYPE_FDC:
     case VIR_DOMAIN_CONTROLLER_TYPE_SCSI:
@@ -13091,6 +13336,11 @@ virDomainHostdevDefParseXML(virDomainXMLOption *xmlopt,
                 def->shareable = true;
             break;
 
+        case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB:
+            if (virDomainUBDevicePortsParseXML(ctxt, def->info, false) < 0)
+                goto error;
+            break;
+
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_USB:
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_PCI:
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_SCSI_HOST:
@@ -14269,6 +14519,9 @@ virDomainHostdevMatchSubsys(virDomainHostdevDef *a,
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
         return STREQ(a->source.subsys.u.vdpa.devpath,
                      b->source.subsys.u.vdpa.devpath);
+    case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB:
+        VIR_INFO("TODO: %s", __func__);
+        return 0;
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_LAST:
         return 0;
     }
@@ -18447,7 +18700,6 @@ virDomainMemorytuneDefParse(virDomainDef *def,
     return ret;
 }
 
-
 static int
 virDomainDefTunablesParse(virDomainDef *def,
                           xmlXPathContextPtr ctxt,
@@ -19900,6 +20152,10 @@ virDomainDeviceInfoCheckABIStability(virDomainDeviceInfo *src,
                            src->addr.pci.slot, src->addr.pci.function);
             return false;
         }
+        break;
+
+    case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_UB:
+        VIR_INFO("TODO: %s\n", __func__);
         break;
 
     case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_DRIVE:
@@ -23298,10 +23554,13 @@ virDomainControllerDefFormat(virBuffer *buf,
         }
         break;
 
+    case VIR_DOMAIN_CONTROLLER_TYPE_UB:
+        VIR_INFO("TODO: %s\n", __func__);
+        break;
+
     case VIR_DOMAIN_CONTROLLER_TYPE_PCI:
         if (virDomainControllerDefFormatPCI(&childBuf, def, flags) < 0)
             return -1;
-
     case VIR_DOMAIN_CONTROLLER_TYPE_IDE:
     case VIR_DOMAIN_CONTROLLER_TYPE_FDC:
     case VIR_DOMAIN_CONTROLLER_TYPE_SCSI:
@@ -23736,6 +23995,32 @@ virDomainHostdevDefFormatSubsysVDPA(virBuffer *buf,
     virXMLFormatElement(buf, "source", &sourceAttrBuf, NULL);
 }
 
+static int
+virDomainHostdevDefFormatSubsysUB(virBuffer *buf,
+                                  virDomainHostdevDef *def)
+{
+    g_auto(virBuffer) sourceChildBuf = VIR_BUFFER_INIT_CHILD(buf);
+    virDomainHostdevSubsysUB *ubsrc = &def->source.subsys.u.ub;
+
+    if (ubsrc->backend != VIR_DOMAIN_HOSTDEV_UB_BACKEND_DEFAULT) {
+        const char *backend = virDomainHostdevSubsysUBBackendTypeToString(ubsrc->backend);
+        if (!backend) {
+            virReportError(VIR_ERR_INTERNAL_ERROR,
+                           _("unexpected ub hostdev driver name type %1$d"),
+                           ubsrc->backend);
+            return -1;
+        }
+
+        virBufferAsprintf(buf, "<driver name='%s'/>\n", backend);
+    }
+
+    virBufferAsprintf(&sourceChildBuf, "<address guid='%s'/>\n",
+                      def->source.subsys.u.ub.addr.guidStr);
+
+    virXMLFormatElement(buf, "source", NULL, &sourceChildBuf);
+
+    return 0;
+}
 
 static int
 virDomainHostdevDefFormatSubsys(virBuffer *buf,
@@ -23766,6 +24051,9 @@ virDomainHostdevDefFormatSubsys(virBuffer *buf,
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
         virDomainHostdevDefFormatSubsysVDPA(buf, def);
         return 0;
+
+    case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB:
+        return virDomainHostdevDefFormatSubsysUB(buf, def);
 
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_LAST:
     default:
@@ -26460,8 +26748,10 @@ virDomainHostdevDefFormat(virBuffer *buf,
                                   virTristateSwitchTypeToString(mdevsrc->ramfb));
         }
 
-        if (def->source.subsys.type == VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA &&
-            def->iommufd) {
+        if (def->iommufd &&
+            (def->source.subsys.type == VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA ||
+             def->source.subsys.type == VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_PCI ||
+             def->source.subsys.type == VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB)) {
             virBufferAsprintf(buf, " iommufd='%u'", def->iommufd);
         }
 
@@ -27290,15 +27580,6 @@ virDomainDefIOThreadsFormat(virBuffer *buf,
 }
 
 static void
-virDomainDefIOMMUFDsFormat(virBuffer *buf,
-                           const virDomainDef *def)
-{
-    if (def->iommufds > 0) {
-        virBufferAsprintf(buf, "<iommufds>%zu</iommufds>\n", def->iommufds);
-    }
-}
-
-static void
 virDomainIOMMUDefFormat(virBuffer *buf,
                         const virDomainIOMMUDef *iommu)
 {
@@ -27862,6 +28143,14 @@ virDomainDefFormatInternal(virDomainDef *def,
                                                  "domain", flags);
 }
 
+static void
+virDomainDefIOMMUFDsFormat(virBuffer *buf,
+                           const virDomainDef *def)
+{
+    if (def->iommufds > 0) {
+        virBufferAsprintf(buf, "<iommufds>%zu</iommufds>\n", def->iommufds);
+    }
+}
 
 /* This internal version appends to an existing buffer
  * (possibly with auto-indent), rather than flattening
@@ -31287,9 +31576,18 @@ virHostdevIsMdevDevice(const virDomainHostdevDef *hostdev)
 bool
 virHostdevIsVFIODevice(const virDomainHostdevDef *hostdev)
 {
-    return hostdev->mode == VIR_DOMAIN_HOSTDEV_MODE_SUBSYS &&
+    if (hostdev->mode == VIR_DOMAIN_HOSTDEV_MODE_SUBSYS &&
         hostdev->source.subsys.type == VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_PCI &&
-        hostdev->source.subsys.u.pci.backend == VIR_DOMAIN_HOSTDEV_PCI_BACKEND_VFIO;
+        hostdev->source.subsys.u.pci.backend == VIR_DOMAIN_HOSTDEV_PCI_BACKEND_VFIO)
+        return true;
+
+    if (hostdev->mode == VIR_DOMAIN_HOSTDEV_MODE_SUBSYS &&
+        hostdev->source.subsys.type == VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB &&
+        hostdev->source.subsys.u.ub.backend == VIR_DOMAIN_HOSTDEV_UB_BACKEND_VFIO) {
+        return true;
+    }
+
+    return false;
 }
 
 

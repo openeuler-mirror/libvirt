@@ -2885,6 +2885,8 @@ qemuDomainAttachHostDevice(virQEMUDriver *driver,
         if (qemuDomainAttachVDPADevice(driver, vm, hostdev) < 0)
             return -1;
         break;
+    /* ub current not supprot hotplug */
+    case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB:
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_LAST:
     default:
         virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
@@ -4808,6 +4810,8 @@ qemuDomainRemoveHostDevice(virQEMUDriver *driver,
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
         qemuDomainRemoveVDPADevice(vm, hostdev);
         break;
+    /* UB current not support hot remove */
+    case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB:
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_LAST:
         break;
     }
@@ -5678,6 +5682,9 @@ qemuDomainDiskControllerIsBusy(virDomainObj *vm,
              * be checked elsewhere */
             continue;
 
+        case VIR_DOMAIN_CONTROLLER_TYPE_UB:
+            continue;
+
         case VIR_DOMAIN_CONTROLLER_TYPE_LAST:
         default:
             continue;
@@ -5717,6 +5724,7 @@ qemuDomainControllerIsBusy(virDomainObj *vm,
     case VIR_DOMAIN_CONTROLLER_TYPE_CCID:
     case VIR_DOMAIN_CONTROLLER_TYPE_USB:
     case VIR_DOMAIN_CONTROLLER_TYPE_PCI:
+    case VIR_DOMAIN_CONTROLLER_TYPE_UB:
     case VIR_DOMAIN_CONTROLLER_TYPE_ISA:
         /* detach of the controller types above is not yet supported */
         return false;
@@ -5840,6 +5848,7 @@ qemuDomainDetachPrepHostdev(virDomainObj *vm,
                            _("vdpa device '%s' not found"),
                            vdpasrc->devpath);
             break;
+        case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB:
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_LAST:
         default:
             virReportError(VIR_ERR_INTERNAL_ERROR,

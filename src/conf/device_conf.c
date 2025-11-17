@@ -26,13 +26,16 @@
 #include "device_conf.h"
 #include "domain_addr.h"
 #include "virstring.h"
+#include "virlog.h"
 
 #define VIR_FROM_THIS VIR_FROM_DEVICE
+VIR_LOG_INIT("conf.device_conf");
 
 VIR_ENUM_IMPL(virDomainDeviceAddress,
               VIR_DOMAIN_DEVICE_ADDRESS_TYPE_LAST,
               "none",
               "pci",
+              "ub",
               "drive",
               "virtio-serial",
               "ccid",
@@ -70,16 +73,44 @@ virZPCIDeviceAddressParseXML(xmlNodePtr node,
     return 0;
 }
 
+static void
+virDomainDeviceInfoClearUdevPort(virUBDevicePort *udevPort)
+{
+    unsigned int i;
+
+    if (!udevPort->ports)
+        return;
+
+    for (i = 0; i < udevPort->num; i++) {
+        if (udevPort->ports[i].status != UB_DEVICE_PORT_STATUS_LINK_UP)
+            continue;
+
+        VIR_FREE(udevPort->ports[i].port);
+        VIR_FREE(udevPort->ports[i].target);
+    }
+
+    virUBBitmapAllocatorFree(udevPort->idx_allocator);
+
+    VIR_FREE(udevPort->ports);
+}
+
 void
 virDomainDeviceInfoClear(virDomainDeviceInfo *info)
 {
     VIR_FREE(info->alias);
+
+    if (info->type == VIR_DOMAIN_DEVICE_ADDRESS_TYPE_UB) {
+        VIR_FREE(info->addr.ub.guidStr);
+        VIR_FREE(info->busInstance.guidStr);
+    }
     memset(&info->addr, 0, sizeof(info->addr));
+
     info->type = VIR_DOMAIN_DEVICE_ADDRESS_TYPE_NONE;
     VIR_FREE(info->romfile);
     VIR_FREE(info->loadparm);
     info->isolationGroup = 0;
     info->isolationGroupLocked = false;
+    virDomainDeviceInfoClearUdevPort(&info->udevPort);
 }
 
 void
@@ -113,6 +144,12 @@ virDomainDeviceInfoAddressIsEqual(const virDomainDeviceInfo *a,
             a->addr.pci.bus != b->addr.pci.bus ||
             a->addr.pci.slot != b->addr.pci.slot ||
             a->addr.pci.function != b->addr.pci.function)
+            return false;
+        break;
+
+    case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_UB:
+        if (!STREQ(a->addr.ub.guidStr, b->addr.ub.guidStr) ||
+            a->addr.ub.eid != b->addr.ub.eid)
             return false;
         break;
 
@@ -246,6 +283,32 @@ virPCIDeviceAddressFormat(virBuffer *buf,
                       addr.bus,
                       addr.slot,
                       addr.function);
+}
+
+int virUBDeviceAddressParseXML(xmlNodePtr node,
+                               virUBDeviceAddress *addr)
+{
+    memset(addr, 0, sizeof(*addr));
+
+    /* will be freed in virDomainDeviceInfoClear */
+    addr->guidStr = virXMLPropString(node, "guid");
+    if (!addr->guidStr) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                       _("missing guid in ub address"));
+        return -1;
+    }
+
+    if (virUBDeviceGetGuidFromStr(&addr->guid, addr->guidStr) < 0)
+        goto cleanup;
+
+    if (virXMLPropUInt(node, "eid", 0, VIR_XML_PROP_NONE, &addr->eid) < 0)
+        goto cleanup;
+
+    return 0;
+
+cleanup:
+    VIR_FREE(addr->guidStr);
+    return -1;
 }
 
 int
@@ -415,6 +478,9 @@ virDomainDeviceAddressIsValid(virDomainDeviceInfo *info,
     case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_PCI:
         return virPCIDeviceAddressIsValid(&info->addr.pci, false);
 
+    case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_UB:
+        return true;
+
     case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_DRIVE:
         return true;
 
@@ -473,4 +539,54 @@ virInterfaceLinkFormat(virBuffer *buf,
                           virNetDevIfStateTypeToString(lnk->state));
     virBufferAddLit(buf, "/>\n");
     return 0;
+}
+
+bool
+virDeviceInfoUBAddressGuidIsWanted(const virDomainDeviceInfo *info)
+{
+    return info->type == VIR_DOMAIN_DEVICE_ADDRESS_TYPE_NONE ||
+           (info->type == VIR_DOMAIN_DEVICE_ADDRESS_TYPE_UB &&
+            virUBDeviceAddressGuidIsEmpty(&info->addr.ub));
+}
+
+bool
+virDeviceInfoUBAddressEidIsWanted(const virDomainDeviceInfo *info)
+{
+    return info->type == VIR_DOMAIN_DEVICE_ADDRESS_TYPE_NONE ||
+           (info->type == VIR_DOMAIN_DEVICE_ADDRESS_TYPE_UB &&
+            virUBDeviceAddressEidIsEmpty(&info->addr.ub));
+}
+
+bool
+virDeviceInfoUBAddressPortNumIsWanted(const virDomainDeviceInfo *info)
+{
+    return info->udevPort.num == 0;
+}
+
+bool
+virDeviceInfoUBAddressPortEntryIsWanted(const virDomainDeviceInfo *info)
+{
+    int i;
+
+    if (info->udevPort.ports == NULL) {
+        return true;
+    }
+
+    for (i = 0; i < info->udevPort.num; i++) {
+        if (info->udevPort.ports[i].status != UB_DEVICE_PORT_STATUS_LINK_DOWN) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+uint32_t
+virDeviceInfoUBDeviceGetEid(const virDomainDeviceInfo *info)
+{
+    if (info->type != VIR_DOMAIN_DEVICE_ADDRESS_TYPE_UB) {
+        return 0;
+    }
+
+    return info->addr.ub.eid;
 }

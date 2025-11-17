@@ -486,6 +486,10 @@ qemuSetupHostdevCgroup(virDomainObj *vm,
         return -1;
     }
 
+    if (dev->iommufd &&
+        qemuCgroupAllowDevicePath(vm, QEMU_DEV_IOMMUFD, VIR_CGROUP_DEVICE_RW, false) < 0)
+        return -1;
+
     return 0;
 }
 
@@ -535,6 +539,10 @@ qemuTeardownHostdevCgroup(virDomainObj *vm,
                                  VIR_CGROUP_DEVICE_RWM, false) < 0) {
         return -1;
     }
+
+    if (dev->iommufd &&
+        qemuCgroupDenyDevicePath(vm, QEMU_DEV_IOMMUFD, VIR_CGROUP_DEVICE_RWM, false) < 0)
+        return -1;
 
     return 0;
 }

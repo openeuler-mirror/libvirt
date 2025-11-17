@@ -1311,6 +1311,8 @@ qemuMigrationSrcIsAllowedHostdev(const virDomainDef *def)
             case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_SCSI:
             case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_SCSI_HOST:
             case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_MDEV:
+            /* vfio ub dont support migrate now */
+            case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB:
                 virReportError(VIR_ERR_OPERATION_UNSUPPORTED,
                                _("cannot migrate a domain with <hostdev mode='subsystem' type='%1$s'>"),
                                virDomainHostdevSubsysTypeToString(hostdev->source.subsys.type));

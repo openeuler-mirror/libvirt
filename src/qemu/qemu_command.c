@@ -572,6 +572,9 @@ qemuBuildDeviceAddressProps(virJSONValue *props,
     }
         break;
 
+    case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_UB:
+        return 0;
+
     case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_USB: {
         const char *contAlias = NULL;
         g_auto(virBuffer) port = VIR_BUFFER_INITIALIZER;
@@ -1008,6 +1011,7 @@ qemuBuildVirtioDevGetConfig(const virDomainDeviceDef *device,
     case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_SPAPRVIO:
     case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_ISA:
     case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_DIMM:
+    case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_UB:
         virReportError(VIR_ERR_INTERNAL_ERROR,
                        _("Unexpected address type for '%1$s'"), baseName);
         return -1;
@@ -2782,7 +2786,105 @@ qemuBuildControllerPCIDevProps(virDomainControllerDef *def,
     return 0;
 }
 
+static int
+ubPreparePortProps(const virDomainDef *domainDef, virDomainDeviceInfo *info)
+{
+    unsigned int i;
+    char *target = NULL;
+    unsigned int teid;
+    int portNum;
 
+    for (i = 0; i < info->udevPort.num; i++) {
+        if (info->udevPort.ports[i].status != UB_DEVICE_PORT_STATUS_LINK_UP)
+            continue;
+
+        teid = info->udevPort.ports[i].teid;
+        target = qemuDomainGetUBControllerAliasByEid(domainDef, teid);
+        if (!target) {
+            virReportError(VIR_ERR_XML_ERROR,
+                           _("failed to find target UB controller by eid(0x%x)"),
+                           teid);
+            return -1;
+        }
+
+        portNum = qemuDomainGetUBPortNumByEid(domainDef, teid);
+        if (portNum < 0 || info->udevPort.ports[i].tport >= portNum) {
+           virReportError(VIR_ERR_XML_ERROR,
+                          _("expect configed teid port less than ub device(eid: 0x%x) port-num(%d), "
+                         "but current configed teid port is %d"),
+                         teid, portNum, info->udevPort.ports[i].tport);
+           return -1;
+        }
+
+        /* be freed in virDomainDeviceInfoClearUdevPort */
+        info->udevPort.ports[i].port = g_strdup_printf("s:port%u", i);
+        info->udevPort.ports[i].target = g_strdup_printf("%s:%d", target, info->udevPort.ports[i].tport);
+    }
+
+    return 0;
+}
+
+static int
+qemuBuildUBDevPortsProps(const virDomainDef *domainDef,
+                        virDomainDeviceInfo *info,
+                        virJSONValue **devprops)
+{
+    unsigned int i;
+
+    if (ubPreparePortProps(domainDef, info) < 0) {
+        return -1;
+    }
+
+    for (i = 0; i < info->udevPort.num; i++) {
+        if (info->udevPort.ports[i].status != UB_DEVICE_PORT_STATUS_LINK_UP)
+            continue;
+
+        if (virJSONValueObjectAdd(devprops,
+                                  info->udevPort.ports[i].port,
+                                  info->udevPort.ports[i].target, NULL) < 0)
+            return -1;
+    }
+
+    return 0;
+}
+
+static int
+qemuBuildUBDevBaseProps(virDomainDeviceInfo *info,
+                        virJSONValue **devprops)
+{
+    if (virJSONValueObjectAdd(devprops,
+                              "s:id", info->alias,
+                              "s:guid", info->addr.ub.guidStr,
+                              "u:eid", info->addr.ub.eid,
+                              "u:portnum", info->udevPort.num,
+                              NULL) < 0)
+        return -1;
+
+    if (info->busInstance.guidStr) {
+        if (virJSONValueObjectAdd(devprops,
+                                  "s:bus_instance_guid",
+                                  info->busInstance.guidStr,
+                                  NULL) < 0)
+            return -1;
+    }
+
+    return 0;
+}
+
+static int
+qemuBuildControllerUBDevProps(virDomainDeviceInfo *info,
+                              virJSONValue **devprops)
+{
+    if (virJSONValueObjectAdd(devprops,
+                              "s:driver", "ubc",
+                              NULL) < 0)
+        return -1;
+
+    if (qemuBuildUBDevBaseProps(info, devprops) < 0)
+        return -1;
+
+    return 0;
+}
 
 /**
  * qemuBuildControllerDevStr:
@@ -2863,6 +2965,12 @@ qemuBuildControllerDevProps(const virDomainDef *domainDef,
             return -1;
 
         break;
+
+    case VIR_DOMAIN_CONTROLLER_TYPE_UB:
+        if (qemuBuildControllerUBDevProps(&def->info, &props) < 0)
+			return -1;
+
+	    break;
 
     case VIR_DOMAIN_CONTROLLER_TYPE_IDE:
     case VIR_DOMAIN_CONTROLLER_TYPE_FDC:
@@ -3094,6 +3202,7 @@ qemuBuildControllersCommandLine(virCommand *cmd,
         VIR_DOMAIN_CONTROLLER_TYPE_IDE,
         VIR_DOMAIN_CONTROLLER_TYPE_SATA,
         VIR_DOMAIN_CONTROLLER_TYPE_VIRTIO_SERIAL,
+        VIR_DOMAIN_CONTROLLER_TYPE_UB,
     };
 
     for (i = 0; i < G_N_ELEMENTS(contOrder); i++) {
@@ -4739,6 +4848,7 @@ qemuBuildPCIHostdevDevProps(const virDomainDef *def,
     g_autoptr(virJSONValue) props = NULL;
     virDomainHostdevSubsysPCI *pcisrc = &dev->source.subsys.u.pci;
     virDomainNetTeamingInfo *teaming;
+    g_autofree char *iommufd = NULL;
     g_autofree char *host = g_strdup_printf(VIR_PCI_DEVICE_ADDRESS_FMT,
                                             pcisrc->addr.domain,
                                             pcisrc->addr.bus,
@@ -5164,6 +5274,34 @@ qemuBuildHostdevSCSICommandLine(virCommand *cmd,
     return 0;
 }
 
+static virJSONValue *
+qemuBuildHostdevUBDevProps(const virDomainDef *domainDef,
+                           virDomainHostdevDef *dev)
+{
+    g_autoptr(virJSONValue) props = NULL;
+    virDomainDeviceInfo *info = dev->info;
+    g_autofree char *iommufd = NULL;
+
+    if (virJSONValueObjectAdd(&props,
+                              "s:driver", "vfio-ub",
+                              "s:host", dev->source.subsys.u.ub.addr.guidStr,
+                              NULL) < 0)
+        return NULL;
+
+    if (qemuBuildUBDevBaseProps(info, &props) < 0)
+        return NULL;
+
+    if (qemuBuildUBDevPortsProps(domainDef, info, &props) < 0)
+        return NULL;
+
+    if (dev->iommufd) {
+        iommufd = g_strdup_printf("iommufd%u", dev->iommufd);
+        if (virJSONValueObjectAdd(&props, "s:iommufd", iommufd, NULL) < 0)
+            return NULL;
+    }
+
+    return g_steal_pointer(&props);
+}
 
 static int
 qemuBuildHostdevCommandLine(virCommand *cmd,
@@ -5264,6 +5402,14 @@ qemuBuildHostdevCommandLine(virCommand *cmd,
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
             if (!(devprops = qemuBuildHostdevVDPADevProps(def, hostdev)))
                 return -1;
+            if (qemuBuildDeviceCommandlineFromJSON(cmd, devprops, def, qemuCaps) < 0)
+                return -1;
+            break;
+
+        case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB:
+            if (!(devprops = qemuBuildHostdevUBDevProps(def, hostdev)))
+                return -1;
+
             if (qemuBuildDeviceCommandlineFromJSON(cmd, devprops, def, qemuCaps) < 0)
                 return -1;
             break;
@@ -6243,7 +6389,8 @@ qemuBuildIOMMUCommandLine(virCommand *cmd,
         return 0;
 
     case VIR_DOMAIN_IOMMU_MODEL_SMMUV3:
-        /* There is no -device for SMMUv3, so nothing to be done here */
+    case VIR_DOMAIN_IOMMU_MODEL_UMMU:
+        /* There is no -device for SMMUv3 and UMMU, so nothing to be done here */
         return 0;
 
     case VIR_DOMAIN_IOMMU_MODEL_LAST:
@@ -7036,6 +7183,9 @@ qemuBuildMachineCommandLine(virCommand *cmd,
         case VIR_DOMAIN_IOMMU_MODEL_SMMUV3:
             virBufferAddLit(&buf, ",iommu=smmuv3");
             break;
+        case VIR_DOMAIN_IOMMU_MODEL_UMMU:
+            virBufferAddLit(&buf, ",ummu=on");
+            break;
 
         case VIR_DOMAIN_IOMMU_MODEL_INTEL:
         case VIR_DOMAIN_IOMMU_MODEL_VIRTIO:
@@ -7148,7 +7298,6 @@ qemuBuildMachineCommandLine(virCommand *cmd,
     }
 
     qemuBuildMachineACPI(&buf, def, qemuCaps);
-
     virCommandAddArgBuffer(cmd, &buf);
 
     return 0;
@@ -7226,7 +7375,6 @@ qemuBuildTSEGCommandLine(virCommand *cmd,
     virCommandAddArgFormat(cmd, "mch.extended-tseg-mbytes=%llu",
                            def->tseg_size >> 20);
 }
-
 
 static int
 qemuBuildSmpCommandLine(virCommand *cmd,
@@ -10539,7 +10687,6 @@ qemuBuildCompatDeprecatedCommandLine(virCommand *cmd,
 
     virCommandAddArgList(cmd, "-compat", propsstr, NULL);
 }
-
 
 /*
  * Constructs a argv suitable for launching qemu with config defined

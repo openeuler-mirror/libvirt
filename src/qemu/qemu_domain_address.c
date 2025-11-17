@@ -26,6 +26,7 @@
 #include "viralloc.h"
 #include "virerror.h"
 #include "virlog.h"
+#include "virub.h"
 
 #define VIR_FROM_THIS VIR_FROM_QEMU
 
@@ -700,6 +701,7 @@ qemuDomainDeviceCalculatePCIConnectFlags(virDomainDeviceDef *dev,
         case VIR_DOMAIN_CONTROLLER_TYPE_CCID:
         case VIR_DOMAIN_CONTROLLER_TYPE_XENBUS:
         case VIR_DOMAIN_CONTROLLER_TYPE_ISA:
+        case VIR_DOMAIN_CONTROLLER_TYPE_UB:
         case VIR_DOMAIN_CONTROLLER_TYPE_LAST:
             return 0;
         }
@@ -1027,6 +1029,7 @@ qemuDomainDeviceCalculatePCIConnectFlags(virDomainDeviceDef *dev,
 
             case VIR_DOMAIN_IOMMU_MODEL_INTEL:
             case VIR_DOMAIN_IOMMU_MODEL_SMMUV3:
+            case VIR_DOMAIN_IOMMU_MODEL_UMMU:
             case VIR_DOMAIN_IOMMU_MODEL_LAST:
                 /* These are not PCI devices */
                 return 0;
@@ -1561,6 +1564,9 @@ qemuDomainAssignPCIAddressExtension(virDomainDef *def G_GNUC_UNUSED,
     virDomainPCIAddressSet *addrs = opaque;
     virPCIDeviceAddress *addr = &info->addr.pci;
 
+    if (info->type == VIR_DOMAIN_DEVICE_ADDRESS_TYPE_UB)
+        return 0;
+
     if (info->type == VIR_DOMAIN_DEVICE_ADDRESS_TYPE_PCI)
         addr->extFlags = info->pciAddrExtFlags;
 
@@ -2000,6 +2006,7 @@ qemuDomainValidateDevicePCISlotsQ35(virDomainDef *def,
         case VIR_DOMAIN_CONTROLLER_TYPE_CCID:
         case VIR_DOMAIN_CONTROLLER_TYPE_XENBUS:
         case VIR_DOMAIN_CONTROLLER_TYPE_ISA:
+        case VIR_DOMAIN_CONTROLLER_TYPE_UB:
         case VIR_DOMAIN_CONTROLLER_TYPE_LAST:
             break;
         }
@@ -2239,6 +2246,9 @@ qemuDomainAssignDevicePCISlots(virDomainDef *def,
             cont->model == VIR_DOMAIN_CONTROLLER_MODEL_SCSI_NCR53C90)
             continue;
 
+        if (cont->type == VIR_DOMAIN_CONTROLLER_TYPE_UB)
+            continue;
+
         if (!virDeviceInfoPCIAddressIsWanted(&cont->info))
             continue;
 
@@ -2443,6 +2453,7 @@ qemuDomainAssignDevicePCISlots(virDomainDef *def,
 
         case VIR_DOMAIN_IOMMU_MODEL_INTEL:
         case VIR_DOMAIN_IOMMU_MODEL_SMMUV3:
+        case VIR_DOMAIN_IOMMU_MODEL_UMMU:
         case VIR_DOMAIN_IOMMU_MODEL_LAST:
             /* These are not PCI devices */
             break;
@@ -3278,6 +3289,465 @@ qemuDomainAssignUSBAddresses(virDomainDef *def,
     return ret;
 }
 
+static int
+qemuDomainUBAddressInfoCollectBitmap(virDomainDef *def,
+                                     virUBDeviceAddress *ub_addr)
+{
+    int ret;
+
+    ret = virUBBitmapAllocatorSetUsed(def->ubgs_allocator, ub_addr->guid.seqNum);
+    if (ret) {
+        VIR_ERROR(_("failed to reserve ub guid seq 0x%lx for guid %s\n"),
+                  (uint64_t)ub_addr->guid.seqNum, ub_addr->guidStr);
+        return -1;
+    }
+
+    ret = virUBBitmapAllocatorSetUsed(def->ubeid_allocator, ub_addr->eid);
+    if (ret) {
+        VIR_ERROR(_("failed to reserve ub eid 0x%x for guid %s\n"),
+                  ub_addr->eid, ub_addr->guidStr);
+        return -1;
+    }
+
+    return 0;
+}
+
+static virDomainControllerDef *
+qemuDomainGetFirstUBController(virDomainDef *def)
+{
+    virDomainControllerDef *cont = NULL;
+    int i;
+
+    for (i = 0; i < def->ncontrollers; i++) {
+        cont = def->controllers[i];
+        if (cont->type == VIR_DOMAIN_CONTROLLER_TYPE_UB) {
+            return cont;
+        }
+    }
+
+    return NULL;
+}
+
+static int
+qemuDomainUBControllerPortInfoCollect(virDomainDef *def, virUBDevicePort *port)
+{
+    virDomainControllerDef *cont = NULL;
+    virUBDevicePort *cont_port = NULL;
+    virUBDevicePortInfo *port_info = NULL;
+    uint32_t ubc_eid, ubc_port_num;
+    int i;
+
+    cont = qemuDomainGetFirstUBController(def);
+    if (cont == NULL) {
+        VIR_ERROR(_("configed ub device without config ub controller\n"));
+        return -1;
+    }
+
+    if (port->num == 0) {
+        return 0;
+    }
+
+    ubc_eid = virDeviceInfoUBDeviceGetEid(&cont->info);
+    if (ubc_eid == 0) {
+        return 0;
+    }
+
+    cont_port = &cont->info.udevPort;
+    ubc_port_num = cont_port->num == 0 ? UB_DEVICE_MAX_PORT_NUM : cont_port->num;
+    if (cont_port->idx_allocator == NULL) {
+        cont_port->idx_allocator = virUBBitmapAllocatorInit(ubc_port_num,
+                                                            "ubc-idx-allocator");
+        if (cont_port->idx_allocator == NULL) {
+            VIR_ERROR(_("failed to init ubc idx allocator\n"));
+            return -1;
+        }
+    }
+
+    for (i = 0; i < port->num; i++) {
+        port_info  = &port->ports[i];
+        if (port_info->status != UB_DEVICE_PORT_STATUS_LINK_UP) {
+            continue;
+        }
+
+        if (port_info->teid != ubc_eid) {
+            continue;
+        }
+
+        if (port_info->tport >= ubc_port_num) {
+            VIR_ERROR(_("ub controller current max support port idx is %u, "
+                        "but ub device configed is %u\n"), ubc_port_num - 1, port_info->tport);
+            return -1;
+        }
+
+        if (virUBBitmapAllocatorSetUsed(cont_port->idx_allocator, port_info->tport) < 0) {
+            VIR_ERROR(_("failed to set ub controller idx used allocator for port %u\n"), port_info->tport);
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+static int
+qemuDomainUBDevicePortInfoEidCollect(virDomainDef *def, virUBDevicePort *port)
+{
+    virUBDevicePortInfo *port_info = NULL;
+    int i;
+
+    if (port->num == 0) {
+        return 0;
+    }
+
+    for (i = 0; i < port->num; i++) {
+        port_info  = &port->ports[i];
+        if (port_info->status != UB_DEVICE_PORT_STATUS_LINK_UP) {
+            continue;
+        }
+
+        if (virUBBitmapAllocatorSetUsed(def->ubeid_allocator, port_info->teid) < 0) {
+            VIR_ERROR(_("failed to collect eid %u from ub device port info\n"), port_info->teid);
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+static int
+qemuDomainUBAddressInfoCollect(virDomainDef *def)
+{
+    virDomainControllerDef *cont = NULL;
+    virDomainHostdevDef *hostdev = NULL;
+    virUBDeviceAddress *ub_addr = NULL;
+    size_t i;
+    int ret;
+
+    for (i = 0; i < def->ncontrollers; i++) {
+        cont = def->controllers[i];
+        if (cont->type != VIR_DOMAIN_CONTROLLER_TYPE_UB) {
+            continue;
+        }
+
+        ub_addr = &cont->info.addr.ub;
+        ret = qemuDomainUBAddressInfoCollectBitmap(def, ub_addr);
+        if (ret) {
+            VIR_ERROR(_("failed to collect ub controller address info\n"));
+            return -1;
+        }
+    }
+
+    for (i = 0; i < def->nhostdevs; i++) {
+        hostdev = def->hostdevs[i];
+        if (hostdev->source.subsys.type != VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB) {
+            continue;
+        }
+
+        ub_addr = &hostdev->info->addr.ub;
+        ret = qemuDomainUBAddressInfoCollectBitmap(def, ub_addr);
+        if (ret) {
+            VIR_ERROR(_("failed to collect ub hostdev(%s) address info\n"),
+                      hostdev->info->alias);
+            return -1;
+        }
+
+        ret = qemuDomainUBDevicePortInfoEidCollect(def, &hostdev->info->udevPort);
+        if (ret) {
+            VIR_ERROR(_("failed to collect port eid info from hostdev(%s)\n"),
+                      hostdev->info->alias);
+            return -1;
+        }
+
+        ret = qemuDomainUBControllerPortInfoCollect(def, &hostdev->info->udevPort);
+        if (ret) {
+            VIR_ERROR(_("failed to collect ub controller port info from hostdev(%s)\n"),
+                      hostdev->info->alias);
+
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+static int
+qemuDomainUBAddressSetGuid(virUBBitmapAllocator *allocator, char *prefix, virUBDeviceAddress *addr)
+{
+    int ret;
+    uint32_t seq;
+
+    ret = virUBBitmapAllocatorAcquire(allocator, &seq);
+    if (ret) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("failed to reserve guid seq for ub controller\n"));
+        return -1;
+    }
+
+    addr->guidStr = g_strdup_printf("%s-%016x", prefix, seq);
+    ret = virUBDeviceGetGuidFromStr(&addr->guid, addr->guidStr);
+    if (ret < 0) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("failed to convert guidStr(%s) to UBGuid struct\n"), addr->guidStr);
+        VIR_FREE(addr->guidStr);
+        return -1;
+    }
+
+    return 0;
+}
+
+static int
+qemuDomainUBAddressSetEid(virUBBitmapAllocator *allocator, virUBDeviceAddress *addr)
+{
+    int ret;
+    uint32_t eid;
+
+    ret = virUBBitmapAllocatorAcquire(allocator, &eid);
+    if (ret) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("failed to reserve eid for ub controller\n"));
+        return -1;
+    }
+
+    addr->eid = eid;
+    return 0;
+}
+
+static int
+qemuDomainUBControllerAddressReserve(virDomainDef *def)
+{
+    virDomainControllerDef *cont = NULL;
+    virDomainDeviceInfo *dev_info = NULL;
+    /* UB Controller default prefix cc08-a000-0-2-000000 */
+    char prefix[] = "cc08-a000-0-2-000000";
+    int i;
+
+    for (i = 0; i < def->ncontrollers; i++) {
+        cont = def->controllers[i];
+        if (cont->type != VIR_DOMAIN_CONTROLLER_TYPE_UB) {
+            continue;
+        }
+
+        dev_info = &cont->info;
+        if (virDeviceInfoUBAddressGuidIsWanted(dev_info) &&
+            qemuDomainUBAddressSetGuid(def->ubgs_allocator, prefix, &dev_info->addr.ub)) {
+            return -1;
+        }
+
+        if (virDeviceInfoUBAddressEidIsWanted(dev_info) &&
+            qemuDomainUBAddressSetEid(def->ubeid_allocator, &dev_info->addr.ub)) {
+            return -1;
+        }
+
+        dev_info->type = VIR_DOMAIN_DEVICE_ADDRESS_TYPE_UB;
+
+        if (virDeviceInfoUBAddressPortNumIsWanted(dev_info)) {
+            dev_info->udevPort.num = UB_CONTROLLER_DEFAULT_PORT_NUM;
+        }
+    }
+
+    return 0;
+}
+
+static int
+qemuDomainUBVhostDevGuidPrefixGet(virDomainHostdevDef *hostdev, char prefix[], uint32_t len)
+{
+    virDomainHostdevSubsys *subsys = NULL;
+    virUBDeviceAddress *ub_addr = NULL;
+    g_autofree char *guidStr = NULL;
+    char *last_dash = NULL;
+
+    subsys = &hostdev->source.subsys;
+    if (subsys->type != VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("type hostdev not ub, failed to get guid prefix\n"));
+        return -1;
+    }
+
+    ub_addr = &subsys->u.ub.addr;
+    guidStr = g_strdup(ub_addr->guidStr);
+    last_dash = strrchr(guidStr, '-');
+    if (last_dash == NULL) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("ub vhostdev source guid(%s) format is err\n"), guidStr);
+        return -1;
+    }
+    *last_dash = '\0';
+    snprintf(prefix, len, "%s", guidStr);
+
+    return 0;
+}
+
+static int
+virDeviceInfoUBAddressPortEntrySet(virDomainDef *def, virDomainDeviceInfo *dev_info)
+{
+    virDomainControllerDef *cont = NULL;
+    virUBDevicePort *udev_port = NULL;
+    virUBDevicePort *ubc_port = NULL;
+    virUBDevicePortInfo *port_info = NULL;
+    uint32_t ubc_eid, port_idx;
+
+    cont = qemuDomainGetFirstUBController(def);
+    if (cont == NULL) {
+        VIR_ERROR(_("configed ub device without config ub controller\n"));
+        return -1;
+    }
+
+    ubc_port = &cont->info.udevPort;
+    if (ubc_port->idx_allocator == NULL) {
+        ubc_port->idx_allocator = virUBBitmapAllocatorInit(ubc_port->num,
+                                                           "ubc-idx-allocator");
+        if (ubc_port->idx_allocator == NULL) {
+            VIR_ERROR(_("failed to init ubc idx allocator\n"));
+            return -1;
+        }
+    }
+
+    if (virUBBitmapAllocatorAcquire(ubc_port->idx_allocator, &port_idx) < 0) {
+        VIR_ERROR(_("failed to reserve port idx for ub device\n"));
+        return -1;
+    }
+
+    udev_port = &dev_info->udevPort;
+    ubc_eid = cont->info.addr.ub.eid;
+    port_info = &udev_port->ports[0];
+    port_info->teid = ubc_eid;
+    port_info->tport = port_idx;
+    port_info->status = UB_DEVICE_PORT_STATUS_LINK_UP;
+
+    return 0;
+}
+
+static int
+qemuDomainUBVhostDevAddressReserve(virDomainDef *def)
+{
+    int i;
+    virDomainHostdevDef *hostdev = NULL;
+    virDomainDeviceInfo *dev_info = NULL;
+    char prefix[UB_DEV_GUID_STRING_LENGTH] = {0};
+
+    for (i = 0; i < def->nhostdevs; i++) {
+        hostdev = def->hostdevs[i];
+        if (hostdev->source.subsys.type != VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB) {
+            continue;
+        }
+
+        if (qemuDomainUBVhostDevGuidPrefixGet(hostdev, prefix, UB_DEV_GUID_STRING_LENGTH)) {
+            return -1;
+        }
+
+        dev_info = hostdev->info;
+        if (virDeviceInfoUBAddressGuidIsWanted(dev_info) &&
+            qemuDomainUBAddressSetGuid(def->ubgs_allocator, prefix, &dev_info->addr.ub)) {
+            return -1;
+        }
+
+        if (virDeviceInfoUBAddressEidIsWanted(dev_info) &&
+            qemuDomainUBAddressSetEid(def->ubeid_allocator, &dev_info->addr.ub)) {
+            return -1;
+        }
+
+        dev_info->type = VIR_DOMAIN_DEVICE_ADDRESS_TYPE_UB;
+
+        if (virDeviceInfoUBAddressPortNumIsWanted(dev_info)) {
+            dev_info->udevPort.num = UB_DEVICE_DEFAULT_PORT_NUM;
+            /* be freed in virDomainDeviceInfoClearUdevPort */
+            dev_info->udevPort.ports = g_malloc0(sizeof(virUBDevicePortInfo) * dev_info->udevPort.num);
+            if (!dev_info->udevPort.ports)
+                return -1;
+        }
+
+        if (virDeviceInfoUBAddressPortEntryIsWanted(dev_info)) {
+            virDeviceInfoUBAddressPortEntrySet(def, dev_info);
+        }
+    }
+
+    return 0;
+}
+
+static int
+qemuDomainUBAddressReserve(virDomainDef *def)
+{
+    int ret;
+
+    ret = qemuDomainUBControllerAddressReserve(def);
+    if (ret < 0) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("failed to reserve ub controller guid\n"));
+        return -1;
+    }
+
+    ret = qemuDomainUBVhostDevAddressReserve(def);
+    if (ret < 0) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("failed to reserve ub vhostdev guid\n"));
+        return -1;
+    }
+
+    return 0;
+}
+
+static int
+qemuDomainAssignUBAddressBitmapAllocatorInit(virDomainDef *def)
+{
+    if (!def->ubgs_allocator) {
+        def->ubgs_allocator = virUBBitmapAllocatorInit(UB_GUID_SEQ_AUTO_ALLOC_NUM,
+                                                       "ub-guid-seq-allocator");
+        if (!def->ubgs_allocator) {
+            virReportError(VIR_ERR_INTERNAL_ERROR,
+                           _("failed to alloc bitmap allocator for guid seq acquire\n"));
+            return -1;
+        }
+
+        /* seq 0 used for invalid val, set used default */
+        virUBBitmapAllocatorSetUsed(def->ubgs_allocator, 0);
+    }
+
+    if (!def->ubeid_allocator) {
+        def->ubeid_allocator = virUBBitmapAllocatorInit(UB_EID_AUTO_ALLOC_NUM,
+                                                        "ub-eid-allocator");
+        if (!def->ubeid_allocator) {
+            virReportError(VIR_ERR_INTERNAL_ERROR,
+                           _("failed to alloc bitmap for ub eid acquire\n"));
+            goto free;
+        }
+
+        /* eid 0 used for invalid val, set used default */
+        virUBBitmapAllocatorSetUsed(def->ubeid_allocator, 0);
+    }
+
+    return 0;
+
+free:
+    virUBBitmapAllocatorFree(def->ubgs_allocator);
+    return -1;
+}
+
+static int
+qemuDomainAssignUBAddress(virDomainDef *def)
+{
+    int ret;
+
+    ret = qemuDomainAssignUBAddressBitmapAllocatorInit(def);
+    if (ret) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("failed to init ub address assign bitmap\n"));
+        return -1;
+    }
+
+    ret = qemuDomainUBAddressInfoCollect(def);
+    if (ret) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                      _("failed to collect used ub address info\n"));
+        return -1;
+    }
+
+    ret = qemuDomainUBAddressReserve(def);
+    if (ret) {
+        VIR_ERROR(_("ub address guid seq reserve failed\n"));
+        return -1;
+    }
+
+    return 0;
+}
 
 int
 qemuDomainAssignAddresses(virDomainDef *def,
@@ -3304,6 +3774,9 @@ qemuDomainAssignAddresses(virDomainDef *def,
         return -1;
 
     if (qemuDomainAssignMemorySlots(def) < 0)
+        return -1;
+
+    if (qemuDomainAssignUBAddress(def) < 0)
         return -1;
 
     return 0;

@@ -1492,6 +1492,9 @@ qemuValidateDomainDeviceDefAddress(const virDomainDeviceDef *dev,
             return -1;
         break;
 
+    case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_UB:
+        break;
+
     case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_NONE:
         /* Address validation might happen before we have had a chance to
          * automatically assign addresses to devices for which the user
@@ -2505,6 +2508,8 @@ qemuValidateDomainDeviceDefHostdev(const virDomainHostdevDef *hostdev,
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_MDEV:
             return qemuValidateDomainMdevDef(hostdev, def, qemuCaps);
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
+            break;
+        case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB:
             break;
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_LAST:
         default:
@@ -4060,6 +4065,9 @@ qemuValidateDomainDeviceDefController(const virDomainControllerDef *controller,
                                                        qemuCaps);
         break;
 
+    case VIR_DOMAIN_CONTROLLER_TYPE_UB:
+        break;
+
     case VIR_DOMAIN_CONTROLLER_TYPE_SATA:
         ret = qemuValidateDomainDeviceDefControllerSATA(controller, def,
                                                         qemuCaps);
@@ -4837,6 +4845,15 @@ qemuValidateDomainDeviceDefIOMMU(const virDomainIOMMUDef *iommu,
             iommu->info.type != VIR_DOMAIN_DEVICE_ADDRESS_TYPE_PCI) {
             virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
                            _("IOMMU device: '%1$s' needs a PCI address"),
+                           virDomainIOMMUModelTypeToString(iommu->model));
+            return -1;
+        }
+        break;
+
+    case VIR_DOMAIN_IOMMU_MODEL_UMMU:
+        if (!qemuDomainIsARMVirt(def)) {
+            virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                           _("IOMMU device: '%1$s' is only supported with ARM Virt machines"),
                            virDomainIOMMUModelTypeToString(iommu->model));
             return -1;
         }

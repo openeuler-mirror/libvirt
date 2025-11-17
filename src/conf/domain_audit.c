@@ -387,6 +387,8 @@ virDomainAuditHostdev(virDomainObj *vm, virDomainHostdevDef *hostdev,
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
             address = g_strdup(vdpasrc->devpath);
             break;
+        case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB:
+            break;
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_LAST:
         default:
             VIR_WARN("Unexpected hostdev type while encoding audit message: %d",
