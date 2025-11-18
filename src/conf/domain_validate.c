@@ -2189,6 +2189,8 @@ virDomainHostdevDefValidate(const virDomainHostdevDef *hostdev)
                 return -1;
             }
             break;
+        case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB:
+            break;
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_MDEV:
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_LAST:
@@ -2849,6 +2851,7 @@ virDomainIOMMUDefValidate(const virDomainIOMMUDef *iommu)
         break;
 
     case VIR_DOMAIN_IOMMU_MODEL_INTEL:
+    case VIR_DOMAIN_IOMMU_MODEL_UMMU:
     case VIR_DOMAIN_IOMMU_MODEL_LAST:
         break;
     }
@@ -2865,6 +2868,7 @@ virDomainIOMMUDefValidate(const virDomainIOMMUDef *iommu)
         break;
 
     case VIR_DOMAIN_IOMMU_MODEL_VIRTIO:
+    case VIR_DOMAIN_IOMMU_MODEL_UMMU:
     case VIR_DOMAIN_IOMMU_MODEL_LAST:
         break;
     }
@@ -2924,6 +2928,7 @@ virDomainDeviceInfoValidate(const virDomainDeviceDef *dev)
 
     switch (info->type) {
     case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_PCI:
+    case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_UB:
     case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_NONE:
     case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_SPAPRVIO:
     case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_VIRTIO_S390:

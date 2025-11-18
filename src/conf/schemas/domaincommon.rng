@@ -865,6 +865,12 @@
       </optional>
 
       <optional>
+        <element name="iommufds">
+          <ref name="unsignedInt"/>
+        </element>
+      </optional>
+
+      <optional>
         <element name="iothreadids">
           <zeroOrMore>
             <element name="iothread">
@@ -3001,6 +3007,27 @@
                 <ref name="unsignedInt"/>
               </attribute>
             </optional>
+          </group>
+          <!-- ub -->
+          <group>
+            <attribute name="type">
+              <value>ub</value>
+            </attribute>
+            <optional>
+              <attribute name="model">
+                <choice>
+                  <value>ubc</value>
+                </choice>
+              </attribute>
+            </optional>
+            <interleave>
+              <optional>
+                 <ref name="ubports"/>
+              </optional>
+              <optional>
+                 <ref name="ubcsource"/>
+              </optional>
+            </interleave>
           </group>
         </choice>
         <optional>
@@ -6008,6 +6035,7 @@
           <value>intel</value>
           <value>smmuv3</value>
           <value>virtio</value>
+          <value>ummu</value>
         </choice>
       </attribute>
       <interleave>
@@ -6249,12 +6277,18 @@
         <ref name="virOnOff"/>
       </attribute>
     </optional>
+    <optional>
+      <attribute name="iommufd">
+         <ref name="unsignedInt"/>
+      </attribute>
+    </optional>
     <choice>
       <ref name="hostdevsubsyspci"/>
       <ref name="hostdevsubsysusb"/>
       <ref name="hostdevsubsysscsi"/>
       <ref name="hostdevsubsyshost"/>
       <ref name="hostdevsubsysmdev"/>
+      <ref name="hostdevsubsysub"/>
     </choice>
   </define>
 
@@ -6454,6 +6488,31 @@
     </element>
   </define>
 
+  <define name="hostdevsubsysub">
+    <attribute name="type">
+      <value>ub</value>
+    </attribute>
+    <interleave>
+      <optional>
+        <element name="driver">
+          <attribute name="name">
+            <choice>
+              <value>vfio</value>
+            </choice>
+          </attribute>
+        </element>
+      </optional>
+      <element name="source">
+        <element name="address">
+          <ref name="ubaddress"/>
+        </element>
+      </element>
+      <optional>
+        <ref name="ubports"/>
+      </optional>
+    </interleave>
+  </define>
+
   <define name="hostdevcapsstorage">
     <attribute name="type">
       <value>storage</value>
@@ -6618,6 +6677,18 @@
         <ref name="UUID"/>
       </attribute>
     </element>
+  </define>
+  <define name="ubaddress">
+    <optional>
+      <attribute name="eid">
+        <ref name="hexuint"/>
+      </attribute>
+    </optional>
+    <optional>
+        <attribute name="guid">
+          <ref name="ubguid"/>
+        </attribute>
+    </optional>
   </define>
   <define name="devices">
     <element name="devices">
@@ -7193,6 +7264,12 @@
             <value>unassigned</value>
           </attribute>
         </group>
+        <group>
+          <attribute name="type">
+            <value>ub</value>
+          </attribute>
+          <ref name="ubaddress"/>
+        </group>
       </choice>
     </element>
   </define>
@@ -7524,6 +7601,41 @@
       </attribute>
       <empty/>
     </element>
+  </define>
+
+  <define name="ubport">
+    <element name="port">
+      <attribute name="index">
+        <ref name="unsignedInt"/>
+      </attribute>
+      <attribute name="teid">
+        <ref name="hexuint"/>
+      </attribute>
+      <attribute name="tport">
+        <ref name="unsignedInt"/>
+      </attribute>
+    </element>
+  </define>
+
+  <define name="ubports">
+    <element name="ports">
+      <attribute name="num">
+        <ref name="unsignedInt"/>
+      </attribute>
+      <optional>
+        <ref name="ubport"/>
+      </optional>
+    </element>
+  </define>
+
+  <define name="ubcsource">
+      <element name="source">
+          <element name="businstance">
+              <attribute name="guid">
+                  <ref name="ubguid"/>
+              </attribute>
+          </element>
+      </element>
   </define>
 
   <define name="deviceBoot">

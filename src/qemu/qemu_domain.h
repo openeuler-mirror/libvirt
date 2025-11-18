@@ -43,6 +43,7 @@
 #include "virenum.h"
 #include "vireventthread.h"
 #include "storage_source_conf.h"
+#include "virub.h"
 
 #define QEMU_DOMAIN_FORMAT_LIVE_FLAGS \
     (VIR_DOMAIN_XML_SECURE)
@@ -82,6 +83,7 @@ struct _qemuDomainUnpluggingDevice {
 #define QEMU_PROC_MOUNTS "/proc/mounts"
 #define QEMU_DEVPREFIX "/dev/"
 #define QEMU_DEV_VFIO "/dev/vfio/vfio"
+#define QEMU_DEV_IOMMUFD "/dev/iommu"
 #define QEMU_DEV_SEV "/dev/sev"
 #define QEMU_DEV_SGX_VEPVC "/dev/sgx_vepc"
 #define QEMU_DEV_SGX_PROVISION "/dev/sgx_provision"
@@ -1135,3 +1137,14 @@ void
 qemuDomainNumatuneMaybeFormatNodesetUnion(virDomainObj *vm,
                                           virBitmap **nodeset,
                                           char **nodesetStr);
+virDomainDeviceInfo *
+qemuDomainGetUBControllerDevInfoByEid(const virDomainDef *def, unsigned int eid);
+
+virDomainDeviceInfo *
+qemuDomainGetUBDeviceDevInfoByEid(const virDomainDef *def, unsigned int eid);
+
+char *
+qemuDomainGetUBControllerAliasByEid(const virDomainDef *def, unsigned int eid);
+
+int
+qemuDomainGetUBPortNumByEid(const virDomainDef *def, unsigned int eid);

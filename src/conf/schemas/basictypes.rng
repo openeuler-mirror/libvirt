@@ -88,6 +88,12 @@
     </choice>
   </define>
 
+  <define name="ubguid">
+    <data type="string">
+      <param name="pattern">[a-fA-F0-9]{4}-[a-fA-F0-9]{4}(-[0-9]{1}){2}-[a-fA-F0-9]{6}-[0-9]{16}</param>
+    </data>
+  </define>
+
   <define name="numaDistanceValue">
     <data type="unsignedInt">
       <param name="minInclusive">10</param>

@@ -6354,6 +6354,10 @@
         {
           "case": "s390-pv-guest",
           "type": "0"
+        },
+        {
+          "case": "iommufd",
+          "type": "0"
         }
       ],
       "members": [
@@ -12625,6 +12629,9 @@
           "features": [
             "unstable"
           ]
+        },
+        {
+          "name": "iommufd"
         }
       ],
       "meta-type": "enum",
@@ -12668,7 +12675,8 @@
         "tls-creds-psk",
         "tls-creds-x509",
         "tls-cipher-suites",
-        "x-remote-object"
+        "x-remote-object",
+        "iommufd"
       ]
     },
     {

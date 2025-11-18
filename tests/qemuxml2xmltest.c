@@ -1029,6 +1029,10 @@ mymain(void)
     DO_TEST_CAPS_ARCH_LATEST("s390-async-teardown-disabled", "s390x");
     DO_TEST_CAPS_ARCH_VER("s390-async-teardown-disabled", "s390x", "6.0.0");
 
+    /* for ub test */
+    DO_TEST_CAPS_ARCH_LATEST("ub-hostdev", "aarch64");
+    DO_TEST_CAPS_ARCH_LATEST("iommu-ummu", "aarch64");
+
  cleanup:
     qemuTestDriverFree(&driver);
     virFileWrapperClearPrefixes();

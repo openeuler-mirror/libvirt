@@ -965,6 +965,7 @@ qemuMonitorInitBalloonObjectPath(qemuMonitor *mon,
     case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_ISA:
     case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_DIMM:
     case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_UNASSIGNED:
+    case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_UB:
     case VIR_DOMAIN_DEVICE_ADDRESS_TYPE_LAST:
     default:
         return;

@@ -28,12 +28,14 @@
 #include "virbuffer.h"
 #include "virccw.h"
 #include "virpci.h"
+#include "virub.h"
 #include "virnetdev.h"
 #include "virenum.h"
 
 typedef enum {
     VIR_DOMAIN_DEVICE_ADDRESS_TYPE_NONE = 0,
     VIR_DOMAIN_DEVICE_ADDRESS_TYPE_PCI,
+    VIR_DOMAIN_DEVICE_ADDRESS_TYPE_UB,
     VIR_DOMAIN_DEVICE_ADDRESS_TYPE_DRIVE,
     VIR_DOMAIN_DEVICE_ADDRESS_TYPE_VIRTIO_SERIAL,
     VIR_DOMAIN_DEVICE_ADDRESS_TYPE_CCID,
@@ -119,6 +121,7 @@ struct _virDomainDeviceInfo {
     virDomainDeviceAddressType type;
     union {
         virPCIDeviceAddress pci;
+        virUBDeviceAddress ub;
         virDomainDeviceDriveAddress drive;
         virDomainDeviceVirtioSerialAddress vioserial;
         virDomainDeviceCcidAddress ccid;
@@ -167,6 +170,12 @@ struct _virDomainDeviceInfo {
      * cases we might want to prevent that from happening by
      * locking the isolation group */
     bool isolationGroupLocked;
+
+    /* for ub device port info */
+    virUBDevicePort udevPort;
+
+    /* for ub host bus instance */
+	virUBBusInstance busInstance;
 };
 
 typedef struct _virDomainDeviceNuma virDomainDeviceNuma;
@@ -197,6 +206,9 @@ void virPCIDeviceAddressFormat(virBuffer *buf,
                                virPCIDeviceAddress addr,
                                bool includeTypeInAddr);
 
+int virUBDeviceAddressParseXML(xmlNodePtr node,
+                               virUBDeviceAddress *addr);
+
 int virCCWDeviceAddressParseXML(xmlNodePtr node,
                                 virCCWDeviceAddress *addr);
 
@@ -220,3 +232,13 @@ int virInterfaceLinkParseXML(xmlNodePtr node,
 
 int virInterfaceLinkFormat(virBuffer *buf,
                            const virNetDevIfLink *lnk);
+
+bool virDeviceInfoUBAddressGuidIsWanted(const virDomainDeviceInfo *info);
+
+bool virDeviceInfoUBAddressEidIsWanted(const virDomainDeviceInfo *info);
+
+bool virDeviceInfoUBAddressPortNumIsWanted(const virDomainDeviceInfo *info);
+
+bool virDeviceInfoUBAddressPortEntryIsWanted(const virDomainDeviceInfo *info);
+
+uint32_t virDeviceInfoUBDeviceGetEid(const virDomainDeviceInfo *info);

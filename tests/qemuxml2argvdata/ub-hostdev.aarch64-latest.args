@@ -1,0 +1,40 @@
+LC_ALL=C \
+PATH=/bin \
+HOME=/var/lib/libvirt/qemu/domain--1-ub-hostdev \
+USER=test \
+LOGNAME=test \
+XDG_DATA_HOME=/var/lib/libvirt/qemu/domain--1-ub-hostdev/.local/share \
+XDG_CACHE_HOME=/var/lib/libvirt/qemu/domain--1-ub-hostdev/.cache \
+XDG_CONFIG_HOME=/var/lib/libvirt/qemu/domain--1-ub-hostdev/.config \
+/usr/bin/qemu-system-aarch64 \
+-name guest=ub-hostdev,debug-threads=on \
+-S \
+-object '{"qom-type":"secret","id":"masterKey0","format":"raw","file":"/var/lib/libvirt/qemu/domain--1-ub-hostdev/master-key.aes"}' \
+-blockdev '{"driver":"file","filename":"/efi.fd","node-name":"libvirt-pflash0-storage","auto-read-only":true,"discard":"unmap"}' \
+-blockdev '{"node-name":"libvirt-pflash0-format","read-only":false,"driver":"raw","file":"libvirt-pflash0-storage"}' \
+-machine virt,usb=off,gic-version=3,dump-guest-core=off,memory-backend=mach-virt.ram,pflash0=libvirt-pflash0-format \
+-accel kvm \
+-cpu host \
+-m size=1048576k \
+-object '{"qom-type":"memory-backend-ram","id":"mach-virt.ram","size":1073741824}' \
+-overcommit mem-lock=off \
+-smp 1,sockets=1,cores=1,threads=1 \
+-object '{"qom-type":"iommufd","id":"iommufd1"}' \
+-object '{"qom-type":"iommufd","id":"iommufd2"}' \
+-uuid 0c7da38a-634b-4e7e-bd46-4cf65b101619 \
+-display none \
+-no-user-config \
+-nodefaults \
+-chardev socket,id=charmonitor,fd=1729,server=on,wait=off \
+-mon chardev=charmonitor,id=monitor,mode=control \
+-rtc base=utc \
+-no-shutdown \
+-boot strict=on \
+-kernel /aarch64.kernel \
+-initrd /aarch64.initrd \
+-append 'rdinit=init console=ttyAMA0 earlycon=pl011,0x9000000 acpi=on' \
+-device '{"driver":"ubc","id":"ubc.1","guid":"cc08-a000-0-2-000000-0000000000000001","eid":1,"portnum":16}' \
+-audiodev '{"id":"audio1","driver":"none"}' \
+-device '{"driver":"vfio-ub","host":"cc08-a000-0-2-000000-0000000000000002","id":"hostdev0","guid":"cc08-a000-0-2-000000-0000000000000002","eid":3,"portnum":1,"port0":"ubc.1:0"}' \
+-sandbox on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny \
+-msg timestamp=on

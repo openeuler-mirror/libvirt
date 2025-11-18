@@ -130,6 +130,11 @@ virDeviceInfoPCIAddressExtensionIsPresent;
 virDeviceInfoPCIAddressExtensionIsWanted;
 virDeviceInfoPCIAddressIsPresent;
 virDeviceInfoPCIAddressIsWanted;
+virDeviceInfoUBAddressEidIsWanted;
+virDeviceInfoUBAddressGuidIsWanted;
+virDeviceInfoUBAddressPortEntryIsWanted;
+virDeviceInfoUBAddressPortNumIsWanted;
+virDeviceInfoUBDeviceGetEid;
 virDomainDeviceAddressIsValid;
 virDomainDeviceAddressTypeToString;
 virDomainDeviceCcidAddressParseXML;
@@ -3717,6 +3722,18 @@ virPCIVPDResourceRONew;
 virPCIVPDResourceRWFree;
 virPCIVPDResourceRWNew;
 virPCIVPDResourceUpdateKeyword;
+
+# util/virub.h
+virUBBitmapAllocatorAcquire;
+virUBBitmapAllocatorFree;
+virUBBitmapAllocatorInit;
+virUBBitmapAllocatorRelease;
+virUBBitmapAllocatorSetUsed;
+virUBDeviceAddressEidIsEmpty;
+virUBDeviceAddressGetIOMMUFDDev;
+virUBDeviceAddressGetIOMMUGroupDev;
+virUBDeviceAddressGuidIsEmpty;
+virUBDeviceGetGuidFromStr;
 
 # util/virvsock.h
 virVsockAcquireGuestCid;

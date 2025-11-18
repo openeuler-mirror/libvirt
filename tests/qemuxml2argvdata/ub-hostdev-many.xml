@@ -1,0 +1,193 @@
+<domain type="kvm">
+  <name>ub-vhostdev-many</name>
+  <uuid>0c7da38a-634b-4e7e-bd46-4cf65b101619</uuid>
+  <memory>1048576</memory>
+  <currentMemory>1048576</currentMemory>
+  <vcpu placement='static'>1</vcpu>
+  <iommufds>2</iommufds>
+  <os>
+    <type arch="aarch64" machine="virt">hvm</type>
+    <kernel>/aarch64.kernel</kernel>
+    <initrd>/aarch64.initrd</initrd>
+    <loader type="pflash">/efi.fd</loader>
+    <cmdline>rdinit=init console=ttyAMA0 earlycon=pl011,0x9000000 acpi=on</cmdline>
+  </os>
+  <features>
+    <gic version='3'/>
+    <acpi/>
+  </features>
+  <cpu mode='host-passthrough' check='none'>
+  </cpu>
+  <clock offset="utc"/>
+  <on_poweroff>destroy</on_poweroff>
+  <on_reboot>restart</on_reboot>
+  <on_crash>restart</on_crash>
+  <devices>
+    <emulator>/usr/bin/qemu-system-aarch64</emulator>
+	<controller type='ub' index='1' model='ubc'>
+	    <ports num='16'>
+	    </ports>
+        <address type='ub' eid='0x1' guid='cc08-a000-0-2-000000-0000000000000000'/>
+    </controller>
+    <hostdev mode='subsystem' type='ub' managed='yes' iommufd='1'>
+        <driver name='vfio'/>
+	    <source>
+	        <address guid="cc08-a000-0-2-000000-0000000000000001"/>
+	    </source>
+        <ports num='1'>
+            <port index='0' teid='0x1' tport='0'/>
+        </ports>
+	    <address type='ub' eid='0x3' guid="cc08-a000-0-2-000000-0000000000000001"/>
+    </hostdev>
+    <hostdev mode='subsystem' type='ub' managed='yes' iommufd='1'>
+        <driver name='vfio'/>
+	    <source>
+	        <address guid="cc08-a000-0-2-000000-0000000000000002"/>
+	    </source>
+        <ports num='1'>
+            <port index='0' teid='0x1' tport='1'/>
+        </ports>
+	    <address type='ub' eid='0x4' guid="cc08-a000-0-2-000000-0000000000000002"/>
+    </hostdev>
+    <hostdev mode='subsystem' type='ub' managed='yes' iommufd='1'>
+        <driver name='vfio'/>
+	    <source>
+	        <address guid="cc08-a000-0-2-000000-0000000000000003"/>
+	    </source>
+        <ports num='1'>
+            <port index='0' teid='0x1' tport='2'/>
+        </ports>
+	    <address type='ub' eid='0x5' guid="cc08-a000-0-2-000000-0000000000000003"/>
+    </hostdev>
+    <hostdev mode='subsystem' type='ub' managed='yes' iommufd='1'>
+        <driver name='vfio'/>
+	    <source>
+	        <address guid="cc08-a000-0-2-000000-0000000000000004"/>
+	    </source>
+        <ports num='1'>
+            <port index='0' teid='0x1' tport='3'/>
+        </ports>
+	    <address type='ub' eid='0x6' guid="cc08-a000-0-2-000000-0000000000000004"/>
+    </hostdev>
+    <hostdev mode='subsystem' type='ub' managed='yes' iommufd='1'>
+        <driver name='vfio'/>
+	    <source>
+	        <address guid="cc08-a000-0-2-000000-0000000000000005"/>
+	    </source>
+        <ports num='1'>
+            <port index='0' teid='0x1' tport='4'/>
+        </ports>
+	    <address type='ub' eid='0x7' guid="cc08-a000-0-2-000000-0000000000000005"/>
+    </hostdev>
+    <hostdev mode='subsystem' type='ub' managed='yes' iommufd='1'>
+        <driver name='vfio'/>
+	    <source>
+	        <address guid="cc08-a000-0-2-000000-0000000000000006"/>
+	    </source>
+        <ports num='1'>
+            <port index='0' teid='0x1' tport='5'/>
+        </ports>
+	    <address type='ub' eid='0x8' guid="cc08-a000-0-2-000000-0000000000000006"/>
+    </hostdev>
+    <hostdev mode='subsystem' type='ub' managed='yes' iommufd='1'>
+        <driver name='vfio'/>
+	    <source>
+	        <address guid="cc08-a000-0-2-000000-0000000000000007"/>
+	    </source>
+        <ports num='1'>
+            <port index='0' teid='0x1' tport='6'/>
+        </ports>
+	    <address type='ub' eid='0x9' guid="cc08-a000-0-2-000000-0000000000000007"/>
+    </hostdev>
+    <hostdev mode='subsystem' type='ub' managed='yes' iommufd='1'>
+        <driver name='vfio'/>
+	    <source>
+	        <address guid="cc08-a000-0-2-000000-0000000000000008"/>
+	    </source>
+        <ports num='1'>
+            <port index='0' teid='0x1' tport='7'/>
+        </ports>
+	    <address type='ub' eid='0xa' guid="cc08-a000-0-2-000000-0000000000000008"/>
+    </hostdev>
+    <hostdev mode='subsystem' type='ub' managed='yes' iommufd='1'>
+        <driver name='vfio'/>
+	    <source>
+	        <address guid="cc08-a000-0-2-000000-0000000000000009"/>
+	    </source>
+        <ports num='1'>
+            <port index='0' teid='0x1' tport='8'/>
+        </ports>
+	    <address type='ub' eid='0xb' guid="cc08-a000-0-2-000000-0000000000000009"/>
+    </hostdev>
+    <hostdev mode='subsystem' type='ub' managed='yes' iommufd='1'>
+        <driver name='vfio'/>
+	    <source>
+	        <address guid="cc08-a000-0-2-000000-0000000000000010"/>
+	    </source>
+        <ports num='1'>
+            <port index='0' teid='0x1' tport='9'/>
+        </ports>
+	    <address type='ub' eid='0xc' guid="cc08-a000-0-2-000000-0000000000000010"/>
+    </hostdev>
+    <hostdev mode='subsystem' type='ub' managed='yes' iommufd='1'>
+        <driver name='vfio'/>
+	    <source>
+	        <address guid="cc08-a000-0-2-000000-0000000000000011"/>
+	    </source>
+        <ports num='1'>
+            <port index='0' teid='0x1' tport='10'/>
+        </ports>
+	    <address type='ub' eid='0xd' guid="cc08-a000-0-2-000000-0000000000000011"/>
+    </hostdev>
+    <hostdev mode='subsystem' type='ub' managed='yes' iommufd='1'>
+        <driver name='vfio'/>
+	    <source>
+	        <address guid="cc08-a000-0-2-000000-0000000000000012"/>
+	    </source>
+        <ports num='1'>
+            <port index='0' teid='0x1' tport='11'/>
+        </ports>
+	    <address type='ub' eid='0xe' guid="cc08-a000-0-2-000000-0000000000000012"/>
+    </hostdev>
+    <hostdev mode='subsystem' type='ub' managed='yes' iommufd='1'>
+        <driver name='vfio'/>
+	    <source>
+	        <address guid="cc08-a000-0-2-000000-0000000000000013"/>
+	    </source>
+        <ports num='1'>
+            <port index='0' teid='0x1' tport='12'/>
+        </ports>
+	    <address type='ub' eid='0xf' guid="cc08-a000-0-2-000000-0000000000000013"/>
+    </hostdev>
+    <hostdev mode='subsystem' type='ub' managed='yes' iommufd='1'>
+        <driver name='vfio'/>
+	    <source>
+	        <address guid="cc08-a000-0-2-000000-0000000000000014"/>
+	    </source>
+        <ports num='1'>
+            <port index='0' teid='0x1' tport='13'/>
+        </ports>
+	    <address type='ub' eid='0x10' guid="cc08-a000-0-2-000000-0000000000000014"/>
+    </hostdev>
+    <hostdev mode='subsystem' type='ub' managed='yes' iommufd='1'>
+        <driver name='vfio'/>
+	    <source>
+	        <address guid="cc08-a000-0-2-000000-0000000000000015"/>
+	    </source>
+        <ports num='1'>
+            <port index='0' teid='0x1' tport='14'/>
+        </ports>
+	    <address type='ub' eid='0x11' guid="cc08-a000-0-2-000000-0000000000000015"/>
+    </hostdev>
+    <hostdev mode='subsystem' type='ub' managed='yes' iommufd='1'>
+        <driver name='vfio'/>
+	    <source>
+	        <address guid="cc08-a000-0-2-000000-0000000000000016"/>
+	    </source>
+        <ports num='1'>
+            <port index='0' teid='0x1' tport='15'/>
+        </ports>
+	    <address type='ub' eid='0x12' guid="cc08-a000-0-2-000000-0000000000000016"/>
+    </hostdev>
+  </devices>
+</domain>

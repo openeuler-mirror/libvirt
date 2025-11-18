@@ -5717,6 +5717,7 @@ qemuDomainControllerDefPostParse(virDomainControllerDef *cont,
     case VIR_DOMAIN_CONTROLLER_TYPE_FDC:
     case VIR_DOMAIN_CONTROLLER_TYPE_XENBUS:
     case VIR_DOMAIN_CONTROLLER_TYPE_ISA:
+    case VIR_DOMAIN_CONTROLLER_TYPE_UB:
     case VIR_DOMAIN_CONTROLLER_TYPE_LAST:
         break;
     }
@@ -10569,6 +10570,7 @@ qemuDomainGetHostdevPath(virDomainHostdevDef *dev,
     virDomainHostdevSubsysSCSIVHost *hostsrc = &dev->source.subsys.u.scsi_host;
     virDomainHostdevSubsysMediatedDev *mdevsrc = &dev->source.subsys.u.mdev;
     virDomainHostdevSubsysVDPA *vdpasrc = &dev->source.subsys.u.vdpa;
+    virDomainHostdevSubsysUB *ubsrc = &dev->source.subsys.u.ub;
 
     g_autoptr(virUSBDevice) usb = NULL;
     g_autoptr(virSCSIDevice) scsi = NULL;
@@ -10642,10 +10644,26 @@ qemuDomainGetHostdevPath(virDomainHostdevDef *dev,
 
             perm = VIR_CGROUP_DEVICE_RW;
             break;
+
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
             tmpPath = g_strdup(vdpasrc->devpath);
             perm = VIR_CGROUP_DEVICE_RW;
             break;
+
+        case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB:
+            if (ubsrc->backend != VIR_DOMAIN_HOSTDEV_UB_BACKEND_VFIO)
+                break;
+
+            if (dev->iommufd) {
+                tmpPath = virUBDeviceAddressGetIOMMUFDDev(&ubsrc->addr);
+            } else {
+                tmpPath = virUBDeviceAddressGetIOMMUGroupDev(&ubsrc->addr);
+            }
+            if (!tmpPath)
+                return -1;
+            perm = VIR_CGROUP_DEVICE_RW;
+            break;
+
         case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_LAST:
             break;
         }
@@ -11420,6 +11438,7 @@ qemuDomainPrepareHostdev(virDomainHostdevDef *hostdev,
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_SCSI_HOST:
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_MDEV:
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
+    case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB:
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_LAST:
         break;
     }
@@ -12731,4 +12750,69 @@ qemuDomainNumatuneMaybeFormatNodesetUnion(virDomainObj *vm,
 
     if (nodeset)
         *nodeset = g_steal_pointer(&unionMask);
+}
+
+virDomainDeviceInfo *
+qemuDomainGetUBControllerDevInfoByEid(const virDomainDef *def, unsigned int eid)
+{
+    size_t i;
+    virDomainControllerDef *cont = NULL;
+    virDomainDeviceInfo *info = NULL;
+
+    for (i = 0; i < def->ncontrollers; i++) {
+        cont = def->controllers[i];
+        if (cont->type != VIR_DOMAIN_CONTROLLER_TYPE_UB)
+            continue;
+
+        info = &cont->info;
+        if (info->addr.ub.eid == eid)
+            return info;
+    }
+
+    return NULL;
+}
+
+virDomainDeviceInfo *
+qemuDomainGetUBDeviceDevInfoByEid(const virDomainDef *def, unsigned int eid)
+{
+    size_t i;
+    virDomainHostdevDef *hostdev = NULL;
+    virDomainDeviceInfo *info = NULL;
+
+    for (i = 0; i < def->nhostdevs; i++) {
+        hostdev = def->hostdevs[i];
+        if (hostdev->source.subsys.type != VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB)
+            continue;
+
+        info = hostdev->info;
+        if (info->addr.ub.eid == eid)
+            return info;
+    }
+
+    return NULL;
+}
+
+char *
+qemuDomainGetUBControllerAliasByEid(const virDomainDef *def, unsigned int eid)
+{
+    virDomainDeviceInfo *info = NULL;
+
+    info = qemuDomainGetUBControllerDevInfoByEid(def, eid);
+    return info ? info->alias : NULL;
+}
+
+int
+qemuDomainGetUBPortNumByEid(const virDomainDef *def, unsigned int eid)
+{
+    virDomainDeviceInfo *info = NULL;
+
+    info = qemuDomainGetUBControllerDevInfoByEid(def, eid);
+    if (info)
+        return info->udevPort.num;
+
+    info = qemuDomainGetUBDeviceDevInfoByEid(def, eid);
+    if (info)
+        return info->udevPort.num;
+
+    return -1;
 }

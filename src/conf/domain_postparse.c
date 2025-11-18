@@ -352,6 +352,7 @@ virDomainHostdevDefPostParse(virDomainHostdevDef *dev,
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_PCI:
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_SCSI_HOST:
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
+    case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB:
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_LAST:
         break;
     }
@@ -1290,6 +1291,12 @@ virDomainDefPostParseCommon(virDomainDef *def,
             };
             if (virDomainDefPostParseDeviceIterator(def, &device, NULL, data) < 0)
                 return -1;
+        }
+
+        /* UB controller default model set to ubc */
+        if (def->controllers[i]->type == VIR_DOMAIN_CONTROLLER_TYPE_UB &&
+            def->controllers[i]->model == VIR_DOMAIN_CONTROLLER_MODEL_UB_DEFAULT) {
+            def->controllers[i]->model = VIR_DOMAIN_CONTROLLER_MODEL_UB_UBC;
         }
     }
 

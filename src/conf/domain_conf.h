@@ -199,6 +199,7 @@ typedef enum {
     VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_SCSI_HOST,
     VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_MDEV,
     VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA,
+    VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB,
 
     VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_LAST
 } virDomainHostdevSubsysType;
@@ -214,6 +215,15 @@ typedef enum {
 } virDomainHostdevSubsysPCIBackendType;
 
 VIR_ENUM_DECL(virDomainHostdevSubsysPCIBackend);
+
+typedef enum {
+    VIR_DOMAIN_HOSTDEV_UB_BACKEND_DEFAULT = 0, /* detect automatically, prefer VFIO */
+    VIR_DOMAIN_HOSTDEV_UB_BACKEND_VFIO, /* force vfio */
+
+    VIR_DOMAIN_HOSTDEV_UB_BACKEND_TYPE_LAST
+} virDomainHostdevSubsysUBBackendType;
+
+VIR_ENUM_DECL(virDomainHostdevSubsysUBBackend);
 
 typedef enum {
     VIR_DOMAIN_HOSTDEV_SCSI_PROTOCOL_TYPE_NONE,
@@ -252,6 +262,11 @@ struct _virDomainHostdevSubsysPCI {
     virDomainHostdevSubsysPCIBackendType backend;
 
     virBitmap *origstates;
+};
+
+struct _virDomainHostdevSubsysUB {
+    virUBDeviceAddress addr;
+    virDomainHostdevSubsysUBBackendType backend;
 };
 
 struct _virDomainHostdevSubsysSCSIHost {
@@ -330,6 +345,7 @@ struct _virDomainHostdevSubsys {
         virDomainHostdevSubsysSCSIVHost scsi_host;
         virDomainHostdevSubsysMediatedDev mdev;
         virDomainHostdevSubsysVDPA vdpa;
+        virDomainHostdevSubsysUB ub;
     } u;
 };
 
@@ -609,6 +625,7 @@ typedef enum {
     VIR_DOMAIN_CONTROLLER_TYPE_PCI,
     VIR_DOMAIN_CONTROLLER_TYPE_XENBUS,
     VIR_DOMAIN_CONTROLLER_TYPE_ISA,
+    VIR_DOMAIN_CONTROLLER_TYPE_UB,
 
     VIR_DOMAIN_CONTROLLER_TYPE_LAST
 } virDomainControllerType;
@@ -629,6 +646,13 @@ typedef enum {
 
     VIR_DOMAIN_CONTROLLER_MODEL_PCI_LAST
 } virDomainControllerModelPCI;
+
+typedef enum {
+    VIR_DOMAIN_CONTROLLER_MODEL_UB_DEFAULT = -1,
+    VIR_DOMAIN_CONTROLLER_MODEL_UB_UBC,
+
+    VIR_DOMAIN_CONTROLLER_MODEL_UB_LAST
+} virDomainControllerModelUB;
 
 typedef enum {
     VIR_DOMAIN_CONTROLLER_PCI_MODEL_NAME_NONE = 0,
@@ -2904,6 +2928,7 @@ typedef enum {
     VIR_DOMAIN_IOMMU_MODEL_INTEL,
     VIR_DOMAIN_IOMMU_MODEL_SMMUV3,
     VIR_DOMAIN_IOMMU_MODEL_VIRTIO,
+    VIR_DOMAIN_IOMMU_MODEL_UMMU,
 
     VIR_DOMAIN_IOMMU_MODEL_LAST
 } virDomainIOMMUModel;
@@ -3170,6 +3195,11 @@ struct _virDomainDef {
                              should be re-run before starting */
 
     unsigned int scsiBusMaxUnit;
+
+    /* ub guid seq allocator */
+    virUBBitmapAllocator *ubgs_allocator;
+    /* ub eid allocaltor */
+    virUBBitmapAllocator *ubeid_allocator;
 };
 
 
