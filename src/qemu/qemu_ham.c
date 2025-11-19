@@ -10,6 +10,7 @@
 #include "virlog.h"
 
 #define VIR_FROM_THIS VIR_FROM_QEMU
+#define HTTPS_SUCCESS 200
 
 VIR_LOG_INIT("qemu.qemu_ham");
 
@@ -269,7 +270,7 @@ qemuHamGetBorrowInfo(qemuHamMigrationInfo *hamInfo,
         return -1;
     }
 
-    if (code != 200) {
+    if (code != HTTPS_SUCCESS) {
         virReportError(VIR_ERR_INTERNAL_ERROR,
                        _("borrow info request failed with code %1$d"), code);
         return -1;
@@ -434,7 +435,7 @@ qemuHamRollbackPages(virDomainObj *vm)
 }
 
 static char *
-qemuHamGetClearReq(qemuHamMigrationInfo *hamInfo, virHamClearType type)
+qemuHamMakeClearReq(qemuHamMigrationInfo *hamInfo, virHamClearType type)
 {
     g_autofree char *clearReqInit = NULL;
     g_autoptr(virJSONValue) clearReq = NULL;
@@ -483,7 +484,7 @@ qemuHamSendClearReq(qemuHamMigrationInfo *hamInfo, virHamClearType type)
 {
     g_autofree char *req = NULL;
 
-    if (!(req = qemuHamGetClearReq(hamInfo, type))) {
+    if (!(req = qemuHamMakeClearReq(hamInfo, type))) {
         virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
                        _("failed to create clear request"));
         return;

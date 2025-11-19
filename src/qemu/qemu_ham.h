@@ -4,7 +4,8 @@
  * Copyright (C) 2025 Huawei Technologies Co., Ltd
  */
 
-#pragma once
+#ifndef QEMU_HAM_H
+#define QEMU_HAM_H
 
 #include "virconftypes.h"
 #include "virdomainjob.h"
@@ -38,3 +39,5 @@ int qemuHamModifyPgtable(virDomainObj *vm);
 int qemuHamRollbackPages(virDomainObj *vm);
 
 void qemuHamSendClearReq(qemuHamMigrationInfo *hamInfo, virHamClearType type);
+
+#endif

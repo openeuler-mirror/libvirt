@@ -4,7 +4,9 @@
  * Copyright (C) 2025 Huawei Technologies Co., Ltd
  */
 
-#pragma once
+#ifndef VIRHAM_H
+#define VIRHAM_H
+
 #define VIR_HAM_CANCELLED_TIMEOUT 1
 #define VIR_HAM_RACK_IPC_TIMEOUT 3
 
@@ -25,3 +27,5 @@ void virHamClearAll(const char *hostname);
 unsigned long long virHamGetCancelledTimeout(void);
 
 void virHamSetupTimeOut(unsigned long long cancelledTimeout, uint16_t rackIpcTimeout);
+
+#endif

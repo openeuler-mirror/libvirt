@@ -9,9 +9,9 @@
 #include "viralloc.h"
 #include "virerror.h"
 #include "virfile.h"
-#include "virham.h"
 #include "virjson.h"
 #include "virlog.h"
+#include "virham.h"
 
 #define VIR_FROM_THIS VIR_FROM_NONE
 
@@ -19,6 +19,7 @@ VIR_LOG_INIT("util.ham");
 
 /* rack ipc path for ham migration */
 #define VIR_HAM_RACK_IPC_PATH "/usr/local/softbus/ctrlbus/lib/librack_com.so"
+#define VIR_HAM_SECOND_TRANS_TO_MILLIONSECOND 1000
 
 static unsigned long long virHamCancelledTimeout = VIR_HAM_CANCELLED_TIMEOUT;
 static uint16_t virHamRackIpcTimeout = VIR_HAM_RACK_IPC_TIMEOUT;
@@ -231,5 +232,5 @@ virHamSetupTimeOut(unsigned long long cancelledTimeout, uint16_t rackIpcTimeout)
 
 unsigned long long
 virHamGetCancelledTimeout(void){
-    return virHamCancelledTimeout * 1000;
+    return virHamCancelledTimeout * VIR_HAM_SECOND_TRANS_TO_MILLIONSECOND;
 }
