@@ -120,7 +120,7 @@ qemuHamGetRamInfo(virDomainPtr domain)
     g_autoptr(virJSONValue) result = NULL;
     virJSONValue *data = NULL;
     virJSONValue *blocksArray = NULL;
-    int i;
+    unsigned int i;
 
     if (!(result = qemuHamSendQemuMonitorCommand(NULL, domain, "query-ramblock",
                                                  NULL, VIR_ASYNC_JOB_MIGRATION_IN))) {
@@ -181,7 +181,7 @@ qemuHamGetBorrowReq(qemuHamMigrationInfo *hamInfo, qemuHamRamInfo *ramInfo)
 {
     g_autoptr(virJSONValue) borrowReq = virJSONValueNewObject();
     g_autoptr(virJSONValue) valist = virJSONValueNewArray();
-    int i;
+    unsigned int i;
 
     if (virJSONValueObjectAppendString(borrowReq, "action", "borrow") < 0) {
         virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
@@ -255,7 +255,7 @@ qemuHamGetBorrowInfo(qemuHamMigrationInfo *hamInfo,
     virJSONValue *numaIdsArray = NULL;
     const char *name;
     int code;
-    int i;
+    unsigned int i;
 
     if (!(resp = virJSONValueFromString(respStr))) {
         virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
@@ -332,7 +332,7 @@ qemuHamSendRamInfo(qemuHamRamInfo *ramInfo, virDomainObj *vm)
     g_autoptr(virJSONValue) arguments = virJSONValueNewObject();
     g_autoptr(virJSONValue) blocksArray = virJSONValueNewArray();
     g_autoptr(virJSONValue) result = NULL;
-    int i;
+    unsigned int i;
 
     if (virJSONValueObjectAppendNumberInt(arguments, "pid", ramInfo->pid) < 0) {
         virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
