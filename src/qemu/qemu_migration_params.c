@@ -206,7 +206,7 @@ static const qemuMigrationParamsFlagMapItem qemuMigrationParamsFlagMap[] = {
      {QEMU_MIGRATION_FLAG_REQUIRED,
      VIR_MIGRATE_LDST,
      QEMU_MIGRATION_CAP_LDST,
-     QEMU_MIGRATION_SOURCE},
+     QEMU_MIGRATION_SOURCE | QEMU_MIGRATION_DESTINATION},
 };
 
 /* Translation from VIR_MIGRATE_PARAM_* typed parameters to
