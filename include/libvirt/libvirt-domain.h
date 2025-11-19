@@ -1115,6 +1115,12 @@ typedef enum {
      * Since: 9.10.0
      */
     VIR_MIGRATE_ONECOPY = (1 << 22),
+
+    /* Support ham migration by LDST.
+     *
+     * Since: 9.10.0
+     */
+    VIR_MIGRATE_LDST = (1 << 27),
 } virDomainMigrateFlags;
 
 
@@ -4203,6 +4209,8 @@ typedef enum {
      * suspended and it can later be resumed using virDomainMigrate* APIs with
      * VIR_MIGRATE_POSTCOPY_RESUME flag. (Since: 8.5.0) */
     VIR_DOMAIN_ABORT_JOB_POSTCOPY = 1 << 0,
+    /* Interrupt ham migration. (Since: 9.10.0) */
+    VIR_DOMAIN_ABORT_JOB_HAM = 1 << 1,
 } virDomainAbortJobFlagsValues;
 
 int virDomainAbortJobFlags(virDomainPtr dom,

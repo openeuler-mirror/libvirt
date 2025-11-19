@@ -55,6 +55,7 @@
 #include "virsystemd.h"
 #include "virhostuptime.h"
 #include "virdaemon.h"
+#include "virham.h"
 
 #include "driver.h"
 
@@ -1192,6 +1193,9 @@ int main(int argc, char **argv) {
         ret = VIR_DAEMON_ERR_INIT;
         goto cleanup;
     }
+
+    VIR_DEBUG("Clear all borrowed numa nodes of ham migration");
+    virHamClearAll(virGetHostname());
 
 #if defined(__linux__) && defined(NETLINK_ROUTE)
     /* Register the netlink event service for NETLINK_ROUTE */

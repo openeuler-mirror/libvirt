@@ -89,6 +89,16 @@ struct qemu_domain_monitor_command_with_files_ret {
     remote_nonnull_string result;
 };
 
+struct qemu_domain_monitor_command_async_args {
+    remote_nonnull_domain dom;
+    remote_nonnull_string cmd;
+    int asyncJob;
+};
+
+struct qemu_domain_monitor_command_async_ret {
+    remote_nonnull_string result;
+};
+
 
 /* Define the program number, protocol version and procedure numbers here. */
 const QEMU_PROGRAM = 0x20008087;
@@ -169,5 +179,12 @@ enum qemu_procedure {
      * @priority: low
      * @acl: domain:write
      */
-    QEMU_PROC_DOMAIN_MONITOR_COMMAND_WITH_FILES = 7
+    QEMU_PROC_DOMAIN_MONITOR_COMMAND_WITH_FILES = 7,
+
+    /**
+     * @generate: none
+     * @priority: low
+     * @acl: domain:write
+     */
+    QEMU_PROC_DOMAIN_MONITOR_COMMAND_ASYNC = 8
 };

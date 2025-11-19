@@ -5553,6 +5553,30 @@ remoteDomainQemuMonitorCommandWithFiles(virDomainPtr domain,
 }
 
 
+static int
+remoteDomainQemuMonitorCommandAsync(virDomainPtr domain, const char *cmd,
+                                    char **result, int asyncJob)
+{
+    qemu_domain_monitor_command_async_args args;
+    g_auto(qemu_domain_monitor_command_async_ret) ret = {0};
+    struct private_data *priv = domain->conn->privateData;
+    VIR_LOCK_GUARD lock = remoteDriverLock(priv);
+
+    make_nonnull_domain(&args.dom, domain);
+    args.cmd = (char *)cmd;
+    args.asyncJob = asyncJob;
+
+    if (call(domain->conn, priv, REMOTE_CALL_QEMU, QEMU_PROC_DOMAIN_MONITOR_COMMAND_ASYNC,
+             (xdrproc_t) xdr_qemu_domain_monitor_command_async_args, (char *) &args,
+             (xdrproc_t) xdr_qemu_domain_monitor_command_async_ret, (char *) &ret) == -1)
+        return -1;
+
+    *result = g_steal_pointer(&ret.result);
+
+    return 0;
+}
+
+
 static char *
 remoteDomainMigrateBegin3(virDomainPtr domain,
                           const char *xmlin,
@@ -7786,6 +7810,7 @@ static virHypervisorDriver hypervisor_driver = {
     .domainSnapshotDelete = remoteDomainSnapshotDelete, /* 0.8.0 */
     .domainQemuMonitorCommand = remoteDomainQemuMonitorCommand, /* 0.8.3 */
     .domainQemuMonitorCommandWithFiles = remoteDomainQemuMonitorCommandWithFiles, /* 8.2.0 */
+    .domainQemuMonitorCommandAsync = remoteDomainQemuMonitorCommandAsync, /* 9.10.0 */
     .domainQemuAttach = remoteDomainQemuAttach, /* 0.9.4 */
     .domainQemuAgentCommand = remoteDomainQemuAgentCommand, /* 0.10.0 */
     .connectDomainQemuMonitorEventRegister = remoteConnectDomainQemuMonitorEventRegister, /* 1.2.3 */

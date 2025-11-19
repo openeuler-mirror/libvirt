@@ -39,6 +39,7 @@
 #include "qemu_slirp.h"
 #include "qemu_block.h"
 #include "qemu_tpm.h"
+#include "qemu_ham.h"
 
 #include "domain_audit.h"
 #include "virlog.h"
@@ -58,6 +59,7 @@
 #include "virprocess.h"
 #include "virdomainsnapshotobjlist.h"
 #include "virutil.h"
+#include "virham.h"
 
 #define VIR_FROM_THIS VIR_FROM_QEMU
 
@@ -5533,6 +5535,7 @@ qemuMigrationSrcPerformPeer2Peer3(virQEMUDriver *driver,
     int maxparams = 0;
     size_t i;
     bool offline = !!(flags & VIR_MIGRATE_OFFLINE);
+    g_autoptr(qemuHamMigrationInfo) hamInfo = NULL;
 
     VIR_DEBUG("driver=%p, sconn=%p, dconn=%p, dconnuri=%s, vm=%p, xmlin=%s, "
               "dname=%s, uri=%s, graphicsuri=%s, listenAddress=%s, "
@@ -5677,6 +5680,19 @@ qemuMigrationSrcPerformPeer2Peer3(virQEMUDriver *driver,
                        _("domainMigratePrepare3 did not set uri"));
         virErrorPreserveLast(&orig_err);
         goto finish;
+    }
+
+    if (flags & VIR_MIGRATE_LDST) {
+        VIR_INFO("Prepare for ham migration");
+        hamInfo = g_new0(qemuHamMigrationInfo, 1);
+        hamInfo->srcHostname = virGetHostname();
+        hamInfo->srcPid = vm->pid;
+        if (qemuHamMigrationPrepare(hamInfo, dconn, vm, cookieout, cookieoutlen) < 0) {
+            virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                           _("failed to prepare for ham migration"));
+            virErrorPreserveLast(&orig_err);
+            goto finish;
+        }
     }
 
     /* Perform the migration.  The driver isn't supposed to return
@@ -5834,6 +5850,19 @@ qemuMigrationSrcPerformPeer2Peer3(virQEMUDriver *driver,
         ret = 0;
     } else {
         ret = -1;
+    }
+
+    if ((flags & VIR_MIGRATE_LDST) && hamInfo && hamInfo->name) {
+        VIR_INFO("Cleanup for ham migration");
+        if (ret < 0) {
+            if (qemuHamRollbackPages(vm) < 0)
+                virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                               _("failed to rollback memory pages for ham migration"));
+            qemuHamSendClearReq(hamInfo, VIR_HAM_CLEAR_MIGRATE_FAILURE);
+            virCondBroadcast(&vm->hamCond);
+        } else {
+            qemuHamSendClearReq(hamInfo, VIR_HAM_CLEAR_MIGRATE_SUCCESS);
+        }
     }
 
     virObjectUnref(st);

@@ -2459,6 +2459,12 @@ virGICVersionTypeToString;
 virGSListStringFree;
 
 
+# util/virham.h
+virHamClearAll;
+virHamGetClearReqInit;
+virHamRackIpcSyncSendAndRecv;
+
+
 # util/virhash.h
 virHashAddEntry;
 virHashAtomicNew;

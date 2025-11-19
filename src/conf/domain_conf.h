@@ -3250,6 +3250,7 @@ struct _virDomainStateReason {
 struct _virDomainObj {
     virObjectLockable parent;
     virCond cond;
+    virCond hamCond;
 
     virDomainJobObj *job;
 

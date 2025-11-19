@@ -64,6 +64,7 @@
      VIR_MIGRATE_ZEROCOPY | \
      VIR_MIGRATE_RETURNPATH | \
      VIR_MIGRATE_ONECOPY | \
+     VIR_MIGRATE_LDST | \
      0)
 
 /* All supported migration parameters and their types. */

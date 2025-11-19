@@ -4106,6 +4106,7 @@ static void virDomainObjDispose(void *obj)
 
     VIR_DEBUG("obj=%p", dom);
     virCondDestroy(&dom->cond);
+    virCondDestroy(&dom->hamCond);
     virDomainDefFree(dom->def);
     virDomainDefFree(dom->newDef);
 
@@ -4133,6 +4134,12 @@ virDomainObjNew(virDomainXMLOption *xmlopt)
     if (virCondInit(&domain->cond) < 0) {
         virReportSystemError(errno, "%s",
                              _("failed to initialize domain condition"));
+        goto error;
+    }
+
+    if (virCondInit(&domain->hamCond) < 0) {
+        virReportSystemError(errno, "%s",
+                             _("failed to initialize domain ham condition"));
         goto error;
     }
 

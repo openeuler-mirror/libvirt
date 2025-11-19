@@ -4740,6 +4740,38 @@ qemuDispatchDomainMonitorCommandWithFiles(virNetServer *server G_GNUC_UNUSED,
 
 
 static int
+qemuDispatchDomainMonitorCommandAsync(virNetServer *server G_GNUC_UNUSED,
+                                      virNetServerClient *client,
+                                      virNetMessage *msg G_GNUC_UNUSED,
+                                      struct virNetMessageError *rerr,
+                                      qemu_domain_monitor_command_async_args *args,
+                                      qemu_domain_monitor_command_async_ret *ret)
+{
+    virDomainPtr dom = NULL;
+    int rv = -1;
+    virConnectPtr conn = remoteGetHypervisorConn(client);
+
+    if (!conn)
+        goto cleanup;
+
+    if (!(dom = get_nonnull_domain(conn, args->dom)))
+        goto cleanup;
+
+    if (virDomainQemuMonitorCommandAsync(dom, args->cmd, &ret->result,
+                                         args->asyncJob) < 0)
+        goto cleanup;
+
+    rv = 0;
+
+ cleanup:
+    if (rv < 0)
+        virNetMessageSaveError(rerr);
+    virObjectUnref(dom);
+    return rv;
+}
+
+
+static int
 remoteDispatchDomainMigrateBegin3(virNetServer *server G_GNUC_UNUSED,
                                   virNetServerClient *client,
                                   virNetMessage *msg G_GNUC_UNUSED,

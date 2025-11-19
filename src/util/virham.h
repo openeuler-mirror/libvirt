@@ -1,0 +1,21 @@
+/*
+ * virham.h: rack ipc functions for ham migration
+ *
+ * Copyright (C) 2025 Huawei Technologies Co., Ltd
+ */
+
+#pragma once
+
+typedef enum {
+    VIR_HAM_CLEAR_ALL = 0,              /* Clear all resource */
+    VIR_HAM_CLEAR_MIGRATE_SUCCESS,      /* Clear specific resource when ham migration succeed */
+    VIR_HAM_CLEAR_MIGRATE_FAILURE,      /* Clear specific resource when ham migration failed */
+
+    VIR_HAM_CLEAR_LAST
+} virHamClearType;
+
+char *virHamRackIpcSyncSendAndRecv(const char *req);
+
+char *virHamGetClearReqInit(virHamClearType type, const char *hostname);
+
+void virHamClearAll(const char *hostname);

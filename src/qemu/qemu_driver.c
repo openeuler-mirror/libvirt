@@ -52,6 +52,7 @@
 #include "qemu_saveimage.h"
 #include "qemu_snapshot.h"
 #include "qemu_validate.h"
+#include "qemu_ham.h"
 
 #include "virerror.h"
 #include "virlog.h"
@@ -12180,6 +12181,29 @@ qemuDomainAbortJobPostcopy(virDomainObj *vm,
 }
 
 
+#define HAM_CANCELLED_TIMEOUT (1000ull * 300)
+
+static int
+qemuHamWaitForCancelled(virDomainObj *vm)
+{
+    unsigned long long now = 0;
+    unsigned long long then = 0;
+
+    if (virTimeMillisNow(&now) < 0)
+        return -1;
+
+    then = now + HAM_CANCELLED_TIMEOUT;
+
+    if (virCondWaitUntil(&vm->hamCond, &vm->parent.lock, then) < 0) {
+        virReportSystemError(errno, "%s",
+                             _("failed to wait for domain ham condition"));
+        return -1;
+    }
+
+    return 0;
+}
+
+
 static int
 qemuDomainAbortJobFlags(virDomainPtr dom,
                         unsigned int flags)
@@ -12187,10 +12211,12 @@ qemuDomainAbortJobFlags(virDomainPtr dom,
     virDomainObj *vm;
     int ret = -1;
     qemuDomainObjPrivate *priv;
+    bool isHam = false;
 
     VIR_DEBUG("flags=0x%x", flags);
 
-    virCheckFlags(VIR_DOMAIN_ABORT_JOB_POSTCOPY, -1);
+    virCheckFlags(VIR_DOMAIN_ABORT_JOB_POSTCOPY |
+                  VIR_DOMAIN_ABORT_JOB_HAM, -1);
 
     if (!(vm = qemuDomainObjFromDomain(dom)))
         goto cleanup;
@@ -12205,6 +12231,9 @@ qemuDomainAbortJobFlags(virDomainPtr dom,
         goto endjob;
 
     priv = vm->privateData;
+
+    isHam = flags & VIR_DOMAIN_ABORT_JOB_HAM &&
+            vm->job->asyncJob == VIR_ASYNC_JOB_MIGRATION_OUT;
 
     if (flags & VIR_DOMAIN_ABORT_JOB_POSTCOPY &&
         (vm->job->asyncJob != VIR_ASYNC_JOB_MIGRATION_OUT ||
@@ -12270,6 +12299,9 @@ qemuDomainAbortJobFlags(virDomainPtr dom,
 
  endjob:
     virDomainObjEndJob(vm);
+
+    if (isHam && ret == 0)
+        ret = qemuHamWaitForCancelled(vm);
 
  cleanup:
     virDomainObjEndAPI(&vm);
@@ -13435,6 +13467,35 @@ qemuDomainQemuMonitorCommand(virDomainPtr domain,
                              unsigned int flags)
 {
     return qemuDomainQemuMonitorCommandWithFiles(domain, cmd, 0, NULL, NULL, NULL, result, flags);
+}
+
+
+static int
+qemuDomainQemuMonitorCommandAsync(virDomainPtr domain,
+                                  const char *cmd,
+                                  char **result,
+                                  int asyncJob)
+{
+    virQEMUDriver *driver = domain->conn->privateData;
+    virDomainObj *vm = NULL;
+    int ret = -1;
+
+    if (!(vm = qemuDomainObjFromDomain(domain)))
+        goto cleanup;
+
+    if (virDomainQemuMonitorCommandAsyncEnsureACL(domain->conn, vm->def) < 0)
+        goto cleanup;
+
+    if (virDomainObjCheckActive(vm) < 0)
+        goto cleanup;
+
+    qemuDomainObjTaint(driver, vm, VIR_DOMAIN_TAINT_CUSTOM_MONITOR, NULL);
+
+    ret = qemuDomainSendQemuMonitorCommandAsync(vm, cmd, result, asyncJob);
+
+ cleanup:
+    virDomainObjEndAPI(&vm);
+    return ret;
 }
 
 
@@ -20307,6 +20368,7 @@ static virHypervisorDriver qemuHypervisorDriver = {
     .domainSnapshotDelete = qemuDomainSnapshotDelete, /* 0.8.0 */
     .domainQemuMonitorCommand = qemuDomainQemuMonitorCommand, /* 0.8.3 */
     .domainQemuMonitorCommandWithFiles = qemuDomainQemuMonitorCommandWithFiles, /* 8.2.0 */
+    .domainQemuMonitorCommandAsync = qemuDomainQemuMonitorCommandAsync, /* 9.10.0 */
     .domainQemuAttach = NULL, /* 0.9.4 - 5.5.0 */
     .domainQemuAgentCommand = qemuDomainQemuAgentCommand, /* 0.10.0 */
     .connectDomainQemuMonitorEventRegister = qemuConnectDomainQemuMonitorEventRegister, /* 1.2.3 */

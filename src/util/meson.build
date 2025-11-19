@@ -111,6 +111,7 @@ util_sources = [
   'virvsock.c',
   'virxml.c',
   'virub.c',
+  'virham.c',
 ]
 
 util_public_sources = files(

@@ -191,6 +191,70 @@ virDomainQemuMonitorCommandWithFiles(virDomainPtr domain,
 }
 
 /**
+ * virDomainQemuMonitorCommandAsync:
+ * @domain: a domain object
+ * @cmd: the QEMU monitor command string
+ * @result: a string returned by @cmd
+ * @asyncJob: enum of type virDomainAsyncJob
+ *
+ * This API is QEMU specific, so it will only work with hypervisor
+ * connections to the QEMU driver.
+ *
+ * Send an arbitrary monitor command @cmd to @domain through the
+ * QEMU monitor. There are several requirements to safely and
+ * successfully use this API:
+ *
+ *   - A @cmd that queries state without making any modifications is safe
+ *   - A @cmd that alters state that is also tracked by libvirt is unsafe,
+ *     and may cause libvirtd to crash
+ *   - A @cmd that alters state not tracked by the current version of
+ *     libvirt is possible as a means to test new QEMU features before
+ *     they have support in libvirt, but no guarantees are made to safety
+ *
+ * When @domain is running in async job, @asyncJob is considered to be set
+ * as same as the domain's async job.
+ *
+ * If successful, @result will be filled with the string output of the
+ * @cmd, and the caller must free this string.
+ *
+ * Returns 0 in case of success, -1 in case of failure
+ *
+ * Since: 9.10.0
+ */
+int
+virDomainQemuMonitorCommandAsync(virDomainPtr domain, const char *cmd,
+                                 char **result, int asyncJob)
+{
+    virConnectPtr conn;
+
+    VIR_DOMAIN_DEBUG(domain, "cmd=%s, result=%p, asyncJob=%d",
+                     cmd, result, asyncJob);
+
+    virResetLastError();
+
+    virCheckDomainReturn(domain, -1);
+    conn = domain->conn;
+
+    virCheckNonNullArgGoto(result, error);
+    virCheckReadOnlyGoto(conn->flags, error);
+
+    if (conn->driver->domainQemuMonitorCommandAsync) {
+        int ret;
+        ret = conn->driver->domainQemuMonitorCommandAsync(domain, cmd, result,
+                                                          asyncJob);
+        if (ret < 0)
+            goto error;
+        return ret;
+    }
+
+    virReportUnsupportedError();
+
+ error:
+    virDispatchError(conn);
+    return -1;
+}
+
+/**
  * virDomainQemuAttach:
  * @conn: pointer to a hypervisor connection
  * @pid_value: the UNIX process ID of the external QEMU process
