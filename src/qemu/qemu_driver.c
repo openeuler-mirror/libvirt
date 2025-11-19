@@ -103,6 +103,7 @@
 #include "netdev_bandwidth_conf.h"
 #include "virdomainsnapshotobjlist.h"
 #include "virenum.h"
+#include "virham.h"
 #include "virdomaincheckpointobjlist.h"
 #include "virutil.h"
 #include "backup_conf.h"
@@ -12180,9 +12181,6 @@ qemuDomainAbortJobPostcopy(virDomainObj *vm,
     return rc;
 }
 
-
-#define HAM_CANCELLED_TIMEOUT (1000ull * 300)
-
 static int
 qemuHamWaitForCancelled(virDomainObj *vm)
 {
@@ -12192,7 +12190,7 @@ qemuHamWaitForCancelled(virDomainObj *vm)
     if (virTimeMillisNow(&now) < 0)
         return -1;
 
-    then = now + HAM_CANCELLED_TIMEOUT;
+    then = now + virHamGetCancelledTimeout();
 
     if (virCondWaitUntil(&vm->hamCond, &vm->parent.lock, then) < 0) {
         virReportSystemError(errno, "%s",

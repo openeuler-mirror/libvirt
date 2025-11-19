@@ -162,6 +162,9 @@ daemonConfigNew(bool privileged G_GNUC_UNUSED)
 
     data->ovs_timeout = VIR_NETDEV_OVS_DEFAULT_TIMEOUT;
 
+    data->vir_ham_cancelled_timeout = 1;
+    data->vir_ham_rack_ipc_timeout =  3;
+
     return data;
 }
 
@@ -378,6 +381,11 @@ daemonConfigLoadOptions(struct daemonConfig *data,
         return -1;
 
     if (virConfGetValueUInt(conf, "ovs_timeout", &data->ovs_timeout) < 0)
+        return -1;
+
+    if (virConfGetValueUInt(conf, "vir_ham_rack_ipc_timeout", &data->vir_ham_rack_ipc_timeout) < 0)
+        return -1;
+    if (virConfGetValueULLong(conf, "vir_ham_cancelled_timeout", &data->vir_ham_cancelled_timeout) < 0)
         return -1;
 
     return 0;

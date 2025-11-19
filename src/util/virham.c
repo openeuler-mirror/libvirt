@@ -19,8 +19,9 @@ VIR_LOG_INIT("util.ham");
 
 /* rack ipc path for ham migration */
 #define VIR_HAM_RACK_IPC_PATH "/usr/local/softbus/ctrlbus/lib/librack_com.so"
-/* rack ipc timeout(seconds) for ham migration */
-#define VIR_HAM_RACK_IPC_TIMEOUT (60 * 30)
+
+static unsigned long long virHamCancelledTimeout = VIR_HAM_CANCELLED_TIMEOUT;
+static uint16_t virHamRackIpcTimeout = VIR_HAM_RACK_IPC_TIMEOUT;
 
 typedef int (*virHamRackIpcClientStart)(uint16_t timeout);
 
@@ -102,7 +103,7 @@ virHamRackIpcInitialize(void)
         goto error;
     }
 
-    if ((code = rackIpcClient->start(VIR_HAM_RACK_IPC_TIMEOUT)) != 0) {
+    if ((code = rackIpcClient->start(virHamRackIpcTimeout)) != 0) {
         virReportError(VIR_ERR_INTERNAL_ERROR,
                        _("failed to start RackIpcClient with code %1$d"), code);
         goto error;
@@ -220,4 +221,15 @@ virHamClearAll(const char *hostname)
     if (virHamRackIpcAsyncSendAndRecv(req, callback) < 0)
         virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
                        _("failed to clear all borrowed numa nodes"));
+}
+
+void
+virHamSetupTimeOut(unsigned long long cancelledTimeout, uint16_t rackIpcTimeout){
+    virHamCancelledTimeout = cancelledTimeout;
+    virHamRackIpcTimeout = rackIpcTimeout;
+}
+
+unsigned long long
+virHamGetCancelledTimeout(void){
+    return virHamCancelledTimeout * 1000;
 }

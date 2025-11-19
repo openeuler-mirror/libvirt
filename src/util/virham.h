@@ -5,6 +5,8 @@
  */
 
 #pragma once
+#define VIR_HAM_CANCELLED_TIMEOUT 1
+#define VIR_HAM_RACK_IPC_TIMEOUT 3
 
 typedef enum {
     VIR_HAM_CLEAR_ALL = 0,              /* Clear all resource */
@@ -19,3 +21,7 @@ char *virHamRackIpcSyncSendAndRecv(const char *req);
 char *virHamGetClearReqInit(virHamClearType type, const char *hostname);
 
 void virHamClearAll(const char *hostname);
+
+unsigned long long virHamGetCancelledTimeout(void);
+
+void virHamSetupTimeOut(unsigned long long cancelledTimeout, uint16_t rackIpcTimeout);

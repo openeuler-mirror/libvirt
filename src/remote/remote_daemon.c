@@ -947,6 +947,8 @@ int main(int argc, char **argv) {
 
     daemonSetupNetDevOpenvswitch(config);
 
+    virHamSetupTimeOut(config->vir_ham_cancelled_timeout, (uint16_t)config->vir_ham_rack_ipc_timeout);
+
     if (daemonSetupAccessManager(config) < 0) {
         VIR_ERROR(_("Can't initialize access manager"));
         exit(EXIT_FAILURE);

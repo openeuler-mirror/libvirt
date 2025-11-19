@@ -96,6 +96,9 @@ struct daemonConfig {
     unsigned int admin_keepalive_count;
 
     unsigned int ovs_timeout;
+
+    unsigned long long vir_ham_cancelled_timeout;
+    unsigned int vir_ham_rack_ipc_timeout;
 };
 
 

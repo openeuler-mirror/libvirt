@@ -542,3 +542,15 @@
 # potential infinite waits blocking libvirt.
 #
 #ovs_timeout = 5
+
+###################################################################
+# HamMigrate timeout:
+# vir_ham_rack_ipc_timeout defines the timeout duration (in seconds) for VirtAgent connections.
+# If VirtAgent does not receive a response within the specified seconds, the connection is considered timed out,
+# and appropriate measures such as reconnection or error reporting will be taken.
+# ham_cancelled_timeout defines the timeout duration (in seconds) for cancelling ham migration.
+# If the cancellation operation is not completed within the specified milliseconds, further actions such as
+# forcefully terminating the migration or generating error reports will be initiated.
+#
+#vir_ham_rack_ipc_timeout = 3
+#vir_ham_cancelled_timeout = 1
