@@ -33,6 +33,8 @@ int qemuHamMigrationPrepare(qemuHamMigrationInfo *hamInfo,
                             char *cookieout,
                             int cookieoutlen);
 
+int qemuHamModifyPgtable(virDomainObj *vm);
+
 int qemuHamRollbackPages(virDomainObj *vm);
 
 void qemuHamSendClearReq(qemuHamMigrationInfo *hamInfo, virHamClearType type);

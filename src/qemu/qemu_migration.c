@@ -6622,6 +6622,13 @@ qemuMigrationDstFinishFresh(virQEMUDriver *driver,
             return -1;
     }
 
+    if ((flags & VIR_MIGRATE_LDST) && qemuHamModifyPgtable(vm) < 0) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                       _("failed to modify page table for ham migration"));
+        if (v3proto)
+            return -1;
+    }
+
     if (vm->job->current->status == VIR_DOMAIN_JOB_STATUS_POSTCOPY)
         *inPostCopy = true;
 

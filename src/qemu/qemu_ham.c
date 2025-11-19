@@ -392,6 +392,27 @@ qemuHamSendRamInfo(qemuHamRamInfo *ramInfo, virDomainObj *vm)
 }
 
 int
+qemuHamModifyPgtable(virDomainObj *vm)
+{
+    g_autoptr(virJSONValue) result = NULL;
+
+    if (!(result = qemuHamSendQemuMonitorCommand(vm, NULL, "modify-pgtable", NULL,
+                                                 VIR_ASYNC_JOB_MIGRATION_IN))) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                       _("unable to execute QMP command 'modify-pgtable'"));
+        return -1;
+    }
+
+    if (virJSONValueObjectHasKey(result, "error")) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                       _("execute QMP command 'modify-pgtable' failed"));
+        return -1;
+    }
+
+    return 0;
+}
+
+int
 qemuHamRollbackPages(virDomainObj *vm)
 {
     g_autoptr(virJSONValue) result = NULL;
