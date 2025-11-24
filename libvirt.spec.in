@@ -32,6 +32,7 @@
 
 # The hypervisor drivers that run in libvirtd
 %define with_qemu          0%{!?_without_qemu:1}
+%define with_ham_migrate   0%{!?_without_ham_migrate:%{with_qemu:1}}
 %define with_lxc           0%{!?_without_lxc:1}
 %define with_libxl         0%{!?_without_libxl:1}
 %define with_vbox          0%{!?_without_vbox:1}
@@ -1134,6 +1135,12 @@ exit 1
     %define arg_qemu -Ddriver_qemu=disabled
 %endif
 
+%if %{with_ham_migrate}
+    %define arg_ham_migrate -Dqemu_ham_migrate=enabled
+%else
+    %define arg_ham_migrate -Dqemu_ham_migrate=disabled
+%endif
+
 %if %{with_openvz}
     %define arg_openvz -Ddriver_openvz=enabled
 %else
@@ -1284,6 +1291,7 @@ export SOURCE_DATE_EPOCH=$(stat --printf='%Y' %{_specdir}/libvirt.spec)
            -Drunstatedir=%{_rundir} \
            -Dinitconfdir=%{_sysconfdir}/sysconfig \
            %{?arg_qemu} \
+           %{?arg_ham_migrate} \
            %{?arg_openvz} \
            %{?arg_lxc} \
            %{?arg_vbox} \
@@ -1408,6 +1416,7 @@ export SOURCE_DATE_EPOCH=$(stat --printf='%Y' %{_specdir}/libvirt.spec)
   -Dpciaccess=disabled \
   -Dpm_utils=disabled \
   -Dpolkit=disabled \
+  -Dqemu_ham_migrate=disabled \
   -Dreadline=disabled \
   -Drpath=disabled \
   -Dsanlock=disabled \

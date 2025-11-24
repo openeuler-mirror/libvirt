@@ -42,6 +42,9 @@ typedef enum {
     QEMU_MIGRATION_CAP_ZERO_COPY_SEND,
     QEMU_MIGRATION_CAP_ONECOPY,
 
+#ifdef WITH_HAM_MIGRATE
+    QEMU_MIGRATION_CAP_LDST,
+#endif
     QEMU_MIGRATION_CAP_LAST
 } qemuMigrationCapability;
 VIR_ENUM_DECL(qemuMigrationCapability);

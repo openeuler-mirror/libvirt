@@ -1630,6 +1630,10 @@ if not get_option('driver_qemu').disabled()
   if use_qemu
     conf.set('WITH_QEMU', 1)
 
+    if get_option('qemu_ham_migrate').enabled()
+      conf.set('WITH_HAM_MIGRATE', 1)
+    endif
+
     conf.set('WITH_CLIENT_QEMU', 0)
     qemu_moddir = get_option('qemu_moddir')
     if qemu_moddir == ''

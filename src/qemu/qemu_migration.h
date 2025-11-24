@@ -40,7 +40,7 @@
  */
 
 /* All supported qemu migration flags.  */
-#define QEMU_MIGRATION_FLAGS \
+#define QEMU_MIGRATION_BASE_FLAGS \
     (VIR_MIGRATE_LIVE | \
      VIR_MIGRATE_PEER2PEER | \
      VIR_MIGRATE_TUNNELLED | \
@@ -65,6 +65,12 @@
      VIR_MIGRATE_RETURNPATH | \
      VIR_MIGRATE_ONECOPY | \
      0)
+
+#ifdef WITH_HAM_MIGRATE
+#define QEMU_MIGRATION_FLAGS (QEMU_MIGRATION_BASE_FLAGS | VIR_MIGRATE_LDST)
+#else
+#define QEMU_MIGRATION_FLAGS QEMU_MIGRATION_BASE_FLAGS
+#endif
 
 /* All supported migration parameters and their types. */
 #define QEMU_MIGRATION_PARAMETERS \

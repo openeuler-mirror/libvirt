@@ -6527,6 +6527,12 @@ static const vshCmdOptDef opts_domjobabort[] = {
      .type = VSH_OT_BOOL,
      .help = N_("interrupt post-copy migration")
     },
+#ifdef WITH_HAM_MIGRATE
+    {.name = "ham",
+     .type = VSH_OT_BOOL,
+     .help = N_("interrupt ham migration")
+    },
+#endif
     {.name = NULL}
 };
 
@@ -6543,6 +6549,10 @@ cmdDomjobabort(vshControl *ctl, const vshCmd *cmd)
     if (vshCommandOptBool(cmd, "postcopy"))
         flags |= VIR_DOMAIN_ABORT_JOB_POSTCOPY;
 
+#ifdef WITH_HAM_MIGRATE
+    if (vshCommandOptBool(cmd, "ham"))
+        flags |= VIR_DOMAIN_ABORT_JOB_HAM;
+#endif
     if (flags == 0)
         rc = virDomainAbortJob(dom);
     else
@@ -11137,6 +11147,12 @@ static const vshCmdOptDef opts_migrate[] = {
      .type = VSH_OT_BOOL,
      .help = N_("enable one-copy migration")
     },
+#ifdef WITH_HAM_MIGRATE
+    {.name = "ldst",
+     .type = VSH_OT_BOOL,
+     .help = N_("enable ham migration")
+    },
+#endif
     {.name = NULL}
 };
 
@@ -11188,6 +11204,9 @@ doMigrate(void *opaque)
         { "suspend", VIR_MIGRATE_PAUSED },
         { "return-path", VIR_MIGRATE_RETURNPATH },
         { "onecopy", VIR_MIGRATE_ONECOPY },
+#ifdef WITH_HAM_MIGRATE
+        { "ldst", VIR_MIGRATE_LDST },
+#endif
     };
 
 #ifndef WIN32

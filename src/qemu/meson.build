@@ -45,6 +45,11 @@ qemu_driver_sources = [
   'qemu_hotpatch.c',
 ]
 
+
+if conf.has('WITH_HAM_MIGRATE')
+  qemu_driver_sources += 'qemu_ham.c'
+endif
+
 driver_source_files += files(qemu_driver_sources)
 stateful_driver_source_files += files(qemu_driver_sources)
 

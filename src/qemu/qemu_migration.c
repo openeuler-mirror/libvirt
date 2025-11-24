@@ -39,6 +39,10 @@
 #include "qemu_slirp.h"
 #include "qemu_block.h"
 #include "qemu_tpm.h"
+#ifdef WITH_HAM_MIGRATE
+#include "qemu_ham.h"
+#include "virham.h"
+#endif
 
 #include "domain_audit.h"
 #include "virlog.h"
@@ -113,6 +117,11 @@ qemuMigrationJobStart(virDomainObj *vm,
     if (job == VIR_ASYNC_JOB_MIGRATION_IN) {
         op = VIR_DOMAIN_JOB_OPERATION_MIGRATION_IN;
         mask = VIR_JOB_NONE;
+#ifdef WITH_HAM_MIGRATE
+        if (apiFlags & VIR_MIGRATE_LDST) {
+            mask = JOB_MASK(VIR_JOB_QUERY);
+        }
+#endif
     } else {
         op = VIR_DOMAIN_JOB_OPERATION_MIGRATION_OUT;
         mask = VIR_JOB_DEFAULT_MASK |
@@ -5533,6 +5542,9 @@ qemuMigrationSrcPerformPeer2Peer3(virQEMUDriver *driver,
     int maxparams = 0;
     size_t i;
     bool offline = !!(flags & VIR_MIGRATE_OFFLINE);
+#ifdef WITH_HAM_MIGRATE
+    g_autoptr(qemuHamMigrationInfo) hamInfo = NULL;
+#endif
 
     VIR_DEBUG("driver=%p, sconn=%p, dconn=%p, dconnuri=%s, vm=%p, xmlin=%s, "
               "dname=%s, uri=%s, graphicsuri=%s, listenAddress=%s, "
@@ -5678,6 +5690,21 @@ qemuMigrationSrcPerformPeer2Peer3(virQEMUDriver *driver,
         virErrorPreserveLast(&orig_err);
         goto finish;
     }
+
+#ifdef WITH_HAM_MIGRATE
+    if (flags & VIR_MIGRATE_LDST) {
+        VIR_INFO("Prepare for ham migration");
+        hamInfo = g_new0(qemuHamMigrationInfo, 1);
+        hamInfo->srcHostname = virGetHostname();
+        hamInfo->srcPid = vm->pid;
+        if (qemuHamMigrationPrepare(hamInfo, dconn, vm, cookieout, cookieoutlen) < 0) {
+            virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                           _("failed to prepare for ham migration"));
+            virErrorPreserveLast(&orig_err);
+            goto finish;
+        }
+    }
+#endif
 
     /* Perform the migration.  The driver isn't supposed to return
      * until the migration is complete. The src VM should remain
@@ -5835,6 +5862,21 @@ qemuMigrationSrcPerformPeer2Peer3(virQEMUDriver *driver,
     } else {
         ret = -1;
     }
+
+#ifdef WITH_HAM_MIGRATE
+    if ((flags & VIR_MIGRATE_LDST) && hamInfo && hamInfo->name) {
+        VIR_INFO("Cleanup for ham migration");
+        if (ret < 0) {
+            if (qemuHamRollbackPages(vm) < 0)
+                virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                               _("failed to rollback memory pages for ham migration"));
+            qemuHamSendClearReq(hamInfo, VIR_HAM_CLEAR_MIGRATE_FAILURE);
+            virCondBroadcast(&vm->hamCond);
+        } else {
+            qemuHamSendClearReq(hamInfo, VIR_HAM_CLEAR_MIGRATE_SUCCESS);
+        }
+    }
+#endif
 
     virObjectUnref(st);
 
@@ -6592,6 +6634,15 @@ qemuMigrationDstFinishFresh(virQEMUDriver *driver,
         if (v3proto)
             return -1;
     }
+
+#ifdef WITH_HAM_MIGRATE
+    if ((flags & VIR_MIGRATE_LDST) && qemuHamModifyPgtable(vm) < 0) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                       _("failed to modify page table for ham migration"));
+        if (v3proto)
+            return -1;
+    }
+#endif
 
     if (vm->job->current->status == VIR_DOMAIN_JOB_STATUS_POSTCOPY)
         *inPostCopy = true;

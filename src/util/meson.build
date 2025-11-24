@@ -113,6 +113,10 @@ util_sources = [
   'virub.c',
 ]
 
+if conf.has('WITH_HAM_MIGRATE')
+  util_sources += 'virham.c'
+endif
+
 util_public_sources = files(
   'virerror.c',
   'virevent.c',

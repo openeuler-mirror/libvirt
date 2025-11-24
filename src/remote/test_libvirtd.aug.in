@@ -67,3 +67,5 @@ module Test_@DAEMON_NAME@ =
         { "admin_keepalive_interval" = "5" }
         { "admin_keepalive_count" = "5" }
         { "ovs_timeout" = "5" }
+        { "vir_ham_rack_ipc_timeout" = "3" }
+        { "vir_ham_cancelled_timeout" = "1" }

@@ -125,6 +125,12 @@ else
   sym_files += 'libvirt_libssh2.syms'
 endif
 
+if conf.has('WITH_HAM_MIGRATE')
+  used_sym_files += 'libvirt_hammigrate.syms'
+else
+  sym_files += 'libvirt_hammigrate.syms'
+endif
+
 # variables filled by subdirectories
 
 libvirt_libs = []

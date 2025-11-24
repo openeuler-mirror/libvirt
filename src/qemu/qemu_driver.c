@@ -52,6 +52,10 @@
 #include "qemu_saveimage.h"
 #include "qemu_snapshot.h"
 #include "qemu_validate.h"
+#ifdef WITH_HAM_MIGRATE
+#include "qemu_ham.h"
+#include "virham.h"
+#endif
 
 #include "virerror.h"
 #include "virlog.h"
@@ -12179,6 +12183,27 @@ qemuDomainAbortJobPostcopy(virDomainObj *vm,
     return rc;
 }
 
+#ifdef WITH_HAM_MIGRATE
+static int
+qemuHamWaitForCancelled(virDomainObj *vm)
+{
+    unsigned long long now = 0;
+    unsigned long long then = 0;
+
+    if (virTimeMillisNow(&now) < 0)
+        return -1;
+
+    then = now + virHamGetCancelledTimeout();
+
+    if (virCondWaitUntil(&vm->hamCond, &vm->parent.lock, then) < 0) {
+        virReportSystemError(errno, "%s",
+                             _("failed to wait for domain ham condition"));
+        return -1;
+    }
+
+    return 0;
+}
+#endif
 
 static int
 qemuDomainAbortJobFlags(virDomainPtr dom,
@@ -12188,9 +12213,17 @@ qemuDomainAbortJobFlags(virDomainPtr dom,
     int ret = -1;
     qemuDomainObjPrivate *priv;
 
+#ifdef WITH_HAM_MIGRATE
+    bool isHam = false;
+#endif
     VIR_DEBUG("flags=0x%x", flags);
 
+#ifdef WITH_HAM_MIGRATE
+    virCheckFlags(VIR_DOMAIN_ABORT_JOB_POSTCOPY |
+                  VIR_DOMAIN_ABORT_JOB_HAM, -1);
+#else
     virCheckFlags(VIR_DOMAIN_ABORT_JOB_POSTCOPY, -1);
+#endif
 
     if (!(vm = qemuDomainObjFromDomain(dom)))
         goto cleanup;
@@ -12205,6 +12238,10 @@ qemuDomainAbortJobFlags(virDomainPtr dom,
         goto endjob;
 
     priv = vm->privateData;
+#ifdef WITH_HAM_MIGRATE
+    isHam = flags & VIR_DOMAIN_ABORT_JOB_HAM &&
+            vm->job->asyncJob == VIR_ASYNC_JOB_MIGRATION_OUT;
+#endif
 
     if (flags & VIR_DOMAIN_ABORT_JOB_POSTCOPY &&
         (vm->job->asyncJob != VIR_ASYNC_JOB_MIGRATION_OUT ||
@@ -12271,6 +12308,10 @@ qemuDomainAbortJobFlags(virDomainPtr dom,
  endjob:
     virDomainObjEndJob(vm);
 
+#ifdef WITH_HAM_MIGRATE
+    if (isHam && ret == 0)
+        ret = qemuHamWaitForCancelled(vm);
+#endif
  cleanup:
     virDomainObjEndAPI(&vm);
     return ret;
