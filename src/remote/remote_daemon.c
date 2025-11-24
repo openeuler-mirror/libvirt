@@ -55,7 +55,9 @@
 #include "virsystemd.h"
 #include "virhostuptime.h"
 #include "virdaemon.h"
+#ifdef WITH_HAM_MIGRATE
 #include "virham.h"
+#endif
 
 #include "driver.h"
 
@@ -947,8 +949,9 @@ int main(int argc, char **argv) {
 
     daemonSetupNetDevOpenvswitch(config);
 
+#ifdef WITH_HAM_MIGRATE
     virHamSetupTimeOut(config->vir_ham_cancelled_timeout, (uint16_t)config->vir_ham_rack_ipc_timeout);
-
+#endif
     if (daemonSetupAccessManager(config) < 0) {
         VIR_ERROR(_("Can't initialize access manager"));
         exit(EXIT_FAILURE);
@@ -1195,9 +1198,10 @@ int main(int argc, char **argv) {
         ret = VIR_DAEMON_ERR_INIT;
         goto cleanup;
     }
-
+#ifdef WITH_HAM_MIGRATE
     VIR_DEBUG("Clear all borrowed numa nodes of ham migration");
     virHamClearAll(virGetHostname());
+#endif
 
 #if defined(__linux__) && defined(NETLINK_ROUTE)
     /* Register the netlink event service for NETLINK_ROUTE */

@@ -53,7 +53,7 @@ qemuHamMigrationInfoFree(qemuHamMigrationInfo *hamInfo)
 }
 
 int
-qemuDomainSendQemuMonitorCommandAsync(virDomainObj *vm,
+qemuDomainSendQemuMonitorCommand(virDomainObj *vm,
                                       const char *cmd,
                                       char **result,
                                       virDomainAsyncJob asyncJob)
@@ -100,10 +100,10 @@ qemuHamSendQemuMonitorCommand(virDomainObj *vm,
     }
 
     if (vm)
-        ret = qemuDomainSendQemuMonitorCommandAsync(vm, monitorCmd, &result, asyncJob);
+        ret = qemuDomainSendQemuMonitorCommand(vm, monitorCmd, &result, asyncJob);
 
     if (domain)
-        ret = domain->conn->driver->domainQemuMonitorCommandAsync(domain, monitorCmd, &result, asyncJob);
+        ret = domain->conn->driver->domainQemuMonitorCommand(domain, monitorCmd, &result, 0);
 
     if (ret < 0) {
         virReportError(VIR_ERR_INTERNAL_ERROR,

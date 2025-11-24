@@ -4106,7 +4106,9 @@ static void virDomainObjDispose(void *obj)
 
     VIR_DEBUG("obj=%p", dom);
     virCondDestroy(&dom->cond);
+#ifdef WITH_HAM_MIGRATE
     virCondDestroy(&dom->hamCond);
+#endif
     virDomainDefFree(dom->def);
     virDomainDefFree(dom->newDef);
 
@@ -4137,11 +4139,13 @@ virDomainObjNew(virDomainXMLOption *xmlopt)
         goto error;
     }
 
+#ifdef WITH_HAM_MIGRATE
     if (virCondInit(&domain->hamCond) < 0) {
         virReportSystemError(errno, "%s",
                              _("failed to initialize domain ham condition"));
         goto error;
     }
+#endif
 
     if (xmlopt->privateData.alloc) {
         domain->privateData = (xmlopt->privateData.alloc)(xmlopt->config.priv);

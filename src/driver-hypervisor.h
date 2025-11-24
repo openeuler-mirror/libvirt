@@ -900,12 +900,6 @@ typedef int
                                            char **result,
                                            unsigned int flags);
 
-typedef int
-(*virDrvDomainQemuMonitorCommandAsync)(virDomainPtr domain,
-                                       const char *cmd,
-                                       char **result,
-                                       int asyncJob);
-
 typedef char *
 (*virDrvDomainQemuAgentCommand)(virDomainPtr domain,
                                 const char *cmd,
@@ -1650,7 +1644,6 @@ struct _virHypervisorDriver {
     virDrvDomainSnapshotDelete domainSnapshotDelete;
     virDrvDomainQemuMonitorCommand domainQemuMonitorCommand;
     virDrvDomainQemuMonitorCommandWithFiles domainQemuMonitorCommandWithFiles;
-    virDrvDomainQemuMonitorCommandAsync domainQemuMonitorCommandAsync;
     virDrvDomainQemuAttach domainQemuAttach;
     virDrvDomainQemuAgentCommand domainQemuAgentCommand;
     virDrvConnectDomainQemuMonitorEventRegister connectDomainQemuMonitorEventRegister;

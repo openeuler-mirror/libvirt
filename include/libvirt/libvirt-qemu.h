@@ -51,9 +51,6 @@ int virDomainQemuMonitorCommandWithFiles(virDomainPtr domain,
                                          char **result,
                                          unsigned int flags);
 
-int virDomainQemuMonitorCommandAsync(virDomainPtr domain, const char *cmd,
-                                     char **result, int asyncJob);
-
 virDomainPtr virDomainQemuAttach(virConnectPtr domain,
                                  unsigned int pid_value,
                                  unsigned int flags);

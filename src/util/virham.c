@@ -52,6 +52,7 @@ struct _virHamRackIpcClient {
     virHamRackIpcClientStart start;
     virHamRackIpcSyncSend syncSend;
     virHamRackIpcAsyncSend asyncSend;
+    virHamRackIpcCallbackDef *callback;
 };
 
 static virHamRackIpcClient *rackIpcClient;
@@ -85,6 +86,7 @@ virHamRackIpcInitialize(void)
     }
 
     rackIpcClient = g_new0(virHamRackIpcClient, 1);
+    rackIpcClient->callback = g_new0(virHamRackIpcCallbackDef, 1);
 
     if (!(rackIpcClient->start = dlsym(handle, "RackStartIpcClientWithTimeout"))) {
         virReportError(VIR_ERR_INTERNAL_ERROR,
@@ -182,7 +184,7 @@ virHamGetClearReqInit(virHamClearType type, const char *hostname)
 }
 
 static int
-virHamRackIpcAsyncSendAndRecv(const char *req, virHamRackIpcCallbackDef *callback)
+virHamRackIpcAsyncSendAndRecv(const char *req)
 {
     g_autoptr(virHamRackIpcData) sendData = g_new0(virHamRackIpcData, 1);
     int code;
@@ -197,7 +199,7 @@ virHamRackIpcAsyncSendAndRecv(const char *req, virHamRackIpcCallbackDef *callbac
     sendData->buffer = g_malloc0(sendData->length);
     memcpy(sendData->buffer, req, sendData->length);
 
-    if ((code = rackIpcClient->asyncSend(sendData, callback)) != 0) {
+    if ((code = rackIpcClient->asyncSend(sendData, rackIpcClient->callback)) != 0) {
         virReportError(VIR_ERR_INTERNAL_ERROR,
                        _("failed to send request to RackAgentIpcServer with code %1$d"), code);
         return -1;
@@ -210,7 +212,6 @@ void
 virHamClearAll(const char *hostname)
 {
     g_autofree char *req = NULL;
-    virHamRackIpcCallbackDef *callback = g_new0(virHamRackIpcCallbackDef, 1);
 
     if (!(req = virHamGetClearReqInit(VIR_HAM_CLEAR_ALL, hostname))) {
         virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
@@ -219,7 +220,7 @@ virHamClearAll(const char *hostname)
     }
     VIR_INFO("Ham migration clear all borrowed numa nodes request: %s", NULLSTR(req));
 
-    if (virHamRackIpcAsyncSendAndRecv(req, callback) < 0)
+    if (virHamRackIpcAsyncSendAndRecv(req) < 0)
         virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
                        _("failed to clear all borrowed numa nodes"));
 }

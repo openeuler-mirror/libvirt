@@ -1,0 +1,11 @@
+#
+# These symbols are dependent upon --with-ham-migrate via WITH_HAM_MIGRATE
+#
+
+
+# util/virham.h
+virHamClearAll;
+virHamGetCancelledTimeout;
+virHamGetClearReqInit;
+virHamRackIpcSyncSendAndRecv;
+virHamSetupTimeOut;

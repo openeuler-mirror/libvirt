@@ -2459,14 +2459,6 @@ virGICVersionTypeToString;
 virGSListStringFree;
 
 
-# util/virham.h
-virHamClearAll;
-virHamGetCancelledTimeout;
-virHamGetClearReqInit;
-virHamRackIpcSyncSendAndRecv;
-virHamSetupTimeOut;
-
-
 # util/virhash.h
 virHashAddEntry;
 virHashAtomicNew;

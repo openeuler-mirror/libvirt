@@ -3250,8 +3250,10 @@ struct _virDomainStateReason {
 struct _virDomainObj {
     virObjectLockable parent;
     virCond cond;
-    virCond hamCond;
 
+#ifdef WITH_HAM_MIGRATE
+    virCond hamCond;
+#endif
     virDomainJobObj *job;
 
     pid_t pid; /* 0 for no PID, avoid negative values like -1 */

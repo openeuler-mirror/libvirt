@@ -23,7 +23,7 @@ struct _qemuHamMigrationInfo {
 void qemuHamMigrationInfoFree(qemuHamMigrationInfo *hamInfo);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(qemuHamMigrationInfo, qemuHamMigrationInfoFree);
 
-int qemuDomainSendQemuMonitorCommandAsync(virDomainObj *vm,
+int qemuDomainSendQemuMonitorCommand(virDomainObj *vm,
                                           const char *cmd,
                                           char **result,
                                           virDomainAsyncJob asyncJob);

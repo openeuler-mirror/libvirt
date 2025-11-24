@@ -100,7 +100,9 @@ VIR_ENUM_IMPL(qemuMigrationCapability,
               "return-path",
               "zero-copy-send",
               "onecopy",
+#ifdef WITH_HAM_MIGRATE
               "ldst",
+#endif
 );
 
 
@@ -203,10 +205,12 @@ static const qemuMigrationParamsFlagMapItem qemuMigrationParamsFlagMap[] = {
      QEMU_MIGRATION_CAP_ONECOPY,
      QEMU_MIGRATION_SOURCE},
 
+#ifdef WITH_HAM_MIGRATE
      {QEMU_MIGRATION_FLAG_REQUIRED,
      VIR_MIGRATE_LDST,
      QEMU_MIGRATION_CAP_LDST,
      QEMU_MIGRATION_SOURCE | QEMU_MIGRATION_DESTINATION},
+#endif
 };
 
 /* Translation from VIR_MIGRATE_PARAM_* typed parameters to
