@@ -48,6 +48,8 @@ VIR_LOG_INIT("util.virresctrl");
 /* Common definitions */
 #define SYSFS_RESCTRL_PATH "/sys/fs/resctrl"
 
+#define VIR_CACHE_MAX_PERCENT 100
+
 
 /* Following are three different enum implementations for the same enum.  Each
  * one of them helps translating to/from strings for different interfaces.  The
@@ -2571,18 +2573,21 @@ virResctrlAllocAssign(virResctrlInfo *resctrl,
                         return -1;
                     }
 
-                    if (type == VIR_CACHE_TYPE_MIN && *(a_type->sizes[cache]) > 100) {
+                    if (type == VIR_CACHE_TYPE_MIN && *(a_type->sizes[cache]) > VIR_CACHE_MAX_PERCENT) {
                         virReportError(VIR_ERR_XML_ERROR,
                                        _("Cache level %1$d id %2$d min value exceeding 100 is invalid"),
                                        level, cache);
                         return -1;
                     }
 
-                    if (type == VIR_CACHE_TYPE_MAX && *(a_type->sizes[cache]) > 100) {
-                        virReportError(VIR_ERR_XML_ERROR,
-                                       _("Cache level %1$d id %2$d max value exceeding 100 is invalid"),
-                                       level, cache);
-                        return -1;
+                    if (type == VIR_CACHE_TYPE_MAX) {
+                        if (*(a_type->sizes[cache]) > VIR_CACHE_MAX_PERCENT || *(a_type->sizes[cache]) <= 0) {
+                            virReportError(VIR_ERR_XML_ERROR,
+                                           _("Cache level %1$d id %2$d max value represent the percentage "
+                                           "cache capacity can be used, just support 1-100"),
+                                           level, cache);
+                            return -1;
+                        }
                     }
 
                     *(a_type->values[cache]) = *(a_type->sizes[cache]);
