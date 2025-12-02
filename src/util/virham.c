@@ -18,7 +18,7 @@
 VIR_LOG_INIT("util.ham");
 
 /* rack ipc path for ham migration */
-#define VIR_HAM_RACK_IPC_PATH "/usr/local/softbus/ctrlbus/lib/librack_com.so"
+#define VIR_HAM_RACK_IPC_PATH "/usr/lib64/libubs-virt-agent.so"
 #define VIR_HAM_SECOND_TRANS_TO_MILLIONSECOND 1000
 
 static unsigned long long virHamCancelledTimeout = VIR_HAM_CANCELLED_TIMEOUT;
