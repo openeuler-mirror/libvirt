@@ -3108,6 +3108,8 @@ virDomainDeviceDefPtr virDomainDeviceDefParse(const char *xmlStr,
 virDomainDiskDefPtr virDomainDiskDefParse(const char *xmlStr,
                                           virDomainXMLOptionPtr xmlopt,
                                           unsigned int flags);
+virDomainDef * virDomainDefIDsParseString(const char *xmlStr,
+                                          unsigned int flags);
 virDomainDefPtr virDomainDefParseString(const char *xmlStr,
                                         virDomainXMLOptionPtr xmlopt,
                                         void *parseOpaque,

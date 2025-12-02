@@ -416,14 +416,20 @@ lxcDomainDefineXMLFlags(virConnectPtr conn, const char *xml, unsigned int flags)
     if (!(caps = virLXCDriverGetCapabilities(driver, false)))
         goto cleanup;
 
+    /* Avoid parsing the whole domain definition for ACL checks */
+    if (!(def = virDomainDefIDsParseString(xml, parse_flags)))
+        goto cleanup;
+
+    if (virDomainDefineXMLFlagsEnsureACL(conn, def) < 0)
+        goto cleanup;
+
+    g_clear_pointer(&def, virDomainDefFree);
+
     if (!(def = virDomainDefParseString(xml, driver->xmlopt,
                                         NULL, parse_flags)))
         goto cleanup;
 
     if (virXMLCheckIllegalChars("name", def->name, "\n") < 0)
-        goto cleanup;
-
-    if (virDomainDefineXMLFlagsEnsureACL(conn, def) < 0)
         goto cleanup;
 
     if (virSecurityManagerVerify(driver->securityManager, def) < 0)
@@ -1101,11 +1107,17 @@ lxcDomainCreateXMLWithFiles(virConnectPtr conn,
     if (!(caps = virLXCDriverGetCapabilities(driver, false)))
         goto cleanup;
 
-    if (!(def = virDomainDefParseString(xml, driver->xmlopt,
-                                        NULL, parse_flags)))
+    /* Avoid parsing the whole domain definition for ACL checks */
+    if (!(def = virDomainDefIDsParseString(xml, parse_flags)))
         goto cleanup;
 
     if (virDomainCreateXMLWithFilesEnsureACL(conn, def) < 0)
+        goto cleanup;
+
+    g_clear_pointer(&def, virDomainDefFree);
+
+    if (!(def = virDomainDefParseString(xml, driver->xmlopt,
+                                        NULL, parse_flags)))
         goto cleanup;
 
     if (virSecurityManagerVerify(driver->securityManager, def) < 0)
