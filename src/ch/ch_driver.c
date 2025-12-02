@@ -202,12 +202,17 @@ chDomainCreateXML(virConnectPtr conn,
     if (flags & VIR_DOMAIN_START_VALIDATE)
         parse_flags |= VIR_DOMAIN_DEF_PARSE_VALIDATE_SCHEMA;
 
+    /* Avoid parsing the whole domain definition for ACL checks */
+    if (!(vmdef = virDomainDefIDsParseString(xml, driver->xmlopt, parse_flags)))
+        return NULL;
+
+    if (virDomainCreateXMLEnsureACL(conn, vmdef) < 0)
+        return NULL;
+
+    g_clear_pointer(&vmdef, virDomainDefFree);
 
     if ((vmdef = virDomainDefParseString(xml, driver->xmlopt,
                                          NULL, parse_flags)) == NULL)
-        goto cleanup;
-
-    if (virDomainCreateXMLEnsureACL(conn, vmdef) < 0)
         goto cleanup;
 
     if (!(vm = virDomainObjListAdd(driver->domains,
@@ -284,14 +289,20 @@ chDomainDefineXMLFlags(virConnectPtr conn, const char *xml, unsigned int flags)
     if (flags & VIR_DOMAIN_START_VALIDATE)
         parse_flags |= VIR_DOMAIN_DEF_PARSE_VALIDATE_SCHEMA;
 
+    /* Avoid parsing the whole domain definition for ACL checks */
+    if (!(vmdef = virDomainDefIDsParseString(xml, driver->xmlopt, parse_flags)))
+        return NULL;
+
+    if (virDomainDefineXMLFlagsEnsureACL(conn, vmdef) < 0)
+        return NULL;
+
+    g_clear_pointer(&vmdef, virDomainDefFree);
+
     if ((vmdef = virDomainDefParseString(xml, driver->xmlopt,
                                          NULL, parse_flags)) == NULL)
         goto cleanup;
 
     if (virXMLCheckIllegalChars("name", vmdef->name, "\n") < 0)
-        goto cleanup;
-
-    if (virDomainDefineXMLFlagsEnsureACL(conn, vmdef) < 0)
         goto cleanup;
 
     if (!(vm = virDomainObjListAdd(driver->domains, &vmdef,

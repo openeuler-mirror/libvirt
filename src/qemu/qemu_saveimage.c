@@ -530,6 +530,8 @@ qemuSaveImageGetCompressionProgram(const char *imageFormat,
  * @wrapperFd: returns the file wrapper structure
  * @open_write: open the file for writing (for updates)
  * @unlink_corrupt: remove the image file if it is corrupted
+ * @conn: parameter for the @ensureACL callback
+ * @ensureACL: ACL callback to check against the definition or NULL
  *
  * Returns the opened fd of the save image file and fills the appropriate fields
  * on success. On error returns -1 on most failures, -3 if corrupt image was
@@ -544,7 +546,9 @@ qemuSaveImageOpen(virQEMUDriver *driver,
                   bool bypass_cache,
                   virFileWrapperFd **wrapperFd,
                   bool open_write,
-                  bool unlink_corrupt)
+                  bool unlink_corrupt,
+                  virConnectPtr conn,
+                  int (*ensureACL)(virConnectPtr, virDomainDef *))
 {
     g_autoptr(virQEMUDriverConfig) cfg = virQEMUDriverGetConfig(driver);
     VIR_AUTOCLOSE fd = -1;
@@ -555,6 +559,8 @@ qemuSaveImageOpen(virQEMUDriver *driver,
     int oflags = open_write ? O_RDWR : O_RDONLY;
     size_t xml_len;
     size_t cookie_len;
+    unsigned int parse_flags = VIR_DOMAIN_DEF_PARSE_INACTIVE |
+                               VIR_DOMAIN_DEF_PARSE_SKIP_VALIDATE;
 
     if (bypass_cache) {
         int directFlag = virFileDirectFdFlag();
@@ -660,10 +666,19 @@ qemuSaveImageOpen(virQEMUDriver *driver,
         }
     }
 
+    if (ensureACL) {
+        /* Parse only the IDs for ACL checks */
+        g_autoptr(virDomainDef) aclDef = virDomainDefIDsParseString(data->xml,
+                                                                    driver->xmlopt,
+                                                                    parse_flags);
+
+        if (!aclDef || ensureACL(conn, aclDef) < 0)
+            return -1;
+    }
+    
     /* Create a domain from this XML */
     if (!(def = virDomainDefParseString(data->xml, driver->xmlopt, qemuCaps,
-                                        VIR_DOMAIN_DEF_PARSE_INACTIVE |
-                                        VIR_DOMAIN_DEF_PARSE_SKIP_VALIDATE)))
+                                        parse_flags)))
         return -1;
 
     *ret_def = g_steal_pointer(&def);
