@@ -211,6 +211,11 @@ virHamRackIpcAsyncSendAndRecv(const char *req)
 void
 virHamClearAll(const char *hostname)
 {
+    if (!virFileExists(VIR_HAM_RACK_IPC_PATH)) {
+        VIR_WARN("Ham rack ipc file doesn't exist");
+        return;
+    }
+
     g_autofree char *req = NULL;
 
     if (!(req = virHamGetClearReqInit(VIR_HAM_CLEAR_ALL, hostname))) {
