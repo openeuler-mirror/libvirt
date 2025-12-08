@@ -4,6 +4,8 @@
  * Copyright (C) 2025 Huawei Technologies Co., Ltd
  */
 
+#include <config.h>
+
 #include "qemu_domain.h"
 #include "qemu_ham.h"
 
