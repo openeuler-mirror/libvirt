@@ -787,6 +787,7 @@ virDomainQemuMonitorEventNew;
 virDomainQemuMonitorEventStateRegisterID;
 virHostdevIsMdevDevice;
 virHostdevIsSCSIDevice;
+virHostdevIsVDPADevice;
 virHostdevIsVFIODevice;
 
 
