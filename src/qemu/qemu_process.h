@@ -258,11 +258,11 @@ unsigned char * virParseCPUList(int *cpumaplen,
                                 const char *cpulist,
                                 int maxcpu);
 
-void qemuProcessHandleMigrationPid(qemuMonitor *mon ATTRIBUTE_UNUSED,
+void qemuProcessHandleMigrationPid(qemuMonitor *mon __attribute__((unused)),
                                    virDomainObj *vm,
                                    int mpid);
 
-void qemuProcessHandleMigrationMultiFdPids(qemuMonitor *mon ATTRIBUTE_UNUSED,
+void qemuProcessHandleMigrationMultiFdPids(qemuMonitor *mon __attribute__((unused)),
                                            virDomainObj *vm,
                                            int mpid);
 
