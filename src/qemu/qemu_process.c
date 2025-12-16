@@ -2868,7 +2868,7 @@ qemuProcessSetMigthreadAffinity(qemuDomainObjPrivate *priv,
 
 
 void
-qemuProcessHandleMigrationPid(qemuMonitor *mon ATTRIBUTE_UNUSED,
+qemuProcessHandleMigrationPid(qemuMonitor *mon __attribute__((unused)),
                               virDomainObj *vm,
                               int mpid)
 {
@@ -2920,7 +2920,7 @@ qemuProcessHandleMigrationPid(qemuMonitor *mon ATTRIBUTE_UNUSED,
 
 
 void
-qemuProcessHandleMigrationMultiFdPids(qemuMonitor *mon ATTRIBUTE_UNUSED,
+qemuProcessHandleMigrationMultiFdPids(qemuMonitor *mon __attribute__((unused)),
                                       virDomainObj *vm,
                                       int mpid)
 {
