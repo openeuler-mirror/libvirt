@@ -9538,6 +9538,14 @@ qemuDomainGetNumVDPADevices(const virDomainDef *def)
         }
     }
 
+    /* For vdpa devices of type VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA,
+     * libvirt does not know their specific types, but they can be
+     * retrieved and counted within Hostdev array. */
+    for (i = 0; i < def->nhostdevs; i++) {
+        if (virHostdevIsVDPADevice(def->hostdevs[i]))
+            n++;
+    }
+
     return n;
 }
 

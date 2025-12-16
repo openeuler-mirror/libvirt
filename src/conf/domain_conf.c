@@ -31630,6 +31630,19 @@ virHostdevIsVFIODevice(const virDomainHostdevDef *hostdev)
     return false;
 }
 
+/**
+ * virHostdevIsVDPADevice:
+ * @hostdev: host device to check
+ *
+ * Returns true if @hostdev is a PCI device with vDPA backend, false otherwise.
+ */
+bool
+virHostdevIsVDPADevice(const virDomainHostdevDef *hostdev)
+{
+    return (hostdev->mode == VIR_DOMAIN_HOSTDEV_MODE_SUBSYS &&
+        hostdev->source.subsys.type == VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA);
+}
+
 
 /**
  * virDomainObjGetMessages:
