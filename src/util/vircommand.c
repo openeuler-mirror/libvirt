@@ -2634,7 +2634,7 @@ virCommandRunAsync(virCommandPtr cmd, pid_t *pid)
 
     str = virCommandToString(cmd, false);
     if (dryRunBuffer || dryRunCallback) {
-        dryRunStatus = 0;
+        dryRunStatus = EXIT_SUCCESS;
         if (!str) {
             /* error already reported by virCommandToString */
             goto cleanup;
