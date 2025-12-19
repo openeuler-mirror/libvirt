@@ -7619,28 +7619,30 @@ qemuProcessBeginStopJob(virQEMUDriverPtr driver,
 {
     qemuDomainObjPrivatePtr priv = vm->privateData;
     unsigned int killFlags = forceKill ? VIR_QEMU_PROCESS_KILL_FORCE : 0;
-    int ret = -1;
 
     /* We need to prevent monitor EOF callback from doing our work (and
      * sending misleading events) while the vm is unlocked inside
-     * BeginJob/ProcessKill API
-     */
+     * BeginJob/ProcessKill API or any other code path before 'vm->def->id' is
+     * cleared inside qemuProcessStop */
     priv->beingDestroyed = true;
 
     if (qemuProcessKill(vm, killFlags) < 0)
-        goto cleanup;
+        goto error;
 
     /* Wake up anything waiting on domain condition */
     virDomainObjBroadcast(vm);
 
     if (qemuDomainObjBeginJob(driver, vm, job) < 0)
-        goto cleanup;
+        goto error;
 
-    ret = 0;
+    /* priv->beingDestroyed is deliberately left set to 'true' here. Caller
+     * is supposed to call qemuProcessStop, which will reset it after
+     * 'vm->def->id' is set to -1 */
+     return 0;
 
- cleanup:
+ error:
     priv->beingDestroyed = false;
-    return ret;
+    return -1;
 }
 
 
