@@ -1,0 +1,6 @@
+<cpus>
+  <model name='Tengyun-S5000C'>
+    <vendor name='Phytium'/>
+    <pvr value='0x862'/>
+  </model>
+</cpus>

@@ -11,6 +11,7 @@ cpumap_data = [
   'arm_Neoverse-N2.xml',
   'arm_Neoverse-V1.xml',
   'arm_Tengyun-S2500.xml',
+  'arm_Tengyun-S5000C.xml',
   'arm_ThunderX299xx.xml',
   'arm_vendors.xml',
   'index.xml',
