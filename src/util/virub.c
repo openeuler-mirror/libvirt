@@ -21,10 +21,45 @@
 #include "virerror.h"
 #include "virub.h"
 #include "virfile.h"
+#include "viralloc.h"
 
 VIR_LOG_INIT("util.ub");
 
 #define VIR_FROM_THIS VIR_FROM_NONE
+#define UB_SYSFS "/sys/bus/ub/"
+
+static virClass *virUBDeviceListClass;
+static void virUBDeviceListDispose(void *obj);
+
+VIR_ENUM_IMPL(virUBStubDriver,
+              VIR_UB_STUB_DRIVER_LAST,
+              "none",
+              "vfio-ub", /* VFIO */
+);
+
+static int virUBOnceInit(void)
+{
+    if (!VIR_CLASS_NEW(virUBDeviceList, virClassForObjectLockable()))
+        return -1;
+
+    return 0;
+}
+
+VIR_ONCE_GLOBAL_INIT(virUB);
+
+static void
+virUBDeviceListDispose(void *obj)
+{
+    virUBDeviceList *list = obj;
+    size_t i;
+
+    for (i = 0; i < list->count; i++) {
+        g_clear_pointer(&list->devs[i], virUBDeviceFree);
+    }
+
+    list->count = 0;
+    g_free(list->devs);
+}
 
 int virUBDeviceGetGuidFromStr(UBGuid *guid, char *guidStr)
 {
@@ -308,4 +343,67 @@ virUBBitmapAllocatorFree(virUBBitmapAllocator *allocator)
 
     virBitmapFree(allocator->bitmap);
     g_free(allocator);
+}
+
+virUBDeviceList *
+virUBDeviceListNew(void)
+{
+    virUBDeviceList *list;
+
+    if (virUBInitialize() < 0)
+        return NULL;
+
+    if (!(list = virObjectLockableNew(virUBDeviceListClass)))
+        return NULL;
+
+    return list;
+}
+
+int
+virUBDeviceSetUsedBy(virUBDevice *dev,
+                     const char *drv_name,
+                     const char *dom_name)
+{
+    VIR_FREE(dev->used_by_drvname);
+    VIR_FREE(dev->used_by_domname);
+    dev->used_by_drvname = g_strdup(drv_name);
+    dev->used_by_domname = g_strdup(dom_name);
+
+    return 0;
+}
+
+virUBDevice *
+virUBDeviceListFind(virUBDeviceList *list, virUBDeviceAddress *devAddr)
+{
+    VIR_DEBUG("list size: %lu, find guid: %s", list->count, devAddr->guidStr);
+    return 0;
+}
+
+int
+virUBDeviceListAdd(virUBDeviceList *list,
+                   virUBDevice *dev)
+{
+    if (virUBDeviceListFind(list, &dev->address)) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Device %1$s is already in use"), dev->address.guidStr);
+        return -1;
+    }
+    VIR_APPEND_ELEMENT(list->devs, list->count, dev);
+
+    return 0;
+}
+
+void
+virUBDeviceFree(virUBDevice *dev)
+{
+    if (!dev)
+        return;
+    VIR_DEBUG("%s: freeing", dev->address.guidStr);
+    g_free(dev->address.guidStr);
+    g_free(dev->used_by_domname);
+    g_free(dev->used_by_drvname);
+    g_free(dev->orig_used_drvname);
+    g_free(dev->stub_driver_name);
+    g_free(dev->path);
+    g_free(dev);
 }

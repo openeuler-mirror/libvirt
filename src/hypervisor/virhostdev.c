@@ -33,6 +33,8 @@
 #include "virutil.h"
 #include "virnetdev.h"
 #include "configmake.h"
+#include "virfile.h"
+#include "virstring.h"
 
 #define VIR_FROM_THIS VIR_FROM_NONE
 
@@ -51,6 +53,12 @@ struct virHostdevIsPCINodeDeviceUsedData {
     const char *driverName;
     const char *domainName;
     bool usesVFIO;
+};
+
+struct virUBDeviceDriverDomainData {
+    virHostdevManager *mgr;
+    const char *driverName;
+    const char *domainName;
 };
 
 /* This module makes heavy use of bookkeeping lists contained inside a
@@ -132,6 +140,8 @@ virHostdevManagerDispose(void *obj)
     virObjectUnref(hostdevMgr->activeSCSIVHostHostdevs);
     virObjectUnref(hostdevMgr->activeMediatedHostdevs);
     virObjectUnref(hostdevMgr->activeNVMeHostdevs);
+    virObjectUnref(hostdevMgr->activeUBHostdevs);
+    virObjectUnref(hostdevMgr->inactiveUBHostdevs);
     g_free(hostdevMgr->stateDir);
 }
 
@@ -163,6 +173,12 @@ virHostdevManagerNew(void)
         return NULL;
 
     if (!(hostdevMgr->activeNVMeHostdevs = virNVMeDeviceListNew()))
+        return NULL;
+
+    if (!(hostdevMgr->activeUBHostdevs = virUBDeviceListNew()))
+        return NULL;
+
+    if (!(hostdevMgr->inactiveUBHostdevs = virUBDeviceListNew()))
         return NULL;
 
     if (privileged) {
@@ -2518,4 +2534,143 @@ virHostdevUpdateActiveNVMeDevices(virHostdevManager *hostdev_mgr,
         lastGoodPCIIdx--;
     }
     goto cleanup;
+}
+
+static virUBDeviceList *
+virHostdevGetUBHostDeviceList(virDomainHostdevDef **hostdevs, int nhostdevs)
+{
+    VIR_DEBUG("hostdev managed: %d, num of devs: %d",
+              (*hostdevs)->managed, nhostdevs);
+    return 0;
+}
+
+static void
+virHostdevReAttachUBDevicesImpl(virHostdevManager *mgr,
+                                 const char *drv_name,
+                                 const char *dom_name,
+                                 virUBDeviceList *ubdevs)
+{
+    VIR_DEBUG("mgr active count: %lu, drv name: %s, dom name: %s, ub count: %lu",
+              mgr->inactiveUBHostdevs->count, drv_name, dom_name, ubdevs->count);
+    return;
+}
+
+static void
+virHostdevDeleteMissingUBDevices(virHostdevManager *mgr,
+                                 virDomainHostdevDef **hostdevs,
+                                 int nhostdevs)
+{
+    VIR_DEBUG("mgr active count: %lu, manage: %d, ub count: %d",
+              mgr->inactiveUBHostdevs->count, (*hostdevs)->managed, nhostdevs);
+    return;
+}
+
+static int
+virHostdevGetUBHostDevice(const virDomainHostdevDef *hostdev,
+                           virUBDevice **ub)
+{
+    if(!(*ub)){
+        return 0;
+    }
+    VIR_DEBUG("hostdev managed: %d, ub: %s",
+              hostdev->managed, (*ub)->address.guidStr);
+    return 0;
+}
+
+static int
+virHostdevPrepareUBDevicesImpl(virHostdevManager *mgr,
+                                const char *drv_name,
+                                const char *dom_name,
+                                virUBDeviceList *ubdevs)
+{
+    VIR_DEBUG("mgr active count: %lu, drv name: %s, dom name: %s, ub count: %lu",
+              mgr->inactiveUBHostdevs->count, drv_name, dom_name, ubdevs->count);
+    return 0;
+}
+
+void
+virHostdevReAttachUBDevices(virHostdevManager *mgr,
+                            const char *drv_name,
+                            const char *dom_name,
+                            virDomainHostdevDef **hostdevs,
+                            int nhostdevs)
+{
+    virUBDeviceList *ubdevs = NULL;
+
+    if (!nhostdevs)
+        return;
+
+    if (!(ubdevs = virHostdevGetUBHostDeviceList(hostdevs, nhostdevs))) {
+        VIR_ERROR(_("Failed to allocate UB device list: %1$s"),
+                  virGetLastErrorMessage());
+        virResetLastError();
+        return;
+    }
+
+    virHostdevReAttachUBDevicesImpl(mgr, drv_name, dom_name, ubdevs);
+
+    /* Handle the case where UB devices from the host went missing
+     * during the domain lifetime */
+    virHostdevDeleteMissingUBDevices(mgr, hostdevs, nhostdevs);
+}
+
+int
+virHostdevUpdateActiveUBDevices(virHostdevManager *mgr,
+                                virDomainHostdevDef **hostdevs,
+                                int nhostdevs,
+                                const char *drv_name,
+                                const char *dom_name)
+{
+    size_t i;
+    int ret = -1;
+    virDomainHostdevDef *hostdev;
+    virUBDevice *actual;
+
+    if (!nhostdevs)
+        return 0;
+
+    virObjectLock(mgr->activeUBHostdevs);
+    virObjectLock(mgr->inactiveUBHostdevs);
+
+    for (i = 0; i < nhostdevs; i++) {
+        hostdev = hostdevs[i];
+
+        if (virHostdevGetUBHostDevice(hostdev, &actual) < 0)
+            goto cleanup;
+
+        if (!actual)
+            continue;
+
+        if (virUBDeviceSetUsedBy(actual, drv_name, dom_name) < 0)
+            goto cleanup;
+
+        if (virUBDeviceListAdd(mgr->activeUBHostdevs, actual) < 0)
+            goto cleanup;
+        actual = NULL;
+    }
+
+    ret = 0;
+ cleanup:
+    virObjectUnlock(mgr->activeUBHostdevs);
+    virObjectUnlock(mgr->inactiveUBHostdevs);
+    return ret;
+}
+
+int
+virHostdevPrepareUBDevices(virHostdevManager *hostdev_mgr,
+                             const char *drv_name,
+                             const char *dom_name,
+                             virDomainHostdevDef **hostdevs,
+                             int nhostdevs)
+{
+    virUBDeviceList *ubdevs = NULL;
+
+    if (!nhostdevs)
+        return 0;
+
+    if (!(ubdevs = virHostdevGetUBHostDeviceList(hostdevs, nhostdevs)))
+        return -1;
+
+    return virHostdevPrepareUBDevicesImpl(hostdev_mgr, drv_name, dom_name, 
+                                           ubdevs);
 }

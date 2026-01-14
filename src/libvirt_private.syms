@@ -1664,6 +1664,7 @@ virHostdevPrepareOneNVMeDevice;
 virHostdevPreparePCIDevices;
 virHostdevPrepareSCSIDevices;
 virHostdevPrepareSCSIVHostDevices;
+virHostdevPrepareUBDevices;
 virHostdevPrepareUSBDevices;
 virHostdevReAttachDomainDevices;
 virHostdevReAttachMediatedDevices;
@@ -1672,12 +1673,14 @@ virHostdevReAttachOneNVMeDevice;
 virHostdevReAttachPCIDevices;
 virHostdevReAttachSCSIDevices;
 virHostdevReAttachSCSIVHostDevices;
+virHostdevReAttachUBDevices;
 virHostdevReAttachUSBDevices;
 virHostdevUpdateActiveDomainDevices;
 virHostdevUpdateActiveMediatedDevices;
 virHostdevUpdateActiveNVMeDevices;
 virHostdevUpdateActivePCIDevices;
 virHostdevUpdateActiveSCSIDevices;
+virHostdevUpdateActiveUBDevices;
 virHostdevUpdateActiveUSBDevices;
 
 
