@@ -407,3 +407,64 @@ virUBDeviceFree(virUBDevice *dev)
     g_free(dev->path);
     g_free(dev);
 }
+
+bool
+virUBDeviceExists(const virUBDeviceAddress *addr)
+{
+    unsigned int devNum;
+    g_autofree char *devPath = NULL;
+
+    devNum = virUBDeviceSysfsGetDevnumByGuid(addr->guidStr);
+    if (devNum == UINT32_MAX) {
+        return false;
+    }
+
+    devPath = g_strdup_printf(UB_SYSFS "devices/%05x/config",
+                              devNum);
+
+    return virFileExists(devPath);
+}
+
+void virUBDeviceAddressCopy(virUBDeviceAddress *dst,
+                            const virUBDeviceAddress *src)
+{
+    memcpy(dst, src, sizeof(*src));
+}
+
+void virUBDeviceSetManaged(virUBDevice *dev, bool managed)
+{
+    dev->managed = managed;
+}
+
+void
+virUBDeviceSetStubDriverType(virUBDevice *dev, virUBStubDriver driverType)
+{
+    dev->stub_driver_type = driverType;
+}
+
+virUBDevice *
+virUBDeviceNew(const virUBDeviceAddress *address)
+{
+    g_autoptr(virUBDevice) dev = NULL;
+    unsigned int devNum;
+
+    devNum = virUBDeviceSysfsGetDevnumByGuid(address->guidStr);
+    if (devNum == UINT32_MAX) {
+        VIR_ERROR("can not find ub dev %s", address->guidStr);
+        return NULL;
+    }
+
+    dev = g_new0(virUBDevice, 1);
+    virUBDeviceAddressCopy(&dev->address, address);
+    dev->path = g_strdup_printf(UB_SYSFS "devices/%05x/config", devNum);
+    if (!virFileExists(dev->path)) {
+        virReportSystemError(errno,
+                             _("Device %1$s not found: could not access %2$s"),
+                             address->guidStr, dev->path);
+        return NULL;
+    }
+
+    VIR_DEBUG("%s: initialized", dev->address.guidStr);
+
+    return g_steal_pointer(&dev);
+}

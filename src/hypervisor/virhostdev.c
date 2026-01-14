@@ -2536,12 +2536,66 @@ virHostdevUpdateActiveNVMeDevices(virHostdevManager *hostdev_mgr,
     goto cleanup;
 }
 
+static int
+virHostdevFindUBDevice(const virDomainHostdevDef *hostdev,
+                       virUBDevice **ub)
+{
+    g_autoptr(virUBDevice) actual = NULL;
+    const virDomainHostdevSubsysUB *ubsrc = &hostdev->source.subsys.u.ub;
+
+    if (hostdev->mode != VIR_DOMAIN_HOSTDEV_MODE_SUBSYS ||
+        hostdev->source.subsys.type != VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB)
+        return 0;
+
+    if (!virUBDeviceExists(&ubsrc->addr))
+        return -1;
+
+    actual = virUBDeviceNew(&ubsrc->addr);
+    if (!actual)
+        return -1;
+
+    virUBDeviceSetManaged(actual, hostdev->managed);
+
+    if (ubsrc->backend == VIR_DOMAIN_HOSTDEV_UB_BACKEND_VFIO) {
+        virUBDeviceSetStubDriverType(actual, VIR_UB_STUB_DRIVER_VFIO);
+    } else {
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                       _("ub backend driver '%1$s' is not supported"),
+                       virDomainHostdevSubsysUBBackendTypeToString(ubsrc->backend));
+        return -1;
+    }
+
+    *ub = g_steal_pointer(&actual);
+    return 0;
+}
+
 static virUBDeviceList *
 virHostdevGetUBHostDeviceList(virDomainHostdevDef **hostdevs, int nhostdevs)
 {
-    VIR_DEBUG("hostdev managed: %d, num of devs: %d",
-              (*hostdevs)->managed, nhostdevs);
-    return 0;
+    g_autoptr(virUBDeviceList) ublist = NULL;
+    virDomainHostdevDef *hostdev = NULL;
+    g_autoptr(virUBDevice) ub = NULL;
+    size_t i;
+
+    if (!(ublist = virUBDeviceListNew()))
+        return NULL;
+
+    for (i = 0; i < nhostdevs; i++) {
+        hostdev = hostdevs[i];
+        ub = NULL;
+        if (virHostdevFindUBDevice(hostdev, &ub) < 0)
+            return NULL;
+
+        if (!ub)
+            continue;
+
+        if (virUBDeviceListAdd(ublist, ub) < 0)
+            return NULL;
+        /* set null to avoid set free last ub in ublist */
+        ub = NULL;
+    }
+
+    return g_steal_pointer(&ublist);
 }
 
 static void
@@ -2595,7 +2649,7 @@ virHostdevReAttachUBDevices(virHostdevManager *mgr,
                             virDomainHostdevDef **hostdevs,
                             int nhostdevs)
 {
-    virUBDeviceList *ubdevs = NULL;
+    g_autoptr(virUBDeviceList) ubdevs = NULL;
 
     if (!nhostdevs)
         return;
@@ -2624,7 +2678,7 @@ virHostdevUpdateActiveUBDevices(virHostdevManager *mgr,
     size_t i;
     int ret = -1;
     virDomainHostdevDef *hostdev;
-    virUBDevice *actual;
+    g_autoptr(virUBDevice) actual = NULL;
 
     if (!nhostdevs)
         return 0;
@@ -2663,7 +2717,7 @@ virHostdevPrepareUBDevices(virHostdevManager *hostdev_mgr,
                              virDomainHostdevDef **hostdevs,
                              int nhostdevs)
 {
-    virUBDeviceList *ubdevs = NULL;
+    g_autoptr(virUBDeviceList) ubdevs = NULL;
 
     if (!nhostdevs)
         return 0;

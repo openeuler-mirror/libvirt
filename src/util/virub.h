@@ -143,3 +143,15 @@ virUBDevice *
 virUBDeviceListFind(virUBDeviceList *list, virUBDeviceAddress *devAddr);
 int
 virUBDeviceListAdd(virUBDeviceList *list, virUBDevice *dev);
+bool
+virUBDeviceExists(const virUBDeviceAddress *addr);
+void
+virUBDeviceAddressCopy(virUBDeviceAddress *dst, const virUBDeviceAddress *src);
+void
+virUBDeviceSetManaged(virUBDevice *dev, bool managed);
+void
+virUBDeviceSetStubDriverType(virUBDevice *dev, virUBStubDriver driverType);
+virUBDevice *
+virUBDeviceNew(const virUBDeviceAddress *address);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(virUBDevice, virUBDeviceFree);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(virUBDeviceList, virObjectUnref);
