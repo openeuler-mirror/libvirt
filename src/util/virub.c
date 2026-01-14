@@ -694,6 +694,7 @@ virUBDeviceSysfsGetDevnumstrByGuid(virUBDevice *dev)
 {
     char *devNumStr = NULL;
     unsigned int devNum;
+
     devNum = virUBDeviceSysfsGetDevnumByGuid(dev->address.guidStr);
     if (devNum == UINT32_MAX) {
         VIR_ERROR("can not find ub dev %s", dev->address.guidStr);
@@ -944,4 +945,13 @@ virUBDeviceGetCurrentDriverNameAndType(virUBDevice *dev,
         *drvType = VIR_UB_STUB_DRIVER_NONE;
     }
     return true;
+}
+
+void
+virUBDeviceGetUsedBy(virUBDevice *dev,
+                     const char **drv_name,
+                     const char **dom_name)
+{
+    *drv_name = dev->used_by_drvname;
+    *dom_name = dev->used_by_domname;
 }

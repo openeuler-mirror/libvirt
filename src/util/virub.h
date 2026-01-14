@@ -183,5 +183,7 @@ bool
 virUBDeviceListAddCopy(virUBDeviceList *list, virUBDevice *dev);
 int
 virUBDeviceReattach(virUBDevice *dev, virUBDeviceList *activeDevs, virUBDeviceList *inactiveDevs);
+void
+virUBDeviceGetUsedBy(virUBDevice *dev, const char **drv_name, const char **dom_name);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(virUBDevice, virUBDeviceFree);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(virUBDeviceList, virObjectUnref);

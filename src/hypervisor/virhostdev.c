@@ -2598,17 +2598,6 @@ virHostdevGetUBHostDeviceList(virDomainHostdevDef **hostdevs, int nhostdevs)
     return g_steal_pointer(&ublist);
 }
 
-static void
-virHostdevReAttachUBDevicesImpl(virHostdevManager *mgr,
-                                 const char *drv_name,
-                                 const char *dom_name,
-                                 virUBDeviceList *ubdevs)
-{
-    VIR_DEBUG("mgr active count: %lu, drv name: %s, dom name: %s, ub count: %lu",
-              mgr->inactiveUBHostdevs->count, drv_name, dom_name, ubdevs->count);
-    return;
-}
-
 static int
 virHostdevGetUBHostDevice(const virDomainHostdevDef *hostdev,
                            virUBDevice **ub)
@@ -2709,6 +2698,74 @@ virHostdevReattachAllUBDevices(virHostdevManager *mgr,
                       ub->address.guidStr);
         }
     }
+}
+
+static void
+virHostdevReAttachUBDevicesImpl(virHostdevManager *mgr,
+                                 const char *drv_name,
+                                 const char *dom_name,
+                                 virUBDeviceList *ubdevs)
+{
+    size_t i = 0;
+    virUBDevice *ub;
+    virUBDevice *actual;
+    const char *actual_drvname;
+    const char *actual_domname;
+
+    virObjectLock(mgr->activeUBHostdevs);
+    virObjectLock(mgr->inactiveUBHostdevs);
+
+    /* Step 1: Filter out all devices that are either not active or not
+     *         used by the current domain and driver */
+    while (i < ubdevs->count) {
+        ub = ubdevs->devs[i];
+
+        /* We need to look up the actual device, which is the one containing
+         * information such as by which domain and driver it is used. */
+        actual = virUBDeviceListFind(mgr->activeUBHostdevs, &ub->address);
+        if (actual) {
+            virUBDeviceGetUsedBy(actual, &actual_drvname, &actual_domname);
+            if (STRNEQ_NULLABLE(drv_name, actual_drvname) ||
+                STRNEQ_NULLABLE(dom_name, actual_domname)) {
+                virUBDeviceListDel(ubdevs, &ub->address);
+                continue;
+            }
+        } else {
+            virUBDeviceListDel(ubdevs, &ub->address);
+            continue;
+        }
+
+        i++;
+    }
+
+    /* Step 2: Move devices from the active list to the inactive list */
+    for (i = 0; i < ubdevs->count; i++) {
+        ub = ubdevs->devs[i];
+
+        VIR_DEBUG("Removing UB device %s from active list",
+                  ub->address.guidStr);
+        actual = virUBDeviceListSteal(mgr->activeUBHostdevs,
+                                      &ub->address);
+
+        VIR_DEBUG("Adding UB device %s to inactive list",
+                  ub->address.guidStr);
+        if (!actual ||
+            virUBDeviceListAdd(mgr->inactiveUBHostdevs, actual) < 0) {
+            VIR_ERROR(_("Failed to add UB device %1$s to the inactive list"),
+                      virGetLastErrorMessage());
+            if (actual) {
+                virUBDeviceFree(actual);
+            }
+            virResetLastError();
+        }
+    }
+
+    /* Step 3: Reattach managed devices to their host drivers; unmanaged
+     *         devices don't need to be processed further */
+    virHostdevReattachAllUBDevices(mgr, ubdevs);
+
+    virObjectUnlock(mgr->activeUBHostdevs);
+    virObjectUnlock(mgr->inactiveUBHostdevs);
 }
 
 static bool
