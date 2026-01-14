@@ -103,6 +103,18 @@ qemuHostdevUpdateActiveNVMeDisks(virQEMUDriver *driver,
                                              def->ndisks);
 }
 
+int
+qemuHostdevUpdateActiveUBDevices(virQEMUDriver *driver,
+                                 virDomainDef *def)
+{
+    virHostdevManager *mgr = driver->hostdevMgr;
+
+    if (!def->nhostdevs)
+        return 0;
+
+    return virHostdevUpdateActiveUBDevices(mgr, def->hostdevs, def->nhostdevs,
+                                           QEMU_DRIVER_NAME, def->name);
+}
 
 int
 qemuHostdevUpdateActiveDomainDevices(virQEMUDriver *driver,
@@ -124,6 +136,9 @@ qemuHostdevUpdateActiveDomainDevices(virQEMUDriver *driver,
         return -1;
 
     if (qemuHostdevUpdateActiveMediatedDevices(driver, def) < 0)
+        return -1;
+
+    if (qemuHostdevUpdateActiveUBDevices(driver, def) < 0)
         return -1;
 
     return 0;
@@ -152,6 +167,96 @@ qemuHostdevHostSupportsPassthroughVFIO(void)
     return true;
 }
 
+bool
+qemuHostdevHostSupportsIOMMUFD(void)
+{
+    if (!virFileExists(QEMU_DEV_IOMMUFD))
+        return false;
+
+    return true;
+}
+
+int
+qemuHostdevHostUbusClusterMode(void)
+{
+    int fd;
+    char buffer[2] = {0};
+    ssize_t bytes_read;
+    int val;
+
+    if (!virFileExists(QEMU_SYS_BUS_UB_CLUSTER)) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, _("ubus cluster file %s not exists"),
+                       QEMU_SYS_BUS_UB_CLUSTER);
+        return -1;
+    }
+
+    fd = open(QEMU_SYS_BUS_UB_CLUSTER, O_RDONLY | O_NONBLOCK);
+    if (fd == -1) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, _("failed to open %s"),
+                       QEMU_SYS_BUS_UB_CLUSTER);
+        return -1;
+    }
+
+    bytes_read = read(fd, buffer, 1);
+    if (bytes_read == -1) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, _("failed to read %s"),
+                       QEMU_SYS_BUS_UB_CLUSTER);
+        close(fd);
+        return -1;
+    }
+
+    close(fd);
+
+    val = atoi(buffer);
+    if (val != 0 && val != 1) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, _("cannot get cluster from %s"),
+                       QEMU_SYS_BUS_UB_CLUSTER);
+        return -1;
+    }
+
+    return val;
+}
+
+#define MAX_INSTANCE_BUF_LEN 128
+bool
+qemuHostdevHostBusInstanceExist(char *guid)
+{
+    FILE *fp = NULL;
+    bool found = false;
+    char buf[MAX_INSTANCE_BUF_LEN] = { 0 };
+    char *tmp_guid_str = NULL;
+
+    if (!virFileExists(QEMU_SYS_BUS_UB_INSTANCE)) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, _("ubus instance file %s not exists"),
+                       QEMU_SYS_BUS_UB_INSTANCE);
+        return false;
+    }
+
+    fp = fopen(QEMU_SYS_BUS_UB_INSTANCE, "r");
+    if (!fp) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, _("failed to open %s"),
+                       QEMU_SYS_BUS_UB_INSTANCE);
+        return false;
+    }
+
+    while (fgets(buf, sizeof(buf), fp)) {
+        tmp_guid_str = strstr(buf, "guid:");
+        if (!tmp_guid_str) {
+            continue;
+        }
+
+        /* skip guid: */;
+        tmp_guid_str += 5;
+        if (!strncmp(tmp_guid_str, guid, UB_DEV_GUID_STRING_LENGTH)) {
+            found = true;
+            break;
+        }
+    }
+
+    fclose(fp);
+
+    return found;
+}
 
 int
 qemuHostdevPrepareOneNVMeDisk(virQEMUDriver *driver,
@@ -256,6 +361,86 @@ qemuHostdevPrepareMediatedDevices(virQEMUDriver *driver,
                                             name, hostdevs, nhostdevs);
 }
 
+
+static int
+qemuHostdevCheckUBDevices(virDomainDef *def)
+{
+    bool supportsPassthroughVFIO;
+    bool supportsIOMMUFD;
+    int cluster;
+    char *bus_instance_guid_str = NULL;
+    bool bus_instance_exist = false;
+    int i;
+    virDomainControllerDef *cont = NULL;
+
+    supportsPassthroughVFIO = qemuHostdevHostSupportsPassthroughVFIO();
+    if (!supportsPassthroughVFIO) {
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                       _("host doesn't support VFIO UB passthrough"));
+        return -1;
+    }
+
+    supportsIOMMUFD = qemuHostdevHostSupportsIOMMUFD();
+    if (!supportsIOMMUFD) {
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                       _("host doesn't support iommufd"));
+        return -1;
+    }
+
+    cluster = qemuHostdevHostUbusClusterMode();
+    if (cluster < 0) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                       _("failed to get cluster mode for vfio ub passthrough"));
+        return -1;
+    }
+
+    for (i = 0; i < def->ncontrollers; i++) {
+        cont = def->controllers[i];
+        if (cont->type == VIR_DOMAIN_CONTROLLER_TYPE_UB) {
+            bus_instance_guid_str = cont->info.busInstance.guidStr;
+            break;
+        }
+    }
+
+    if (bus_instance_guid_str == NULL) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                       _("cannot find configed bus instance for vfio ub device"));
+        return -1;
+    }
+
+    bus_instance_exist = qemuHostdevHostBusInstanceExist(bus_instance_guid_str);
+    if (!bus_instance_exist) {
+        /* cluster mode */
+        if (cluster == 1) {
+            virReportError(VIR_ERR_INTERNAL_ERROR,
+                           _("bus instance %s not create in cluster mode"),
+                           bus_instance_guid_str);
+            return -1;
+        }
+    } else {
+        VIR_INFO(_("bus instance %s exist\n"), bus_instance_guid_str);
+    }
+
+    return 0;
+}
+
+int
+qemuHostdevPrepareUBDevices(virQEMUDriver *driver,
+                            virDomainDef *def)
+{
+    const char *name = def->name;
+    virDomainHostdevDef **hostdevs = def->hostdevs;
+    int nhostdevs = def->nhostdevs;
+
+    if (qemuHostdevCheckUBDevices(def) < 0) {
+        return -1;
+    }
+    return virHostdevPrepareUBDevices(driver->hostdevMgr,
+                                      QEMU_DRIVER_NAME,
+                                      name, hostdevs,
+                                      nhostdevs);
+}
+
 int
 qemuHostdevPrepareDomainDevices(virQEMUDriver *driver,
                                 virDomainDef *def,
@@ -285,6 +470,9 @@ qemuHostdevPrepareDomainDevices(virQEMUDriver *driver,
 
     if (qemuHostdevPrepareMediatedDevices(driver, def->name,
                                           def->hostdevs, def->nhostdevs) < 0)
+        return -1;
+
+    if (qemuHostdevPrepareUBDevices(driver, def) < 0)
         return -1;
 
     return 0;
@@ -322,6 +510,18 @@ qemuHostdevReAttachPCIDevices(virQEMUDriver *driver,
 
     virHostdevReAttachPCIDevices(hostdev_mgr, QEMU_DRIVER_NAME, name,
                                  hostdevs, nhostdevs);
+}
+
+void
+qemuHostdevReAttachUBDevices(virQEMUDriver *driver,
+                             const char *name,
+                             virDomainHostdevDef **hostdevs,
+                             int nhostdevs)
+{
+    virHostdevManager *hostdev_mgr = driver->hostdevMgr;
+
+    virHostdevReAttachUBDevices(hostdev_mgr, QEMU_DRIVER_NAME, name,
+                                hostdevs, nhostdevs);
 }
 
 void
@@ -396,4 +596,7 @@ qemuHostdevReAttachDomainDevices(virQEMUDriver *driver,
 
     qemuHostdevReAttachMediatedDevices(driver, def->name, def->hostdevs,
                                        def->nhostdevs);
+
+    qemuHostdevReAttachUBDevices(driver, def->name, def->hostdevs,
+                                 def->nhostdevs);
 }

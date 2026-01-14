@@ -27,6 +27,14 @@ bool qemuHostdevNeedsVFIO(const virDomainHostdevDef *hostdev);
 
 bool qemuHostdevHostSupportsPassthroughVFIO(void);
 
+bool qemuHostdevHostSupportsIOMMUFD(void);
+
+int qemuHostdevHostUbusClusterMode(void);
+
+bool qemuHostdevHostBusInstanceExist(char *guid);
+
+int qemuHostdevHostBusInstanceCreate(char *guid);
+
 int qemuHostdevUpdateActiveNVMeDisks(virQEMUDriver *driver,
                                      virDomainDef *def);
 int qemuHostdevUpdateActiveMediatedDevices(virQEMUDriver *driver,
@@ -39,6 +47,8 @@ int qemuHostdevUpdateActiveSCSIDevices(virQEMUDriver *driver,
                                        virDomainDef *def);
 int qemuHostdevUpdateActiveDomainDevices(virQEMUDriver *driver,
                                          virDomainDef *def);
+int qemuHostdevUpdateActiveUBDevices(virQEMUDriver *driver,
+                                 virDomainDef *def);
 
 int qemuHostdevPrepareOneNVMeDisk(virQEMUDriver *driver,
                                   const char *name,
@@ -70,6 +80,8 @@ int qemuHostdevPrepareMediatedDevices(virQEMUDriver *driver,
                                       const char *name,
                                       virDomainHostdevDef **hostdevs,
                                       int nhostdevs);
+int qemuHostdevPrepareUBDevices(virQEMUDriver *driver,
+                                virDomainDef *def);
 int qemuHostdevPrepareDomainDevices(virQEMUDriver *driver,
                                     virDomainDef *def,
                                     unsigned int flags);
@@ -101,5 +113,9 @@ void qemuHostdevReAttachMediatedDevices(virQEMUDriver *driver,
                                         const char *name,
                                         virDomainHostdevDef **hostdevs,
                                         int nhostdevs);
+void qemuHostdevReAttachUBDevices(virQEMUDriver *driver,
+                                  const char *name,
+                                  virDomainHostdevDef **hostdevs,
+                                  int nhostdevs);
 void qemuHostdevReAttachDomainDevices(virQEMUDriver *driver,
                                       virDomainDef *def);
