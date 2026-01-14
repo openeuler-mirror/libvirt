@@ -118,7 +118,9 @@ struct _virUBBusInstance {
     bool cluster;
 };
 
+uint32_t virUBDeviceSysfsGetDevnumByGuid(char *guidStr);
 int virUBDeviceGetGuidFromStr(UBGuid *guid, char *guidStr);
+uint32_t virUBDeviceSysfsGetDevnumByGuid(char *guidStr);
 char *virUBDeviceAddressGetIOMMUGroupDev(virUBDeviceAddress *addr);
 char *virUBDeviceAddressGetIOMMUFDDev(virUBDeviceAddress *addr);
 bool virUBDeviceAddressGuidIsEmpty(const virUBDeviceAddress *addr);
@@ -150,6 +152,10 @@ virUBDeviceAddressCopy(virUBDeviceAddress *dst, const virUBDeviceAddress *src);
 void
 virUBDeviceSetManaged(virUBDevice *dev, bool managed);
 void
+virUBDeviceSetStubDriverName(virUBDevice *dev, char* driverName);
+bool
+virUBDeviceGetManaged(virUBDevice *dev);
+void
 virUBDeviceSetStubDriverType(virUBDevice *dev, virUBStubDriver driverType);
 virUBDevice *
 virUBDeviceNew(const virUBDeviceAddress *address);
@@ -161,5 +167,19 @@ virUBDevice *
 virUBDeviceListSteal(virUBDeviceList *list, virUBDeviceAddress *devAddr);
 void
 virUBDeviceListDel(virUBDeviceList *list, virUBDeviceAddress *devAddr);
+char *
+virUBFile(const unsigned int devNum, const char *file);
+virUBDeviceAddress *
+virUBDeviceSysfsGetAddrByDevnum(unsigned int devNum);
+int
+virUBDeviceGetCurrentDriverName(virUBDevice *dev, char **name);
+int
+virUBDeviceUnbind(virUBDevice *dev);
+int
+virUBDeviceDetach(virUBDevice *dev, virUBDeviceList *activeDevs, virUBDeviceList *inactiveDevs);
+bool
+virUBDeviceGetCurrentDriverNameAndType(virUBDevice *dev, char **drvName, virUBStubDriver *drvType);
+bool
+virUBDeviceListAddCopy(virUBDeviceList *list, virUBDevice *dev);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(virUBDevice, virUBDeviceFree);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(virUBDeviceList, virObjectUnref);
