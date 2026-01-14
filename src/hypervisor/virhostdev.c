@@ -2682,8 +2682,33 @@ static void
 virHostdevReattachAllUBDevices(virHostdevManager *mgr,
                                virUBDeviceList *ubdevs)
 {
-    VIR_DEBUG("mgr active ub count: %lu, ubdevs count: %lu", mgr->activeUBHostdevs->count, ubdevs->count);
-    return;
+    size_t i;
+    virUBDevice *ub;
+    virUBDevice *actual;
+
+    for (i = 0; i < ubdevs->count; i++) {
+        ub = ubdevs->devs[i];
+
+        /* We need to look up the actual device because that's what
+         * virUBDeviceReattach() expects as its argument */
+        if (!(actual = virUBDeviceListFind(mgr->inactiveUBHostdevs,
+                                           &ub->address)))
+            continue;
+
+        if (virUBDeviceGetManaged(actual)) {
+            VIR_DEBUG("Reattaching managed UB device %s",
+                      ub->address.guidStr);
+            if (virUBDeviceReattach(actual,
+                                    mgr->activeUBHostdevs,
+                                    mgr->inactiveUBHostdevs) < 0) {
+                VIR_ERROR(_("Failed to re-attach UB device: %1$s"),
+                          virGetLastErrorMessage());
+            }
+        } else {
+            VIR_DEBUG("Not reattaching unmanaged UB device %s",
+                      ub->address.guidStr);
+        }
+    }
 }
 
 static bool

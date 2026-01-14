@@ -181,5 +181,7 @@ bool
 virUBDeviceGetCurrentDriverNameAndType(virUBDevice *dev, char **drvName, virUBStubDriver *drvType);
 bool
 virUBDeviceListAddCopy(virUBDeviceList *list, virUBDevice *dev);
+int
+virUBDeviceReattach(virUBDevice *dev, virUBDeviceList *activeDevs, virUBDeviceList *inactiveDevs);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(virUBDevice, virUBDeviceFree);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(virUBDeviceList, virObjectUnref);
