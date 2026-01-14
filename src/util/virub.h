@@ -153,5 +153,13 @@ void
 virUBDeviceSetStubDriverType(virUBDevice *dev, virUBStubDriver driverType);
 virUBDevice *
 virUBDeviceNew(const virUBDeviceAddress *address);
+int
+virUBDeviceListFindIndex(virUBDeviceList *list, virUBDeviceAddress *devAddr);
+virUBDevice *
+virUBDeviceListStealIndex(virUBDeviceList *list, int idx);
+virUBDevice *
+virUBDeviceListSteal(virUBDeviceList *list, virUBDeviceAddress *devAddr);
+void
+virUBDeviceListDel(virUBDeviceList *list, virUBDeviceAddress *devAddr);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(virUBDevice, virUBDeviceFree);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(virUBDeviceList, virObjectUnref);

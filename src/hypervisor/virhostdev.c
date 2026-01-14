@@ -2609,26 +2609,73 @@ virHostdevReAttachUBDevicesImpl(virHostdevManager *mgr,
     return;
 }
 
+static int
+virHostdevGetUBHostDevice(const virDomainHostdevDef *hostdev,
+                           virUBDevice **ub)
+{
+    g_autoptr(virUBDevice) actual = NULL;
+    const virDomainHostdevSubsysUB *ubsrc = &hostdev->source.subsys.u.ub;
+
+    if (hostdev->mode != VIR_DOMAIN_HOSTDEV_MODE_SUBSYS ||
+        hostdev->source.subsys.type != VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB)
+        return 0;
+
+    if (!virUBDeviceExists(&ubsrc->addr))
+        return -ENOENT;
+
+    actual = virUBDeviceNew(&ubsrc->addr);
+    if (!actual)
+        return -ENOMEM ;
+
+    virUBDeviceSetManaged(actual, hostdev->managed);
+
+    if (ubsrc->backend == VIR_DOMAIN_HOSTDEV_UB_BACKEND_VFIO) {
+        virUBDeviceSetStubDriverType(actual, VIR_UB_STUB_DRIVER_VFIO);
+    } else {
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                       _("ub backend driver '%1$s' is not supported"),
+                       virDomainHostdevSubsysUBBackendTypeToString(ubsrc->backend));
+        return -EINVAL;
+    }
+
+    *ub = g_steal_pointer(&actual);
+    return 0;
+}
+
 static void
 virHostdevDeleteMissingUBDevices(virHostdevManager *mgr,
                                  virDomainHostdevDef **hostdevs,
                                  int nhostdevs)
 {
-    VIR_DEBUG("mgr active count: %lu, manage: %d, ub count: %d",
-              mgr->inactiveUBHostdevs->count, (*hostdevs)->managed, nhostdevs);
-    return;
-}
+    size_t i;
+    virDomainHostdevDef *hostdev;
+    virDomainHostdevSubsysUB *ubsrc;
+    virUBDevice *ub = NULL;
 
-static int
-virHostdevGetUBHostDevice(const virDomainHostdevDef *hostdev,
-                           virUBDevice **ub)
-{
-    if(!(*ub)){
-        return 0;
+    if (nhostdevs == 0)
+        return;
+
+    virObjectLock(mgr->activeUBHostdevs);
+    virObjectLock(mgr->inactiveUBHostdevs);
+
+    for (i = 0; i < nhostdevs; i++) {
+        hostdev = hostdevs[i];
+        ubsrc = &hostdev->source.subsys.u.ub;
+        ub = NULL;
+
+        if (virHostdevGetUBHostDevice(hostdev, &ub) != -ENOENT){
+            if (ub) {
+                virUBDeviceFree(ub);
+            }
+            continue;
+        }
+
+        virUBDeviceListDel(mgr->activeUBHostdevs, &ubsrc->addr);
+        virUBDeviceListDel(mgr->inactiveUBHostdevs, &ubsrc->addr);
     }
-    VIR_DEBUG("hostdev managed: %d, ub: %s",
-              hostdev->managed, (*ub)->address.guidStr);
-    return 0;
+
+    virObjectUnlock(mgr->inactiveUBHostdevs);
+    virObjectUnlock(mgr->activeUBHostdevs);
 }
 
 static int

@@ -428,7 +428,12 @@ virUBDeviceExists(const virUBDeviceAddress *addr)
 void virUBDeviceAddressCopy(virUBDeviceAddress *dst,
                             const virUBDeviceAddress *src)
 {
-    memcpy(dst, src, sizeof(*src));
+    memcpy(&dst->guid, &src->guid, sizeof(UBGuid));
+    dst->eid = src->eid;
+    if (dst->guidStr != NULL) {
+        g_free(dst->guidStr);
+    }
+    dst->guidStr = g_strdup(src->guidStr);
 }
 
 void virUBDeviceSetManaged(virUBDevice *dev, bool managed)
@@ -467,4 +472,51 @@ virUBDeviceNew(const virUBDeviceAddress *address)
     VIR_DEBUG("%s: initialized", dev->address.guidStr);
 
     return g_steal_pointer(&dev);
+}
+
+int
+virUBDeviceListFindIndex(virUBDeviceList *list,
+                         virUBDeviceAddress *devAddr)
+{
+    virUBDevice *checkdev;
+
+    for (int i = 0; i < list->count; i++) {
+        checkdev = list->devs[i];
+        if (checkdev->address.guid.deviceId == devAddr->guid.deviceId &&
+            checkdev->address.guid.rsv      == devAddr->guid.rsv      &&
+            checkdev->address.guid.seqNum   == devAddr->guid.seqNum   &&
+            checkdev->address.guid.type     == devAddr->guid.type     &&
+            checkdev->address.guid.vendorId == devAddr->guid.vendorId &&
+            checkdev->address.guid.version  == devAddr->guid.version)
+            return i;
+    }
+    return -1;
+}
+
+virUBDevice *
+virUBDeviceListStealIndex(virUBDeviceList *list,
+                          int idx)
+{
+    virUBDevice *ret;
+
+    if (idx < 0 || idx >= list->count)
+        return NULL;
+
+    ret = list->devs[idx];
+    VIR_DELETE_ELEMENT(list->devs, idx, list->count);
+    return ret;
+}
+
+virUBDevice *
+virUBDeviceListSteal(virUBDeviceList *list,
+                     virUBDeviceAddress *devAddr)
+{
+    return virUBDeviceListStealIndex(list, virUBDeviceListFindIndex(list, devAddr));
+}
+
+void
+virUBDeviceListDel(virUBDeviceList *list,
+                   virUBDeviceAddress *devAddr)
+{
+    virUBDeviceFree(virUBDeviceListSteal(list, devAddr));
 }
