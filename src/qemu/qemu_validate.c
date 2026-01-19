@@ -225,7 +225,31 @@ qemuValidateDomainDefFeatures(const virDomainDef *def,
                 return -1;
             }
             break;
+        case VIR_DOMAIN_FEATURE_RAS:
+            if (def->features[i] != VIR_TRISTATE_SWITCH_ON)
+                continue;
 
+            if (def->os.arch != VIR_ARCH_AARCH64) {
+                virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                              _("ras is only supported on AArch64"));
+                return -1;
+            }
+
+            /* On AArch64, ras requires ACPI */
+            if (def->features[VIR_DOMAIN_FEATURE_ACPI] != VIR_TRISTATE_SWITCH_ON) {
+                virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                              _("ras requires ACPI to be enabled"));
+                return -1;
+            }
+
+            /* On AArch64, ras requires GICV3+ */
+            if (def->features[VIR_DOMAIN_FEATURE_GIC] != VIR_TRISTATE_SWITCH_ON ||
+                def->gic_version < VIR_GIC_VERSION_3) {
+                virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                              _("ras requires GICV3 or newer on AArch64"));
+                return -1;
+            }
+            break;
         case VIR_DOMAIN_FEATURE_SMM:
         case VIR_DOMAIN_FEATURE_KVM:
         case VIR_DOMAIN_FEATURE_XEN:
