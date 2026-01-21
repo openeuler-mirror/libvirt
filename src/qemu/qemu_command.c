@@ -7038,6 +7038,10 @@ qemuAppendDomainFeaturesMachineParam(virBuffer *buf,
         virBufferAsprintf(buf, ",cap-ibs=%s", str);
     }
 
+    if (def->features[VIR_DOMAIN_FEATURE_RAS] == VIR_TRISTATE_SWITCH_ON) {
+        virBufferAddLit(buf, ",ras=on");
+    }
+
     return 0;
 }
 

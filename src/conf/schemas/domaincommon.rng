@@ -6899,6 +6899,11 @@
               </optional>
             </element>
           </optional>
+          <optional>
+            <element name="ras">
+              <empty/>
+            </element>
+          </optional>
         </interleave>
       </element>
     </optional>
