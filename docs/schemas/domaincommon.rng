@@ -5475,6 +5475,9 @@
         <optional>
           <ref name="cpuCache"/>
         </optional>
+        <zeroOrMore>
+          <ref name="cpuCacheInfo"/>
+        </zeroOrMore>
       </interleave>
     </element>
   </define>
