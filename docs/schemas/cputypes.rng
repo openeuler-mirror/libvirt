@@ -196,4 +196,21 @@
     </element>
   </define>
 
+  <define name="cpuCacheInfo">
+    <element name="cacheinfo">
+      <attribute name="cache">
+        <choice>
+          <value>l1d</value>
+          <value>l1i</value>
+          <value>l1</value>
+          <value>l2</value>
+          <value>l3</value>
+        </choice>
+      </attribute>
+      <attribute name="size">
+        <data type="unsignedLong"/>
+      </attribute>
+    </element>
+  </define>
+
 </grammar>
