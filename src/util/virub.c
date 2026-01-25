@@ -564,8 +564,31 @@ virUBDeviceListAddCopy(virUBDeviceList *list, virUBDevice *dev)
 
 virUBDeviceAddress *virUBDeviceSysfsGetAddrByDevnum(unsigned int devNum)
 {
-    VIR_DEBUG("try to get the dev %u guid address\n", devNum);
-    return NULL;
+    virUBDeviceAddress *addr = NULL;
+    g_autofree char *filePath = NULL;
+
+    addr = g_new0(virUBDeviceAddress, 1);
+    /* include '\n\0' at the end, len is UB_DEV_GUID_STRING_LENGTH + 2*/
+    addr->guidStr = g_new0(char, UB_DEV_GUID_STRING_LENGTH + 2);
+
+    filePath = virUBFile(devNum, "guid");
+    if (virFileReadAll(filePath, UB_DEV_GUID_STRING_LENGTH + 1, &addr->guidStr) < 0) {
+        g_free(addr->guidStr);
+        g_free(addr);
+        return NULL;
+    }
+
+    if (addr->guidStr[UB_DEV_GUID_STRING_LENGTH] == '\n')
+        addr->guidStr[UB_DEV_GUID_STRING_LENGTH] = '\0';
+
+    if (virUBDeviceGetGuidFromStr(&addr->guid, addr->guidStr) < 0) {
+        VIR_ERROR("failed to convert the string: %s to guid\n", addr->guidStr);
+        g_free(addr->guidStr);
+        g_free(addr);
+        return NULL;
+    }
+
+    return addr;
 }
 
 int
