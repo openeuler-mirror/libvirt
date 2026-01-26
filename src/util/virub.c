@@ -576,6 +576,53 @@ virUBDeviceGetCurrentDriverName(virUBDevice *dev, char **name)
     return 0;
 }
 
+static char *
+virUBDriverDir(const char *driver)
+{
+    return g_strdup_printf(UB_SYSFS "drivers/%s", driver);
+}
+
+static int
+virUBProbeDriver(const char *driverName)
+{
+    g_autofree char *drvpath = NULL;
+    g_autofree char *errbuf = NULL;
+
+    drvpath = virUBDriverDir(driverName);
+    if (virFileExists(drvpath))
+        return 0;
+
+    if ((errbuf = virKModLoad(driverName))) {
+        VIR_WARN("failed to load driver %s: %s", driverName, errbuf);
+        goto err;
+    }
+
+    if (!virFileExists(drvpath))
+        goto err;
+
+    return 0;
+
+ err:
+    if (virKModIsProhibited(driverName)) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Failed to load UB driver module %1$s: administratively prohibited"),
+                       driverName);
+    } else {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Failed to load UB driver module %1$s"),
+                       driverName);
+    }
+
+    return -1;
+}
+
+static char *
+virUBDeviceSysfsGetDevnumstrByGuid(virUBDevice *dev)
+{
+    VIR_DEBUG("dev guid: %s", dev->address.guidStr);
+    return 0;
+}
+
 int
 virUBDeviceUnbind(virUBDevice *dev)
 {
@@ -584,9 +631,99 @@ virUBDeviceUnbind(virUBDevice *dev)
 }
 
 static int
+virUBDeviceRebind(virUBDevice *dev)
+{
+    g_autofree char *devNumStr = NULL;
+
+    if (virUBDeviceUnbind(dev) < 0)
+        return -1;
+
+    devNumStr = virUBDeviceSysfsGetDevnumstrByGuid(dev);
+    if (!devNumStr) {
+        return -1;
+    }
+
+    if (virFileWriteStr(UB_SYSFS "drivers_probe", devNumStr, 0) < 0) {
+        virReportSystemError(errno,
+                             _("Failed to trigger a probe for UB device '%1$s'"),
+                             dev->address.guidStr);
+        return -1;
+    }
+
+    return 0;
+}
+
+static int
+virUBDeviceBindWithDriverOverride(virUBDevice *dev,
+                                  const char *driverName)
+{
+    g_autofree char *path = NULL;
+    unsigned int devNum;
+
+    devNum = virUBDeviceSysfsGetDevnumByGuid(dev->address.guidStr);
+    if (devNum == UINT32_MAX) {
+        return -1;
+    }
+
+    path = virUBFile(devNum, "driver_override");
+    if (virFileWriteStr(path, driverName, 0) < 0) {
+        virReportSystemError(errno,
+                             _("Failed to add driver '%1$s' to driver_override interface of UB device '%2$s'"),
+                             driverName, dev->address.guidStr);
+        return -1;
+    }
+
+    if (virUBDeviceRebind(dev) < 0)
+        return -1;
+
+    return 0;
+}
+
+static int
 virUBDeviceBindToStub(virUBDevice *dev)
 {
-    VIR_DEBUG("UB device %s try to bind driver", dev->address.guidStr);
+    const char *stub_driver_name = dev->stub_driver_name;
+    g_autofree char *stubDriverPath = NULL;
+    g_autofree char *driverLink = NULL;
+    unsigned int devNum;
+
+    if (dev->stub_driver_type == VIR_UB_STUB_DRIVER_NONE) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("No stub driver configured for UB device %1$s"),
+                       dev->address.guidStr);
+        return -1;
+    }
+
+    if (!stub_driver_name &&
+        !(stub_driver_name = virUBStubDriverTypeToString(dev->stub_driver_type))) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Unknown stub driver configured for UB device %1$s"),
+                       dev->address.guidStr);
+        return -1;
+    }
+
+    if (virUBProbeDriver(stub_driver_name) < 0)
+        return -1;
+
+    devNum = virUBDeviceSysfsGetDevnumByGuid(dev->address.guidStr);
+    if (devNum == UINT32_MAX) {
+        return -1;
+    }
+    stubDriverPath = virUBDriverDir(stub_driver_name);
+    driverLink = virUBFile(devNum, "driver");
+    if (virFileExists(driverLink)) {
+        if (virFileLinkPointsTo(driverLink, stubDriverPath)) {
+            /* The device is already bound to the correct driver */
+            VIR_DEBUG("Device %s is already bound to %s",
+                      dev->address.guidStr, stub_driver_name);
+            return 0;
+        }
+    }
+
+    if (virUBDeviceBindWithDriverOverride(dev, stub_driver_name) < 0)
+        return -1;
+
+    dev->unbind_from_stub = true;
     return 0;
 }
 
