@@ -3108,3 +3108,22 @@ virHostdevPrepareUBDevices(virHostdevManager *hostdev_mgr,
     return virHostdevPrepareUBDevicesImpl(hostdev_mgr, drv_name, dom_name, 
                                            ubdevs);
 }
+
+bool
+virHostdevHasUBDevice(virDomainHostdevDef **hostdevs, int nhostdevs)
+{
+    bool has = false;
+    int i;
+    virDomainHostdevDef *hostdev = NULL;
+
+    for (i = 0; i < nhostdevs; i++) {
+        hostdev = hostdevs[i];
+        if (hostdev->mode == VIR_DOMAIN_HOSTDEV_MODE_SUBSYS &&
+            hostdev->source.subsys.type == VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB) {
+            has = true;
+            break;
+        }
+    }
+
+    return has;
+}

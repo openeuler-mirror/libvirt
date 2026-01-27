@@ -246,6 +246,9 @@ virHostdevPrepareUBDevices(virHostdevManager *hostdev_mgr,
                              int nhostdevs)
     ATTRIBUTE_NONNULL(1) ATTRIBUTE_NONNULL(2) ATTRIBUTE_NONNULL(3);
 
+bool
+virHostdevHasUBDevice(virDomainHostdevDef **hostdevs, int nhostdevs);
+
 void
 virHostdevReAttachUBDevices(virHostdevManager *mgr,
                             const char *drv_name,

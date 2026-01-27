@@ -1652,6 +1652,7 @@ virCloseCallbacksDomainRunForConn;
 
 # hypervisor/virhostdev.h
 virHostdevFindUSBDevice;
+virHostdevHasUBDevice;
 virHostdevIsPCIDevice;
 virHostdevManagerGetDefault;
 virHostdevPCINodeDeviceDetach;

@@ -432,9 +432,14 @@ qemuHostdevPrepareUBDevices(virQEMUDriver *driver,
     virDomainHostdevDef **hostdevs = def->hostdevs;
     int nhostdevs = def->nhostdevs;
 
+    if (!virHostdevHasUBDevice(hostdevs, nhostdevs)) {
+        return 0;
+    }
+
     if (qemuHostdevCheckUBDevices(def) < 0) {
         return -1;
     }
+
     return virHostdevPrepareUBDevices(driver->hostdevMgr,
                                       QEMU_DRIVER_NAME,
                                       name, hostdevs,
