@@ -1158,7 +1158,8 @@ qemuValidateDomainDef(const virDomainDef *def,
     g_autoptr(virQEMUCaps) qemuCapsLocal = NULL;
     virQEMUCaps *qemuCaps = parseOpaque;
     size_t i;
-    bool isCvm = def->sec && def->sec->sectype == VIR_DOMAIN_LAUNCH_SECURITY_CVM;
+    bool isCvm = def->sec && (def->sec->sectype == VIR_DOMAIN_LAUNCH_SECURITY_CVM ||
+                              def->sec->sectype == VIR_DOMAIN_LAUNCH_SECURITY_CCA);
 
     if (!qemuCaps) {
         if (!(qemuCapsLocal = virQEMUCapsCacheLookup(driver->qemuCapsCache,
