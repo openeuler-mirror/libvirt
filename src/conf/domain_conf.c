@@ -22487,11 +22487,22 @@ virDomainDefIDsParseString(const char *xmlStr,
     g_autoptr(virDomainDef) def = NULL;
     g_autoptr(xmlDoc) xml = NULL;
     g_autoptr(xmlXPathContext) ctxt = NULL;
+    xmlNodePtr root = NULL;
     bool uuid_generated = false;
     int keepBlanksDefault = xmlKeepBlanksDefault(0);
 
     if (!(xml = virXMLParse(NULL, xmlStr, _("(domain_definition)"))))
         goto cleanup;
+
+    if(!(ctxt = virXMLXPathContextNew(xml)))
+        goto cleanup;
+
+    root = xmlDocGetRootElement(xml);
+
+    if(!root)
+        goto cleanup;
+    
+    ctxt->node = root;
 
     def = virDomainDefNew();
     if (!def)
