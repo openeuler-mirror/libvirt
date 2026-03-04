@@ -449,6 +449,11 @@
           </attribute>
         </optional>
         <optional>
+          <attribute name="hisi-cca-enable">
+            <ref name="virYesNo"/>
+          </attribute>
+        </optional>
+        <optional>
           <element name="enum">
             <attribute name="name">
               <value>measurement-algo</value>

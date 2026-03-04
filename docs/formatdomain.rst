@@ -8769,7 +8769,7 @@ Arm Confidential Compute Architecture software stack:
 
   <domain>
     ...
-    <launchSecurity type='cca' measurement-log='yes'>
+    <launchSecurity type='cca' measurement-log='yes' hisi-cca-enable='yes'>
       <measurement-algo>sha256</measurement-algo>
       <personalization-value>...</personalization-value>
     </launchSecurity>
@@ -8796,6 +8796,10 @@ The ``<launchSecurity/>`` element accepts the following attributes:
    The optional ``measurement-log`` element provides a way to create
    an event log in the format defined by the Trusted Computing Group
    for TPM2.
+
+``hisi-cca-enable``
+   The optional ``hisi-cca-enable`` element provides a way to enable
+   ccal support.
 
 Example configs
 ===============

@@ -13858,6 +13858,9 @@ virDomainCCADefParseXML(virDomainCCADef *def,
                                &def->measurement_log) < 0)
         return -1;
 
+    if (virXMLPropTristateBool(ctxt->node, "hisi-cca-enable", VIR_XML_PROP_NONE,
+                               &def->hisi_cca_enable) < 0)
+        return -1;
     return 0;
 }
 
@@ -27121,8 +27124,26 @@ virDomainSecDefFormat(virBuffer *buf, virDomainSecDef *sec)
 
     case VIR_DOMAIN_LAUNCH_SECURITY_PV:
     case VIR_DOMAIN_LAUNCH_SECURITY_CVM:
-    case VIR_DOMAIN_LAUNCH_SECURITY_CCA:
         break;
+    case VIR_DOMAIN_LAUNCH_SECURITY_CCA: {
+        virDomainCCADef *cca = &sec->data.cca;
+
+        if (cca->hisi_cca_enable) {
+            virBufferAsprintf(&attrBuf, " hisi-cca-enable='%s'",
+                              virTristateBoolTypeToString(cca->hisi_cca_enable));
+        }
+        if (cca->measurement_log) {
+            virBufferAsprintf(&attrBuf, " measurement-log='%s'",
+                              virTristateBoolTypeToString(cca->measurement_log));
+        }
+
+        if (cca->measurement_algo)
+            virBufferEscapeString(&childBuf, "<measurement-algo>%s</measurement-algo>\n", cca->measurement_algo);
+        if (cca->personalization_value)
+            virBufferEscapeString(&childBuf, "<personalization-value>%s</personalization-value>\n",
+                                  cca->personalization_value);
+        break;
+    }
 
     case VIR_DOMAIN_LAUNCH_SECURITY_NONE:
     case VIR_DOMAIN_LAUNCH_SECURITY_LAST:

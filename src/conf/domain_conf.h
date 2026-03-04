@@ -2912,6 +2912,7 @@ struct _virDomainCCADef {
     char *measurement_algo;
     char *personalization_value;
     virTristateBool measurement_log;
+    virTristateBool hisi_cca_enable;
 };
 
 struct _virDomainSecDef {
