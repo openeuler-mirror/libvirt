@@ -38,4 +38,8 @@
   <feature name='dcpop'/>
   <feature name='asimddp'/>
   <feature name='asimdfhm'/>
+
+  <!-- Kunpeng-920-V1 cpu features -->
+  <feature name='svef32mm'/>
+  <feature name='svef64mm'/>
 </cpus>
