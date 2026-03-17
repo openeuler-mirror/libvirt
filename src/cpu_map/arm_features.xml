@@ -42,4 +42,35 @@
   <!-- Kunpeng-920-V1 cpu features -->
   <feature name='svef32mm'/>
   <feature name='svef64mm'/>
+
+  <!-- Kunpeng-920-V2 cpu features -->
+  <feature name='lrcpc'/>
+  <feature name='sha3'/>
+  <feature name='sm3'/>
+  <feature name='sm4'/>
+  <feature name='sha512'/>
+  <feature name='dit'/>
+  <feature name='uscat'/>
+  <feature name='ilrcpc'/>
+  <feature name='flagm'/>
+  <feature name='ssbs'/>
+  <feature name='sb'/>
+  <feature name='paca'/>
+  <feature name='pacg'/>
+  <feature name='dcpodp'/>
+  <feature name='sve2'/>
+  <feature name='sveaes'/>
+  <feature name='svepmull'/>
+  <feature name='svebitperm'/>
+  <feature name='svesha3'/>
+  <feature name='svesm4'/>
+  <feature name='flagm2'/>
+  <feature name='frint'/>
+  <feature name='svei8mm'/>
+  <feature name='svebf16'/>
+  <feature name='i8mm'/>
+  <feature name='bf16'/>
+  <feature name='dgh'/>
+  <feature name='rng'/>
+  <feature name='ecv'/>
 </cpus>

@@ -8,6 +8,7 @@ cpumap_data = [
   'arm_features.xml',
   'arm_Kunpeng-920.xml',
   'arm_Kunpeng-920-V1.xml',
+  'arm_Kunpeng-920-V2.xml',
   'arm_Neoverse-N1.xml',
   'arm_Neoverse-N2.xml',
   'arm_Neoverse-V1.xml',

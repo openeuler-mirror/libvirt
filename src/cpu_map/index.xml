@@ -117,6 +117,7 @@
     <!-- Hisilicon-based CPU models -->
     <include filename='arm_Kunpeng-920.xml'/>
     <include filename='arm_Kunpeng-920-V1.xml'/>
+    <include filename='arm_Kunpeng-920-V2.xml'/>
 
     <!-- Phytium-based CPU models -->
     <include filename='arm_FT-2000plus.xml'/>
