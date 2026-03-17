@@ -73,4 +73,14 @@
   <feature name='dgh'/>
   <feature name='rng'/>
   <feature name='ecv'/>
+
+  <!-- Kunpeng-950-V1 cpu features -->
+  <feature name='bti'/>
+  <feature name='afp'/>
+  <feature name='rpres'/>
+  <feature name='wfxt'/>
+  <feature name='rprfm'/>
+  <feature name='hbc'/>
+  <feature name='ls64'/>
+  <feature name='ls64_v'/>
 </cpus>

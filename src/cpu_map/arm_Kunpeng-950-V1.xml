@@ -1,0 +1,6 @@
+<cpus>
+  <model name='Kunpeng-950-V1'>
+    <vendor name='HiSilicon'/>
+    <pvr value='0xd06'/>
+  </model>
+</cpus>
