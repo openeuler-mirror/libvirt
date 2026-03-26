@@ -572,6 +572,8 @@ struct _qemuDomainJobPrivate {
     bool dumpCompleted;                 /* dump completed */
     bool snapshotDelete;                /* indicate that snapshot job is
                                          * deleting snapshot */
+    bool urmaRcuExpeditedActive;        /* kernel.rcu_expedited tuned for URMA */
+    int urmaRcuExpeditedPrev;           /* 0/1 before URMA migration */
     qemuMigrationParams *migParams;
     GSList *migTempBitmaps;  /* temporary block dirty bitmaps - qemuDomainJobPrivateMigrateTempBitmap */
 };
