@@ -6431,7 +6431,7 @@ qemuBuildGlobalControllerCommandLine(virCommand *cmd,
             }
 
             virCommandAddArg(cmd, "-global");
-            virCommandAddArgFormat(cmd, "%s.pci-hole64-size=%luK", hoststr,
+            virCommandAddArgFormat(cmd, "%s.pci-hole64-size=%lluK", hoststr,
                                    cont->opts.pciopts.pcihole64size);
         }
     }
