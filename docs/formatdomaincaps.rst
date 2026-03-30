@@ -724,6 +724,13 @@ async-teardown
 
 Reports whether the asynchronous teardown feature can be enabled.
 
+kvm-vtimer-status
+^^^^^^^^^^^^^^^^^
+
+Reports whether the kvm-vtimer-status feature can be enabled for AArch64 KVM
+guests. This feature allows the guest OS to query the virtual timer status from
+the hypervisor.
+
 s390-pv capability
 ^^^^^^^^^^^^^^^^^^
 

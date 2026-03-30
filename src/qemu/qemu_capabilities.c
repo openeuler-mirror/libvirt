@@ -701,6 +701,9 @@ VIR_ENUM_IMPL(virQEMUCaps,
               "smp-clusters", /* QEMU_CAPS_SMP_CLUSTERS */
               "tmm-guest", /* QEMU_CAPS_VIRTCCA */
               "rme-guest", /* QEMU_CAPS_CCA_GUEST */
+
+              /* 455 */
+              "cpu.kvm-vtimer-status", /* QEMU_CAPS_ARM_KVM_VTIMER_STATUS */
     );
 
 
@@ -1709,6 +1712,7 @@ static struct virQEMUCapsStringFlags virQEMUCapsObjectPropsMaxCPU[] = {
     { "unavailable-features", QEMU_CAPS_CPU_UNAVAILABLE_FEATURES },
     { "kvm-no-adjvtime", QEMU_CAPS_CPU_KVM_NO_ADJVTIME },
     { "migratable", QEMU_CAPS_CPU_MIGRATABLE },
+    { "kvm-vtimer-status", QEMU_CAPS_ARM_KVM_VTIMER_STATUS },
 };
 
 static virQEMUCapsObjectTypeProps virQEMUCapsObjectProps[] = {

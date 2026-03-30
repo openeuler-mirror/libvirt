@@ -250,6 +250,26 @@ qemuValidateDomainDefFeatures(const virDomainDef *def,
                 return -1;
             }
             break;
+
+        case VIR_DOMAIN_FEATURE_KVM_VTIMER_STATUS:
+            if (def->features[i] == VIR_TRISTATE_SWITCH_ABSENT)
+                continue;
+
+            if (def->os.arch != VIR_ARCH_AARCH64 || def->virtType != VIR_DOMAIN_VIRT_KVM) {
+                virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                              _("kvm-vtimer-status is only supported on AArch64 with KVM"));
+                return -1;
+            }
+
+
+            if (def->features[i] == VIR_TRISTATE_BOOL_YES &&
+                !virQEMUCapsGet(qemuCaps, QEMU_CAPS_ARM_KVM_VTIMER_STATUS)) {
+                virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                              _("kvm-vtimer-status is not available with this QEMU binary"));
+                return -1;
+            }
+            break;
+
         case VIR_DOMAIN_FEATURE_SMM:
         case VIR_DOMAIN_FEATURE_KVM:
         case VIR_DOMAIN_FEATURE_XEN:

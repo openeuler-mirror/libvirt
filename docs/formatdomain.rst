@@ -2254,6 +2254,13 @@ are:
    Depending on the ``enabled`` attribute (values ``yes``, ``no``) enable or
    disable QEMU asynchronous teardown to improve memory reclaiming on a guest.
    :since:`Since 9.6.0` (QEMU only)
+``kvm-vtimer-status``
+   Enable or disable the KVM vtimer status reporting for AArch64 KVM guests.
+   Depending on the ``enabled`` attribute (values ``yes``, ``no``) enable or
+   disable the feature. When enabled, the guest OS can query the virtual timer
+   status from the hypervisor, which is useful for paravirtualized timer
+   implementations. This feature is only supported on AArch64 architecture with
+   KVM virtualization. :since:`Since 9.10.0` (QEMU/KVM only)
 
 Time keeping
 ------------

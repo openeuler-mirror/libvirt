@@ -185,6 +185,7 @@ VIR_ENUM_IMPL(virDomainFeature,
               "tcg",
               "async-teardown",
               "ras",
+              "kvm-vtimer-status",
 );
 
 VIR_ENUM_IMPL(virDomainCapabilitiesPolicy,
@@ -17152,6 +17153,7 @@ virDomainFeaturesDefParse(virDomainDef *def,
                 return -1;
             break;
 
+        case VIR_DOMAIN_FEATURE_KVM_VTIMER_STATUS:
         case VIR_DOMAIN_FEATURE_ASYNC_TEARDOWN: {
             virTristateBool enabled;
 
@@ -21142,6 +21144,7 @@ virDomainDefFeaturesCheckABIStability(virDomainDef *src,
         case VIR_DOMAIN_FEATURE_NESTED_HV:
         case VIR_DOMAIN_FEATURE_CCF_ASSIST:
         case VIR_DOMAIN_FEATURE_RAS:
+        case VIR_DOMAIN_FEATURE_KVM_VTIMER_STATUS:
             if (src->features[i] != dst->features[i]) {
                 virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
                                _("State of feature '%1$s' differs: source: '%2$s', destination: '%3$s'"),
@@ -28186,6 +28189,12 @@ virDomainDefFormatFeatures(virBuffer *buf,
         case VIR_DOMAIN_FEATURE_ASYNC_TEARDOWN:
             if (def->features[i] != VIR_TRISTATE_SWITCH_ABSENT)
                 virBufferAsprintf(&childBuf, "<async-teardown enabled='%s'/>\n",
+                                  virTristateBoolTypeToString(def->features[i]));
+            break;
+
+        case VIR_DOMAIN_FEATURE_KVM_VTIMER_STATUS:
+            if (def->features[i] != VIR_TRISTATE_SWITCH_ABSENT)
+                virBufferAsprintf(&childBuf, "<kvm-vtimer-status enabled='%s'/>\n",
                                   virTristateBoolTypeToString(def->features[i]));
             break;
 
