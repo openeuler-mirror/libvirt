@@ -298,6 +298,9 @@ qemuMigrationSrcPostcopyFailed(virDomainObj *vm);
 void
 qemuMigrationDstPostcopyFailed(virDomainObj *vm);
 
+void
+qemuMigrationUrmaRcuExpeditedRestore(qemuDomainJobPrivate *jobPriv);
+
 int
 qemuMigrationSrcFetchMirrorStats(virDomainObj *vm,
                                  virDomainAsyncJob asyncJob,

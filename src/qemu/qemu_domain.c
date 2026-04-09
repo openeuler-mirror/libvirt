@@ -29,6 +29,7 @@
 #include "qemu_capabilities.h"
 #include "qemu_firmware.h"
 #include "qemu_hostdev.h"
+#include "qemu_migration.h"
 #include "qemu_migration_params.h"
 #include "qemu_security.h"
 #include "qemu_slirp.h"
@@ -104,6 +105,8 @@ qemuJobFreePrivate(void *opaque)
     if (!priv)
         return;
 
+    qemuMigrationUrmaRcuExpeditedRestore(priv);
+
     qemuMigrationParamsFree(priv->migParams);
     g_slist_free_full(priv->migTempBitmaps,
                       (GDestroyNotify) qemuDomainJobPrivateMigrateTempBitmapFree);
@@ -115,6 +118,8 @@ static void
 qemuJobResetPrivate(void *opaque)
 {
     qemuDomainJobPrivate *priv = opaque;
+
+    qemuMigrationUrmaRcuExpeditedRestore(priv);
 
     priv->spiceMigration = false;
     priv->spiceMigrated = false;

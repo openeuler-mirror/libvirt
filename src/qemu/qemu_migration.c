@@ -103,6 +103,67 @@ qemuMigrationJobIsAllowed(virDomainObj *vm)
 }
 
 
+#define QEMU_URMA_RCU_EXPEDITED_SYSCTL "/sys/kernel/rcu_expedited"
+#define QEMU_URMA_RCU_EXPEDITED_SYSCTL_MAX 16
+
+
+void
+qemuMigrationUrmaRcuExpeditedRestore(qemuDomainJobPrivate *jobPriv)
+{
+    g_autofree char *val = NULL;
+
+    if (!jobPriv || !jobPriv->urmaRcuExpeditedActive)
+        return;
+
+    jobPriv->urmaRcuExpeditedActive = false;
+
+    if (!virFileExists(QEMU_URMA_RCU_EXPEDITED_SYSCTL))
+        return;
+
+    val = g_strdup_printf("%d", jobPriv->urmaRcuExpeditedPrev);
+    if (virFileWriteStr(QEMU_URMA_RCU_EXPEDITED_SYSCTL, val, 0) < 0) {
+        VIR_WARN("Unable to restore %s after URMA migration",
+                 QEMU_URMA_RCU_EXPEDITED_SYSCTL);
+    }
+}
+
+
+static int
+qemuMigrationUrmaRcuExpeditedTuneStart(qemuDomainJobPrivate *jobPriv)
+{
+    g_autofree char *old = NULL;
+    const char *p = NULL;
+
+    if (!jobPriv || jobPriv->urmaRcuExpeditedActive)
+        return 0;
+
+    if (!virFileExists(QEMU_URMA_RCU_EXPEDITED_SYSCTL))
+        return 0;
+
+    if (virFileReadAll(QEMU_URMA_RCU_EXPEDITED_SYSCTL, 
+                       QEMU_URMA_RCU_EXPEDITED_SYSCTL_MAX, &old) < 0) {
+        virReportSystemError(errno,
+                             _("unable to read %1$s for URMA migration RCU tuning"),
+                             QEMU_URMA_RCU_EXPEDITED_SYSCTL);
+        return -1;
+    }
+
+    p = old;
+    virSkipSpaces(&p);
+    jobPriv->urmaRcuExpeditedPrev = (*p == '1');
+
+    if (virFileWriteStr(QEMU_URMA_RCU_EXPEDITED_SYSCTL, "1", 0) < 0) {
+        virReportSystemError(errno,
+                             _("unable to write %1$s for URMA migration RCU tuning"),
+                             QEMU_URMA_RCU_EXPEDITED_SYSCTL);
+        return -1;
+    }
+
+    jobPriv->urmaRcuExpeditedActive = true;
+    return 0;
+}
+
+
 static int ATTRIBUTE_NONNULL(1) ATTRIBUTE_NONNULL(2) G_GNUC_WARN_UNUSED_RESULT
 qemuMigrationJobStart(virDomainObj *vm,
                       virDomainAsyncJob job,
@@ -3130,6 +3191,10 @@ qemuMigrationDstPrepareActive(virQEMUDriver *driver,
                                          !!(flags & VIR_MIGRATE_NON_SHARED_INC)) < 0)
         goto error;
 
+    if (STREQ_NULLABLE(protocol, "urma") &&
+        qemuMigrationUrmaRcuExpeditedTuneStart(jobPriv) < 0)
+        goto error;
+
     if (tunnel &&
         virPipe(dataFD) < 0)
         goto error;
@@ -3261,6 +3326,7 @@ qemuMigrationDstPrepareActive(virQEMUDriver *driver,
 
  error:
     virErrorPreserveLast(&origErr);
+    qemuMigrationUrmaRcuExpeditedRestore(jobPriv);
     qemuMigrationParamsReset(vm, VIR_ASYNC_JOB_MIGRATION_IN,
                              jobPriv->migParams, vm->job->apiFlags);
 
@@ -3531,6 +3597,10 @@ qemuMigrationDstPrepareResume(virQEMUDriver *driver,
                                              listenAddress, port, -1)))
         goto cleanup;
 
+    if (STREQ_NULLABLE(protocol, "urma") &&
+        qemuMigrationUrmaRcuExpeditedTuneStart(vm->job->privateData) < 0)
+        goto cleanup;
+
     if (qemuDomainObjEnterMonitorAsync(vm, VIR_ASYNC_JOB_MIGRATION_IN) < 0)
         goto cleanup;
 
@@ -3554,6 +3624,7 @@ qemuMigrationDstPrepareResume(virQEMUDriver *driver,
  cleanup:
     qemuProcessIncomingDefFree(incoming);
     if (ret < 0) {
+        qemuMigrationUrmaRcuExpeditedRestore(vm->job->privateData);
         VIR_FREE(priv->origname);
         ignore_value(qemuMigrationJobSetPhase(vm, QEMU_MIGRATION_PHASE_POSTCOPY_FAILED));
     }
@@ -3984,7 +4055,7 @@ qemuMigrationSrcConfirmPhase(virQEMUDriver *driver,
               driver, vm, NULLSTR(cookiein), cookieinlen,
               flags, retcode);
 
-    virCheckFlags(QEMU_MIGRATION_FLAGS, -1);
+    virCheckFlagsGoto(QEMU_MIGRATION_FLAGS, confirm_err);
 
     if (retcode != 0 &&
         virDomainObjIsPostcopy(vm, vm->job) &&
@@ -4008,13 +4079,13 @@ qemuMigrationSrcConfirmPhase(virQEMUDriver *driver,
     }
 
     if (qemuMigrationJobStartPhase(vm, phase) < 0)
-        return -1;
+        goto confirm_err;
 
     if (!(mig = qemuMigrationCookieParse(driver, vm, vm->def, priv->origname,
                                          priv->qemuCaps,
                                          cookiein, cookieinlen,
                                          QEMU_MIGRATION_COOKIE_STATS)))
-        return -1;
+        goto confirm_err;
 
     if (retcode == 0)
         jobData = vm->job->completed;
@@ -4033,7 +4104,7 @@ qemuMigrationSrcConfirmPhase(virQEMUDriver *driver,
     }
 
     if (flags & VIR_MIGRATE_OFFLINE)
-        return 0;
+        goto confirm_out;
 
     /* Did the migration go as planned?  If yes, kill off the domain object.
      * If something failed, resume CPUs, but only if we didn't use post-copy.
@@ -4066,7 +4137,13 @@ qemuMigrationSrcConfirmPhase(virQEMUDriver *driver,
         qemuDomainSaveStatus(vm);
     }
 
+ confirm_out:
+    qemuMigrationUrmaRcuExpeditedRestore(jobPriv);
     return 0;
+
+ confirm_err:
+    qemuMigrationUrmaRcuExpeditedRestore(jobPriv);
+    return -1;
 }
 
 int
@@ -5189,6 +5266,7 @@ qemuMigrationSrcPerformNative(virQEMUDriver *driver,
                               const char *nbdURI)
 {
     qemuDomainObjPrivate *priv = vm->privateData;
+    qemuDomainJobPrivate *jobPriv = vm->job->privateData;
     g_autoptr(virURI) uribits = NULL;
     int ret = -1;
     qemuMigrationSpec spec;
@@ -5257,6 +5335,11 @@ qemuMigrationSrcPerformNative(virQEMUDriver *driver,
 
     spec.fwdType = MIGRATION_FWD_DIRECT;
 
+    if (STREQ(uribits->scheme, "urma")) {
+        if (qemuMigrationUrmaRcuExpeditedTuneStart(jobPriv) < 0)
+            return -1;
+    }
+
     if (flags & VIR_MIGRATE_POSTCOPY_RESUME) {
         ret = qemuMigrationSrcResume(vm, migParams, cookiein, cookieinlen,
                                      cookieout, cookieoutlen, &spec, flags);
@@ -5267,6 +5350,9 @@ qemuMigrationSrcPerformNative(virQEMUDriver *driver,
                                   nmigrate_disks, migrate_disks,
                                   migParams, nbdURI);
     }
+
+    if (ret < 0 && STREQ(uribits->scheme, "urma"))
+        qemuMigrationUrmaRcuExpeditedRestore(jobPriv);
 
     if (spec.destType == MIGRATION_DEST_FD)
         VIR_FORCE_CLOSE(spec.dest.fd.qemu);
@@ -6545,6 +6631,8 @@ qemuMigrationDstComplete(virQEMUDriver *driver,
     virPortAllocatorRelease(priv->migrationPort);
     priv->migrationPort = 0;
     qemuDomainSetMaxMemLock(vm, 0, &priv->preMigrationMemlock);
+
+    qemuMigrationUrmaRcuExpeditedRestore(jobPriv);
 }
 
 
@@ -6815,6 +6903,8 @@ qemuMigrationDstFinishActive(virQEMUDriver *driver,
     /* Need to save the current error, in case shutting down the process
      * overwrites it. */
     virErrorPreserveLast(&orig_err);
+
+    qemuMigrationUrmaRcuExpeditedRestore(jobPriv);
 
     if (virDomainObjIsActive(vm)) {
         if (doKill) {
