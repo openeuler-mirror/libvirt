@@ -4848,7 +4848,6 @@ qemuBuildPCIHostdevDevProps(const virDomainDef *def,
     g_autoptr(virJSONValue) props = NULL;
     virDomainHostdevSubsysPCI *pcisrc = &dev->source.subsys.u.pci;
     virDomainNetTeamingInfo *teaming;
-    g_autofree char *iommufd = NULL;
     g_autofree char *host = g_strdup_printf(VIR_PCI_DEVICE_ADDRESS_FMT,
                                             pcisrc->addr.domain,
                                             pcisrc->addr.bus,
