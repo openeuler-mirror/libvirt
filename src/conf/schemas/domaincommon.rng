@@ -6909,6 +6909,16 @@
               <empty/>
             </element>
           </optional>
+          <optional>
+            <element name="kvm-vtimer-status">
+              <optional>
+                <attribute name="enabled">
+                  <ref name="virYesNo"/>
+                </attribute>
+              </optional>
+              <empty/>
+            </element>
+          </optional>
         </interleave>
       </element>
     </optional>

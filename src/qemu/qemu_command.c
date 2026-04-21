@@ -6506,6 +6506,11 @@ qemuBuildCpuModelArgStr(virQEMUDriver *driver,
     if (cpu->vendor_id)
         virBufferAsprintf(buf, ",vendor=%s", cpu->vendor_id);
 
+    if (def->features[VIR_DOMAIN_FEATURE_KVM_VTIMER_STATUS] != VIR_TRISTATE_SWITCH_ABSENT) {
+            virBufferAsprintf(buf, ",kvm-vtimer-status=%s",
+                              virTristateBoolTypeToString(def->features[VIR_DOMAIN_FEATURE_KVM_VTIMER_STATUS]));
+    }
+
     for (i = 0; i < cpu->nfeatures; i++) {
         const char *featname =
             virQEMUCapsCPUFeatureToQEMU(def->os.arch, cpu->features[i].name);
