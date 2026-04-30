@@ -3191,7 +3191,8 @@ qemuMigrationDstPrepareActive(virQEMUDriver *driver,
                                          !!(flags & VIR_MIGRATE_NON_SHARED_INC)) < 0)
         goto error;
 
-    if (STREQ_NULLABLE(protocol, "urma") &&
+    if ((STREQ_NULLABLE(protocol, "urma") ||
+         STREQ_NULLABLE(protocol, "hcom")) &&
         qemuMigrationUrmaRcuExpeditedTuneStart(jobPriv) < 0)
         goto error;
 
@@ -3597,7 +3598,8 @@ qemuMigrationDstPrepareResume(virQEMUDriver *driver,
                                              listenAddress, port, -1)))
         goto cleanup;
 
-    if (STREQ_NULLABLE(protocol, "urma") &&
+    if ((STREQ_NULLABLE(protocol, "urma") ||
+         STREQ_NULLABLE(protocol, "hcom")) &&
         qemuMigrationUrmaRcuExpeditedTuneStart(vm->job->privateData) < 0)
         goto cleanup;
 
@@ -5335,7 +5337,8 @@ qemuMigrationSrcPerformNative(virQEMUDriver *driver,
 
     spec.fwdType = MIGRATION_FWD_DIRECT;
 
-    if (STREQ(uribits->scheme, "urma")) {
+    if (STREQ(uribits->scheme, "urma") ||
+        STREQ(uribits->scheme, "hcom")) {
         if (qemuMigrationUrmaRcuExpeditedTuneStart(jobPriv) < 0)
             return -1;
     }
@@ -5351,7 +5354,9 @@ qemuMigrationSrcPerformNative(virQEMUDriver *driver,
                                   migParams, nbdURI);
     }
 
-    if (ret < 0 && STREQ(uribits->scheme, "urma"))
+    if (ret < 0 &&
+        (STREQ(uribits->scheme, "urma") ||
+         STREQ(uribits->scheme, "hcom")))
         qemuMigrationUrmaRcuExpeditedRestore(jobPriv);
 
     if (spec.destType == MIGRATION_DEST_FD)
