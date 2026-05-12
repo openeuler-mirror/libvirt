@@ -253,7 +253,7 @@ qemuHostdevHostBusInstanceExist(char *guid)
         }
     }
 
-    fclose(fp);
+    VIR_FORCE_FCLOSE(fp);
 
     return found;
 }

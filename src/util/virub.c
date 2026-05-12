@@ -138,7 +138,7 @@ virUBDeviceSysfsGetDevnumByGuid(char *guidStr)
         }
 
         bytes_read = fread(guid_buffer, 1, MAX_BUF_LENGTH - 1, file);
-        fclose(file);
+        VIR_FORCE_FCLOSE(file);
         guid_buffer[bytes_read] = '\0';
         /* discard annoying line breaks */
         if (bytes_read > 0 && guid_buffer[bytes_read - 1] == '\n') {
