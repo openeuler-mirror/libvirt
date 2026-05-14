@@ -30,6 +30,7 @@
 #include "conf/domain_conf.h"
 #include "virmdev.h"
 #include "virnvme.h"
+#include "virub.h"
 
 typedef enum {
     VIR_HOSTDEV_STRICT_ACS_CHECK     = (1 << 0), /* strict acs check */
@@ -56,6 +57,8 @@ struct _virHostdevManager {
     /* NVMe devices are PCI devices really, but one NVMe disk can
      * have multiple namespaces. */
     virNVMeDeviceList *activeNVMeHostdevs;
+    virUBDeviceList *activeUBHostdevs;
+    virUBDeviceList *inactiveUBHostdevs;
 };
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(virHostdevManager, virObjectUnref);
@@ -234,3 +237,28 @@ virHostdevUpdateActiveNVMeDevices(virHostdevManager *hostdev_mgr,
                                   size_t ndisks);
 
 bool virHostdevIsPCIDevice(const virDomainHostdevDef *hostdev);
+
+int
+virHostdevPrepareUBDevices(virHostdevManager *hostdev_mgr,
+                             const char *drv_name,
+                             const char *dom_name,
+                             virDomainHostdevDef **hostdevs,
+                             int nhostdevs)
+    ATTRIBUTE_NONNULL(1) ATTRIBUTE_NONNULL(2) ATTRIBUTE_NONNULL(3);
+
+bool
+virHostdevHasUBDevice(virDomainHostdevDef **hostdevs, int nhostdevs);
+
+void
+virHostdevReAttachUBDevices(virHostdevManager *mgr,
+                            const char *drv_name,
+                            const char *dom_name,
+                            virDomainHostdevDef **hostdevs,
+                            int nhostdevs);
+
+int
+virHostdevUpdateActiveUBDevices(virHostdevManager *mgr,
+                                virDomainHostdevDef **hostdevs,
+                                int nhostdevs,
+                                const char *drv_name,
+                                const char *dom_name);

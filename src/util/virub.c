@@ -21,10 +21,53 @@
 #include "virerror.h"
 #include "virub.h"
 #include "virfile.h"
+#include "viralloc.h"
+#include "virstring.h"
+#include "virkmod.h"
 
 VIR_LOG_INIT("util.ub");
 
 #define VIR_FROM_THIS VIR_FROM_NONE
+#define UB_SYSFS "/sys/bus/ub/"
+
+static virClass *virUBDeviceListClass;
+static void virUBDeviceListDispose(void *obj);
+
+VIR_ENUM_IMPL(virUBStubDriver,
+              VIR_UB_STUB_DRIVER_LAST,
+              "none",
+              "vfio-ub", /* VFIO */
+);
+
+static int virUBOnceInit(void)
+{
+    if (!VIR_CLASS_NEW(virUBDeviceList, virClassForObjectLockable()))
+        return -1;
+
+    return 0;
+}
+
+VIR_ONCE_GLOBAL_INIT(virUB);
+
+char *
+virUBFile(const unsigned int devNum, const char *file)
+{
+    return g_strdup_printf(UB_SYSFS "devices/%05x/%s", devNum, file);
+}
+
+static void
+virUBDeviceListDispose(void *obj)
+{
+    virUBDeviceList *list = obj;
+    size_t i;
+
+    for (i = 0; i < list->count; i++) {
+        g_clear_pointer(&list->devs[i], virUBDeviceFree);
+    }
+
+    list->count = 0;
+    g_free(list->devs);
+}
 
 int virUBDeviceGetGuidFromStr(UBGuid *guid, char *guidStr)
 {
@@ -61,7 +104,7 @@ int virUBDeviceGetGuidFromStr(UBGuid *guid, char *guidStr)
 }
 
 #define MAX_BUF_LENGTH 256
-static uint32_t
+uint32_t
 virUBDeviceSysfsGetDevnumByGuid(char *guidStr)
 {
     uint32_t id = UINT32_MAX;
@@ -95,7 +138,7 @@ virUBDeviceSysfsGetDevnumByGuid(char *guidStr)
         }
 
         bytes_read = fread(guid_buffer, 1, MAX_BUF_LENGTH - 1, file);
-        fclose(file);
+        VIR_FORCE_FCLOSE(file);
         guid_buffer[bytes_read] = '\0';
         /* discard annoying line breaks */
         if (bytes_read > 0 && guid_buffer[bytes_read - 1] == '\n') {
@@ -308,4 +351,607 @@ virUBBitmapAllocatorFree(virUBBitmapAllocator *allocator)
 
     virBitmapFree(allocator->bitmap);
     g_free(allocator);
+}
+
+virUBDeviceList *
+virUBDeviceListNew(void)
+{
+    virUBDeviceList *list;
+
+    if (virUBInitialize() < 0)
+        return NULL;
+
+    if (!(list = virObjectLockableNew(virUBDeviceListClass)))
+        return NULL;
+
+    return list;
+}
+
+int
+virUBDeviceSetUsedBy(virUBDevice *dev,
+                     const char *drv_name,
+                     const char *dom_name)
+{
+    VIR_FREE(dev->used_by_drvname);
+    VIR_FREE(dev->used_by_domname);
+    dev->used_by_drvname = g_strdup(drv_name);
+    dev->used_by_domname = g_strdup(dom_name);
+
+    return 0;
+}
+
+virUBDevice *
+virUBDeviceListFind(virUBDeviceList *list, virUBDeviceAddress *devAddr)
+{
+    int idx;
+
+    if ((idx = virUBDeviceListFindIndex(list, devAddr)) >= 0)
+        return list->devs[idx];
+    else
+        return NULL;
+}
+
+int
+virUBDeviceListAdd(virUBDeviceList *list,
+                   virUBDevice *dev)
+{
+    if (virUBDeviceListFind(list, &dev->address)) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Device %1$s is already in use"), dev->address.guidStr);
+        return -1;
+    }
+    VIR_APPEND_ELEMENT(list->devs, list->count, dev);
+
+    return 0;
+}
+
+void
+virUBDeviceFree(virUBDevice *dev)
+{
+    if (!dev)
+        return;
+    VIR_DEBUG("%s: freeing", dev->address.guidStr);
+    g_free(dev->address.guidStr);
+    g_free(dev->used_by_domname);
+    g_free(dev->used_by_drvname);
+    g_free(dev->orig_used_drvname);
+    g_free(dev->stub_driver_name);
+    g_free(dev->path);
+    g_free(dev);
+}
+
+bool
+virUBDeviceExists(const virUBDeviceAddress *addr)
+{
+    unsigned int devNum;
+    g_autofree char *devPath = NULL;
+
+    devNum = virUBDeviceSysfsGetDevnumByGuid(addr->guidStr);
+    if (devNum == UINT32_MAX) {
+        return false;
+    }
+
+    devPath = g_strdup_printf(UB_SYSFS "devices/%05x/config",
+                              devNum);
+
+    return virFileExists(devPath);
+}
+
+void virUBDeviceAddressCopy(virUBDeviceAddress *dst,
+                            const virUBDeviceAddress *src)
+{
+    memcpy(&dst->guid, &src->guid, sizeof(UBGuid));
+    dst->eid = src->eid;
+    if (dst->guidStr != NULL) {
+        g_free(dst->guidStr);
+    }
+    dst->guidStr = g_strdup(src->guidStr);
+}
+
+void virUBDeviceSetManaged(virUBDevice *dev, bool managed)
+{
+    dev->managed = managed;
+}
+
+void
+virUBDeviceSetStubDriverName(virUBDevice *dev, char* driverName)
+{
+    g_free(dev->stub_driver_name);
+    dev->stub_driver_name = g_strdup(driverName);
+}
+
+bool virUBDeviceGetManaged(virUBDevice *dev)
+{
+    return dev->managed;
+}
+
+void
+virUBDeviceSetStubDriverType(virUBDevice *dev, virUBStubDriver driverType)
+{
+    dev->stub_driver_type = driverType;
+}
+
+virUBDevice *
+virUBDeviceNew(const virUBDeviceAddress *address)
+{
+    g_autoptr(virUBDevice) dev = NULL;
+    unsigned int devNum;
+
+    devNum = virUBDeviceSysfsGetDevnumByGuid(address->guidStr);
+    if (devNum == UINT32_MAX) {
+        VIR_ERROR("can not find ub dev %s", address->guidStr);
+        return NULL;
+    }
+
+    dev = g_new0(virUBDevice, 1);
+    virUBDeviceAddressCopy(&dev->address, address);
+    dev->path = g_strdup_printf(UB_SYSFS "devices/%05x/config", devNum);
+    if (!virFileExists(dev->path)) {
+        virReportSystemError(errno,
+                             _("Device %1$s not found: could not access %2$s"),
+                             address->guidStr, dev->path);
+        return NULL;
+    }
+
+    VIR_DEBUG("%s: initialized", dev->address.guidStr);
+
+    return g_steal_pointer(&dev);
+}
+
+int
+virUBDeviceListFindIndex(virUBDeviceList *list,
+                         virUBDeviceAddress *devAddr)
+{
+    virUBDevice *checkdev;
+
+    for (int i = 0; i < list->count; i++) {
+        checkdev = list->devs[i];
+        if (checkdev->address.guid.deviceId == devAddr->guid.deviceId &&
+            checkdev->address.guid.rsv      == devAddr->guid.rsv      &&
+            checkdev->address.guid.seqNum   == devAddr->guid.seqNum   &&
+            checkdev->address.guid.type     == devAddr->guid.type     &&
+            checkdev->address.guid.vendorId == devAddr->guid.vendorId &&
+            checkdev->address.guid.version  == devAddr->guid.version)
+            return i;
+    }
+    return -1;
+}
+
+virUBDevice *
+virUBDeviceListStealIndex(virUBDeviceList *list,
+                          int idx)
+{
+    virUBDevice *ret;
+
+    if (idx < 0 || idx >= list->count)
+        return NULL;
+
+    ret = list->devs[idx];
+    VIR_DELETE_ELEMENT(list->devs, idx, list->count);
+    return ret;
+}
+
+virUBDevice *
+virUBDeviceListSteal(virUBDeviceList *list,
+                     virUBDeviceAddress *devAddr)
+{
+    return virUBDeviceListStealIndex(list, virUBDeviceListFindIndex(list, devAddr));
+}
+
+void
+virUBDeviceListDel(virUBDeviceList *list,
+                   virUBDeviceAddress *devAddr)
+{
+    virUBDeviceFree(virUBDeviceListSteal(list, devAddr));
+}
+
+static virUBDevice *
+virUBDeviceCopy(virUBDevice *dev)
+{
+    virUBDevice *copy;
+
+    copy = g_new0(virUBDevice, 1);
+
+    /* shallow copy to take care of most attributes */
+    *copy = *dev;
+    copy->path = NULL;
+    copy->address.guidStr = NULL;
+    copy->orig_used_drvname = NULL;
+    copy->used_by_drvname = NULL;
+    copy->used_by_domname = NULL;
+    copy->stub_driver_name = NULL;
+
+    copy->path = g_strdup(dev->path);
+    copy->address.guidStr = g_strdup(dev->address.guidStr);
+    copy->orig_used_drvname = g_strdup(dev->orig_used_drvname);
+    copy->used_by_drvname = g_strdup(dev->used_by_drvname);
+    copy->used_by_domname = g_strdup(dev->used_by_domname);
+    copy->stub_driver_name = g_strdup(dev->stub_driver_name);
+    return copy;
+}
+
+bool
+virUBDeviceListAddCopy(virUBDeviceList *list, virUBDevice *dev)
+{
+    g_autoptr(virUBDevice) copy = virUBDeviceCopy(dev);
+
+    if (!copy)
+        return false;
+    if (virUBDeviceListAdd(list, copy) < 0)
+        return false;
+
+    copy = NULL;
+    return true;
+}
+
+virUBDeviceAddress *virUBDeviceSysfsGetAddrByDevnum(unsigned int devNum)
+{
+    virUBDeviceAddress *addr = NULL;
+    g_autofree char *filePath = NULL;
+
+    addr = g_new0(virUBDeviceAddress, 1);
+    /* include '\n\0' at the end, len is UB_DEV_GUID_STRING_LENGTH + 2*/
+    addr->guidStr = g_new0(char, UB_DEV_GUID_STRING_LENGTH + 2);
+
+    filePath = virUBFile(devNum, "guid");
+    if (virFileReadAll(filePath, UB_DEV_GUID_STRING_LENGTH + 1, &addr->guidStr) < 0) {
+        g_free(addr->guidStr);
+        g_free(addr);
+        return NULL;
+    }
+
+    if (addr->guidStr[UB_DEV_GUID_STRING_LENGTH] == '\n')
+        addr->guidStr[UB_DEV_GUID_STRING_LENGTH] = '\0';
+
+    if (virUBDeviceGetGuidFromStr(&addr->guid, addr->guidStr) < 0) {
+        VIR_ERROR("failed to convert the string: %s to guid\n", addr->guidStr);
+        g_free(addr->guidStr);
+        g_free(addr);
+        return NULL;
+    }
+
+    return addr;
+}
+
+int
+virUBDeviceGetCurrentDriverName(virUBDevice *dev, char **name)
+{
+    g_autofree char *drvlink = NULL;
+    unsigned int devNum;
+    g_autofree char *path = NULL;
+
+    *name = NULL;
+    devNum = virUBDeviceSysfsGetDevnumByGuid(dev->address.guidStr);
+    if (devNum == UINT32_MAX) {
+        return -1;
+    }
+    /* drvlink = "/sys/bus/ub/xxxxx/driver" */
+    drvlink = virUBFile(devNum, "driver");
+    if (!virFileExists(drvlink)) {
+        return 0;
+    }
+
+    if (virFileIsLink(drvlink) != 1) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Invalid device %1$s driver file %2$s is not a symlink"),
+                       dev->address.guidStr, drvlink);
+        return -1;
+    }
+    if (virFileResolveLink(drvlink, &path) < 0) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Unable to resolve device %1$s driver symlink %2$s"),
+                       dev->address.guidStr, drvlink);
+        return -1;
+    }
+    /* path = "/sys/bus/ub/drivers/${drivername}" */
+    *name = g_path_get_basename(path);
+    /* name = "${drivername}" */
+    return 0;
+}
+
+static char *
+virUBDriverDir(const char *driver)
+{
+    return g_strdup_printf(UB_SYSFS "drivers/%s", driver);
+}
+
+static int
+virUBProbeDriver(const char *driverName)
+{
+    g_autofree char *drvpath = NULL;
+    g_autofree char *errbuf = NULL;
+
+    drvpath = virUBDriverDir(driverName);
+    if (virFileExists(drvpath))
+        return 0;
+
+    if ((errbuf = virKModLoad(driverName))) {
+        VIR_WARN("failed to load driver %s: %s", driverName, errbuf);
+        goto err;
+    }
+
+    if (!virFileExists(drvpath))
+        goto err;
+
+    return 0;
+
+ err:
+    if (virKModIsProhibited(driverName)) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Failed to load UB driver module %1$s: administratively prohibited"),
+                       driverName);
+    } else {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Failed to load UB driver module %1$s"),
+                       driverName);
+    }
+
+    return -1;
+}
+
+static char *
+virUBDeviceSysfsGetDevnumstrByGuid(virUBDevice *dev)
+{
+    char *devNumStr = NULL;
+    unsigned int devNum;
+
+    devNum = virUBDeviceSysfsGetDevnumByGuid(dev->address.guidStr);
+    if (devNum == UINT32_MAX) {
+        VIR_ERROR("can not find ub dev %s", dev->address.guidStr);
+        devNumStr = NULL;
+    }
+    devNumStr = g_strdup_printf("%05x", devNum);
+    return devNumStr;
+}
+
+int
+virUBDeviceUnbind(virUBDevice *dev)
+{
+    g_autofree char *path = NULL;
+    g_autofree char *driver = NULL;
+    g_autofree char *devNumStr = NULL;
+    unsigned int devNum;
+
+    if (virUBDeviceGetCurrentDriverName(dev, &driver) < 0)
+        return -1;
+
+    if (!driver)
+        /* The device is not bound to any driver */
+        return 0;
+
+    devNum = virUBDeviceSysfsGetDevnumByGuid(dev->address.guidStr);
+    if (devNum == UINT32_MAX) {
+        return -1;
+    }
+
+    devNumStr = virUBDeviceSysfsGetDevnumstrByGuid(dev);
+    if (!devNumStr) {
+        return -1;
+    }
+
+    path = virUBFile(devNum, "driver/unbind");
+    if (virFileExists(path)) {
+        if (virFileWriteStr(path, devNumStr, 0) < 0) {
+            virReportSystemError(errno,
+                                 _("Failed to unbind UB device '%1$s' from %2$s"),
+                                 dev->address.guidStr, driver);
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+static int
+virUBDeviceRebind(virUBDevice *dev)
+{
+    g_autofree char *devNumStr = NULL;
+
+    if (virUBDeviceUnbind(dev) < 0)
+        return -1;
+
+    devNumStr = virUBDeviceSysfsGetDevnumstrByGuid(dev);
+    if (!devNumStr) {
+        return -1;
+    }
+
+    if (virFileWriteStr(UB_SYSFS "drivers_probe", devNumStr, 0) < 0) {
+        virReportSystemError(errno,
+                             _("Failed to trigger a probe for UB device '%1$s'"),
+                             dev->address.guidStr);
+        return -1;
+    }
+
+    return 0;
+}
+
+static int
+virUBDeviceBindWithDriverOverride(virUBDevice *dev,
+                                  const char *driverName)
+{
+    g_autofree char *path = NULL;
+    unsigned int devNum;
+
+    devNum = virUBDeviceSysfsGetDevnumByGuid(dev->address.guidStr);
+    if (devNum == UINT32_MAX) {
+        return -1;
+    }
+
+    path = virUBFile(devNum, "driver_override");
+    if (virFileWriteStr(path, driverName, 0) < 0) {
+        virReportSystemError(errno,
+                             _("Failed to add driver '%1$s' to driver_override interface of UB device '%2$s'"),
+                             driverName, dev->address.guidStr);
+        return -1;
+    }
+
+    if (virUBDeviceRebind(dev) < 0)
+        return -1;
+
+    return 0;
+}
+
+static int
+virUBDeviceBindToStub(virUBDevice *dev)
+{
+    const char *stub_driver_name = dev->stub_driver_name;
+    g_autofree char *stubDriverPath = NULL;
+    g_autofree char *driverLink = NULL;
+    unsigned int devNum;
+
+    if (dev->stub_driver_type == VIR_UB_STUB_DRIVER_NONE) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("No stub driver configured for UB device %1$s"),
+                       dev->address.guidStr);
+        return -1;
+    }
+
+    if (!stub_driver_name &&
+        !(stub_driver_name = virUBStubDriverTypeToString(dev->stub_driver_type))) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Unknown stub driver configured for UB device %1$s"),
+                       dev->address.guidStr);
+        return -1;
+    }
+
+    if (virUBProbeDriver(stub_driver_name) < 0)
+        return -1;
+
+    devNum = virUBDeviceSysfsGetDevnumByGuid(dev->address.guidStr);
+    if (devNum == UINT32_MAX) {
+        return -1;
+    }
+    stubDriverPath = virUBDriverDir(stub_driver_name);
+    driverLink = virUBFile(devNum, "driver");
+    if (virFileExists(driverLink)) {
+        if (virFileLinkPointsTo(driverLink, stubDriverPath)) {
+            /* The device is already bound to the correct driver */
+            VIR_DEBUG("Device %s is already bound to %s",
+                      dev->address.guidStr, stub_driver_name);
+            return 0;
+        }
+    }
+
+    if (virUBDeviceBindWithDriverOverride(dev, stub_driver_name) < 0)
+        return -1;
+
+    dev->unbind_from_stub = true;
+    return 0;
+}
+
+int
+virUBDeviceDetach(virUBDevice *dev,
+                  virUBDeviceList *activeDevs,
+                  virUBDeviceList *inactiveDevs)
+{
+    if (activeDevs && virUBDeviceListFind(activeDevs, &dev->address)) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Not detaching active device %1$s"), dev->address.guidStr);
+        return -1;
+    }
+
+    if (virUBDeviceGetCurrentDriverName(dev, &dev->orig_used_drvname) < 0) {
+        VIR_DEBUG("UB device %s do not bind any driver now", dev->address.guidStr);
+    } else {
+        VIR_DEBUG("UB device %s originally bind driver %s", dev->address.guidStr, dev->orig_used_drvname);
+    }
+
+    if (virUBDeviceBindToStub(dev) < 0)
+        return -1;
+
+    /* Add *a copy of* the dev into list inactiveDevs, if
+     * it's not already there.
+     */
+    if (inactiveDevs && !virUBDeviceListFind(inactiveDevs, &dev->address)) {
+        VIR_DEBUG("Adding UB device %s to inactive list", dev->address.guidStr);
+        if (!virUBDeviceListAddCopy(inactiveDevs, dev))
+            return -1;
+    }
+
+    return 0;
+}
+
+static int
+virUBDeviceUnbindFromStub(virUBDevice *dev)
+{
+    if (!dev->unbind_from_stub) {
+        VIR_DEBUG("Unbind from stub skipped for UB device %s", dev->address.guidStr);
+        return 0;
+    }
+
+    if (!dev->orig_used_drvname) {
+        return virUBDeviceUnbind(dev);
+    }
+    return virUBDeviceBindWithDriverOverride(dev, dev->orig_used_drvname);
+}
+
+int
+virUBDeviceReattach(virUBDevice *dev,
+                    virUBDeviceList *activeDevs,
+                    virUBDeviceList *inactiveDevs)
+{
+    if (activeDevs && virUBDeviceListFind(activeDevs, &dev->address)) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                       _("Not reattaching active device %1$s"), dev->address.guidStr);
+        return -1;
+    }
+
+    if (virUBDeviceUnbindFromStub(dev) < 0)
+        return -1;
+
+    /* Steal the dev from list inactiveDevs */
+    if (inactiveDevs) {
+        VIR_DEBUG("Removing UB device %s from inactive list", dev->address.guidStr);
+        virUBDeviceListDel(inactiveDevs, &dev->address);
+    }
+
+    return 0;
+}
+
+bool
+virUBDeviceGetCurrentDriverNameAndType(virUBDevice *dev,
+                                       char **drvName,
+                                       virUBStubDriver *drvType)
+{
+    g_autofree char *vfioDevDir = NULL;
+    int tmpType;
+    unsigned int devNum;
+
+    if (virUBDeviceGetCurrentDriverName(dev, drvName) < 0)
+        return false;
+
+    if (!*drvName) {
+        *drvType = VIR_UB_STUB_DRIVER_NONE;
+        return true;
+    }
+
+    tmpType = virUBStubDriverTypeFromString(*drvName);
+    if (tmpType > VIR_UB_STUB_DRIVER_NONE) {
+        *drvType = tmpType;
+        return true; /* exact match of a known driver name (or no name) */
+    }
+
+    devNum = virUBDeviceSysfsGetDevnumByGuid(dev->address.guidStr);
+    if (devNum == UINT32_MAX) {
+        return false;
+    }
+    vfioDevDir = virUBFile(devNum, "vfio-dev");
+    if (!virFileIsDir(vfioDevDir)) {
+        VIR_DEBUG("Driver %s is a vfio_ub driver", *drvName);
+        *drvType = VIR_UB_STUB_DRIVER_VFIO;
+    } else {
+        VIR_DEBUG("Driver %s is NOT a vfio_ub driver, or kernel is too old",
+                  *drvName);
+        *drvType = VIR_UB_STUB_DRIVER_NONE;
+    }
+    return true;
+}
+
+void
+virUBDeviceGetUsedBy(virUBDevice *dev,
+                     const char **drv_name,
+                     const char **dom_name)
+{
+    *drv_name = dev->used_by_drvname;
+    *dom_name = dev->used_by_domname;
 }

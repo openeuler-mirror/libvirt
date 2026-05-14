@@ -89,6 +89,8 @@ struct _qemuDomainUnpluggingDevice {
 #define QEMU_DEV_SGX_PROVISION "/dev/sgx_provision"
 #define QEMU_DEVICE_MAPPER_CONTROL_PATH "/dev/mapper/control"
 #define QEMU_DEV_UDMABUF "/dev/udmabuf"
+#define QEMU_SYS_BUS_UB_CLUSTER "/sys/bus/ub/cluster"
+#define QEMU_SYS_BUS_UB_INSTANCE "/sys/bus/ub/instance"
 
 
 #define QEMU_DOMAIN_AES_IV_LEN 16   /* 16 bytes for 128 bit random */

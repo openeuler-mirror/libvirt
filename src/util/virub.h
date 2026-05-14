@@ -17,6 +17,8 @@
 
 #pragma once
 #include "virbitmap.h"
+#include "virenum.h"
+#include "virobject.h"
 
 #define GUID_STR_EXAMPLE "cc08-a000-0-2-000000-0000000000000001" \
           "(VendorID-DeviceId-Version-Type-RSV-SequenceNumber)"
@@ -46,6 +48,40 @@ typedef enum _virUBDevicePortStatus virUBDevicePortStatus;
 enum _virUBDevicePortStatus {
     UB_DEVICE_PORT_STATUS_LINK_DOWN,
     UB_DEVICE_PORT_STATUS_LINK_UP,
+};
+
+typedef enum {
+    VIR_UB_STUB_DRIVER_NONE = 0,
+    VIR_UB_STUB_DRIVER_VFIO,
+    VIR_UB_STUB_DRIVER_LAST
+} virUBStubDriver;
+
+VIR_ENUM_DECL(virUBStubDriver);
+
+typedef struct _virUBDevice virUBDevice;
+struct _virUBDevice {
+    virUBDeviceAddress address;
+    char            *path;
+
+    /* The driver:domain which uses the device */
+    char            *used_by_drvname;
+    char            *used_by_domname;
+
+    virUBStubDriver stub_driver_type;
+    char            *stub_driver_name; /* if blank, use default for type */
+
+    /* the origin driver before manage */
+    char            *orig_used_drvname;
+
+    bool            managed;
+    bool            unbind_from_stub;
+};
+
+typedef struct _virUBDeviceList virUBDeviceList;
+struct _virUBDeviceList {
+    virObjectLockable parent;
+    size_t count;
+    virUBDevice **devs;
 };
 
 #define UB_DEVICE_MAX_PORT_NUM 256
@@ -82,7 +118,9 @@ struct _virUBBusInstance {
     bool cluster;
 };
 
+uint32_t virUBDeviceSysfsGetDevnumByGuid(char *guidStr);
 int virUBDeviceGetGuidFromStr(UBGuid *guid, char *guidStr);
+uint32_t virUBDeviceSysfsGetDevnumByGuid(char *guidStr);
 char *virUBDeviceAddressGetIOMMUGroupDev(virUBDeviceAddress *addr);
 char *virUBDeviceAddressGetIOMMUFDDev(virUBDeviceAddress *addr);
 bool virUBDeviceAddressGuidIsEmpty(const virUBDeviceAddress *addr);
@@ -97,3 +135,55 @@ int
 virUBBitmapAllocatorSetUsed(virUBBitmapAllocator *allocator, uint64_t idx);
 void
 virUBBitmapAllocatorFree(virUBBitmapAllocator *allocator);
+void
+virUBDeviceFree(virUBDevice *dev);
+virUBDeviceList *
+virUBDeviceListNew(void);
+int
+virUBDeviceSetUsedBy(virUBDevice *dev, const char *drv_name, const char *dom_name);
+virUBDevice *
+virUBDeviceListFind(virUBDeviceList *list, virUBDeviceAddress *devAddr);
+int
+virUBDeviceListAdd(virUBDeviceList *list, virUBDevice *dev);
+bool
+virUBDeviceExists(const virUBDeviceAddress *addr);
+void
+virUBDeviceAddressCopy(virUBDeviceAddress *dst, const virUBDeviceAddress *src);
+void
+virUBDeviceSetManaged(virUBDevice *dev, bool managed);
+void
+virUBDeviceSetStubDriverName(virUBDevice *dev, char* driverName);
+bool
+virUBDeviceGetManaged(virUBDevice *dev);
+void
+virUBDeviceSetStubDriverType(virUBDevice *dev, virUBStubDriver driverType);
+virUBDevice *
+virUBDeviceNew(const virUBDeviceAddress *address);
+int
+virUBDeviceListFindIndex(virUBDeviceList *list, virUBDeviceAddress *devAddr);
+virUBDevice *
+virUBDeviceListStealIndex(virUBDeviceList *list, int idx);
+virUBDevice *
+virUBDeviceListSteal(virUBDeviceList *list, virUBDeviceAddress *devAddr);
+void
+virUBDeviceListDel(virUBDeviceList *list, virUBDeviceAddress *devAddr);
+char *
+virUBFile(const unsigned int devNum, const char *file);
+virUBDeviceAddress *
+virUBDeviceSysfsGetAddrByDevnum(unsigned int devNum);
+int
+virUBDeviceGetCurrentDriverName(virUBDevice *dev, char **name);
+int
+virUBDeviceUnbind(virUBDevice *dev);
+int
+virUBDeviceDetach(virUBDevice *dev, virUBDeviceList *activeDevs, virUBDeviceList *inactiveDevs);
+bool
+virUBDeviceGetCurrentDriverNameAndType(virUBDevice *dev, char **drvName, virUBStubDriver *drvType);
+bool
+virUBDeviceListAddCopy(virUBDeviceList *list, virUBDevice *dev);
+int
+virUBDeviceReattach(virUBDevice *dev, virUBDeviceList *activeDevs, virUBDeviceList *inactiveDevs);
+void
+virUBDeviceGetUsedBy(virUBDevice *dev, const char **drv_name, const char **dom_name);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(virUBDevice, virUBDeviceFree);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(virUBDeviceList, virObjectUnref);
