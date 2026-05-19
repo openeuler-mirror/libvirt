@@ -821,6 +821,7 @@
                     <choice>
                       <value>immediate</value>
                       <value>ondemand</value>
+                      <value>hugepage-ondemand</value>
                     </choice>
                   </attribute>
                 </optional>
