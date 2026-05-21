@@ -792,6 +792,28 @@ virUBDeviceBindWithDriverOverride(virUBDevice *dev,
 }
 
 static int
+virUBDeviceSetMatchDriver(virUBDevice *dev)
+{
+    g_autofree char *path = NULL;
+    unsigned int devNum;
+
+    devNum = virUBDeviceSysfsGetDevnumByGuid(dev->address.guidStr);
+    if (devNum == UINT32_MAX) {
+        return -1;
+    }
+
+    path = virUBFile(devNum, "match_driver");
+    if (virFileWriteStr(path, "1", 0) < 0) {
+        virReportSystemError(errno,
+                             _("Failed to set match_driver to 1 for UB device '%1$s'"),
+                             dev->address.guidStr);
+        return -1;
+    }
+
+    return 0;
+}
+
+static int
 virUBDeviceBindToStub(virUBDevice *dev)
 {
     const char *stub_driver_name = dev->stub_driver_name;
@@ -831,6 +853,9 @@ virUBDeviceBindToStub(virUBDevice *dev)
             return 0;
         }
     }
+
+    if (virUBDeviceSetMatchDriver(dev) < 0)
+        return -1;
 
     if (virUBDeviceBindWithDriverOverride(dev, stub_driver_name) < 0)
         return -1;
