@@ -684,6 +684,9 @@ typedef enum { /* virQEMUCapsFlags grouping marker for syntax-check */
     /* 455 */
     QEMU_CAPS_ARM_KVM_VTIMER_STATUS, /* -cpu kvm-vtimer-status */
 
+    /* 475 */
+    QEMU_CAPS_MACHINE_VIRT_HIGHMEM_MMIO_SIZE, /* -machine virt,highmem-mmio-size=<size> */
+
     QEMU_CAPS_LAST /* this must always be the last item */
 } virQEMUCapsFlags;
 
