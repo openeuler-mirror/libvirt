@@ -62,6 +62,7 @@
 #include "virhook.h"
 #include "virjson.h"
 #include "virnetworkportdef.h"
+#include "virstring.h"
 #include "virutil.h"
 
 #include "netdev_bandwidth_conf.h"
@@ -115,6 +116,22 @@ networkDnsmasqDefNamespaceFree(void *nsdata)
     g_free(def);
 }
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(networkDnsmasqXmlNsDef, networkDnsmasqDefNamespaceFree);
+
+
+static int
+networkDnsmasqConfCheckLineBreaks(const char *record,
+                                  const char *field,
+                                  const char *value)
+{
+    if (virStringHasChars(value, "\r\n")) {
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                       _("DNS %1$s record %2$s must not contain line breaks"),
+                       record, field);
+        return -1;
+    }
+
+    return 0;
+}
 
 
 static int
@@ -1238,6 +1255,10 @@ networkDnsmasqConfContents(virNetworkObj *obj,
 
     if (wantDNS) {
         for (i = 0; i < dns->ntxts; i++) {
+            if (networkDnsmasqConfCheckLineBreaks("TXT", "name", dns->txts[i].name) < 0 ||
+                networkDnsmasqConfCheckLineBreaks("TXT", "value", dns->txts[i].value) < 0)
+                return -1;
+
             virBufferAsprintf(&configbuf, "txt-record=%s,%s\n",
                               dns->txts[i].name,
                               dns->txts[i].value);
@@ -1259,6 +1280,13 @@ networkDnsmasqConfContents(virNetworkObj *obj,
                                def->name);
                 return -1;
             }
+
+            if (networkDnsmasqConfCheckLineBreaks("SRV", "service", dns->srvs[i].service) < 0 ||
+                networkDnsmasqConfCheckLineBreaks("SRV", "protocol", dns->srvs[i].protocol) < 0 ||
+                networkDnsmasqConfCheckLineBreaks("SRV", "domain", dns->srvs[i].domain) < 0 ||
+                networkDnsmasqConfCheckLineBreaks("SRV", "target", dns->srvs[i].target) < 0)
+                return -1;
+
             /* RFC2782 requires that service and protocol be preceded by
              * an underscore.
              */
