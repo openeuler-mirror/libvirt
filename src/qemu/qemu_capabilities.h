@@ -677,8 +677,20 @@ typedef enum { /* virQEMUCapsFlags grouping marker for syntax-check */
     /* 450 */
     QEMU_CAPS_RUN_WITH_ASYNC_TEARDOWN, /* asynchronous teardown -run-with async-teardown=on|off */
     QEMU_CAPS_DEVICE_VIRTIO_BLK_VHOST_VDPA, /* virtio-blk-vhost-vdpa block driver */
+    QEMU_CAPS_VIRTIO_BLK_IOTHREAD_MAPPING, /* virtio-blk supports per-virtqueue iothread mapping */
     QEMU_CAPS_SMP_CLUSTERS, /* -smp clusters= */
+
     QEMU_CAPS_VIRTCCA, /* tmm-guest */
+
+	/* 455 */
+	QEMU_CAPS_BLOCKJOB_BACKING_MASK_PROTOCOL, /* backing-mask-protocol of block-commit/block-stream */
+	QEMU_CAPS_DISPLAY_RELOAD, /* 'display-reload' qmp command is supported */
+	QEMU_CAPS_DEVICE_USB_MTP, /* -device usb-mtp */
+	QEMU_CAPS_MACHINE_VIRT_RAS, /* -machine virt,ras= */
+	QEMU_CAPS_DEVICE_VIRTIO_SOUND, /* -device virtio-sound-* */
+
+	/* 460 */
+	QEMU_CAPS_SEV_SNP_GUEST, /* -object sev-snp-guest */
     QEMU_CAPS_CCA_GUEST, /* -object rme-guest */
 
     /* 455 */

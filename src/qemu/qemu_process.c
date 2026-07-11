@@ -6806,14 +6806,14 @@ qemuProcessUpdateSEVInfo(virDomainObj *vm)
      * mandatory on QEMU cmdline
      */
     sevCaps = virQEMUCapsGetSEVCapabilities(qemuCaps);
-    if (!sev->haveCbitpos) {
-        sev->cbitpos = sevCaps->cbitpos;
-        sev->haveCbitpos = true;
+    if (!sev->common.haveCbitpos) {
+        sev->common.cbitpos = sevCaps->cbitpos;
+        sev->common.haveCbitpos = true;
     }
 
-    if (!sev->haveReducedPhysBits) {
-        sev->reduced_phys_bits = sevCaps->reduced_phys_bits;
-        sev->haveReducedPhysBits = true;
+    if (!sev->common.haveReducedPhysBits) {
+        sev->common.reduced_phys_bits = sevCaps->reduced_phys_bits;
+        sev->common.haveReducedPhysBits = true;
     }
 
     return 0;
@@ -6974,11 +6974,24 @@ qemuProcessPrepareDomain(virQEMUDriver *driver,
     for (i = 0; i < vm->def->nshmems; i++)
         qemuDomainPrepareShmemChardev(vm->def->shmems[i]);
 
-    if (vm->def->sec &&
-        vm->def->sec->sectype == VIR_DOMAIN_LAUNCH_SECURITY_SEV) {
-        VIR_DEBUG("Updating SEV platform info");
-        if (qemuProcessUpdateSEVInfo(vm) < 0)
+    if (vm->def->sec) {
+        switch (vm->def->sec->sectype) {
+        case VIR_DOMAIN_LAUNCH_SECURITY_SEV:
+        case VIR_DOMAIN_LAUNCH_SECURITY_SEV_SNP:
+            VIR_DEBUG("Updating SEV platform info");
+            if (qemuProcessUpdateSEVInfo(vm) < 0)
+                return -1;
+            break;
+        case VIR_DOMAIN_LAUNCH_SECURITY_PV:
+            break;
+        case VIR_DOMAIN_LAUNCH_SECURITY_CCA:
+            break;
+        case VIR_DOMAIN_LAUNCH_SECURITY_CVM:
+        case VIR_DOMAIN_LAUNCH_SECURITY_NONE:
+        case VIR_DOMAIN_LAUNCH_SECURITY_LAST:
+            virReportEnumRangeError(virDomainLaunchSecurity, vm->def->sec->sectype);
             return -1;
+        }
     }
 
     return 0;
@@ -7049,9 +7062,11 @@ qemuProcessPrepareLaunchSecurityGuestInput(virDomainObj *vm)
     if (!sec)
         return 0;
 
-    switch ((virDomainLaunchSecurity) sec->sectype) {
+    switch (sec->sectype) {
     case VIR_DOMAIN_LAUNCH_SECURITY_SEV:
         return qemuProcessPrepareSEVGuestInput(vm);
+    case VIR_DOMAIN_LAUNCH_SECURITY_SEV_SNP:
+        break;
     case VIR_DOMAIN_LAUNCH_SECURITY_CCA:
         return 0;
     case VIR_DOMAIN_LAUNCH_SECURITY_PV:

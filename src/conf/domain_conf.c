@@ -1533,6 +1533,7 @@ VIR_ENUM_IMPL(virDomainLaunchSecurity,
               VIR_DOMAIN_LAUNCH_SECURITY_LAST,
               "",
               "sev",
+              "sev-snp",
               "s390-pv",
               "cvm",
               "cca",
@@ -3849,7 +3850,7 @@ virDomainSecDefFree(virDomainSecDef *def)
     if (!def)
         return;
 
-    switch ((virDomainLaunchSecurity) def->sectype) {
+    switch (def->sectype) {
     case VIR_DOMAIN_LAUNCH_SECURITY_SEV:
         g_free(def->data.sev.dh_cert);
         g_free(def->data.sev.session);
@@ -3860,6 +3861,12 @@ virDomainSecDefFree(virDomainSecDef *def)
     case VIR_DOMAIN_LAUNCH_SECURITY_CCA:
         g_free(def->data.cca.measurement_algo);
         g_free(def->data.cca.personalization_value);
+        break;
+    case VIR_DOMAIN_LAUNCH_SECURITY_SEV_SNP:
+        g_free(def->data.sev_snp.guest_visible_workarounds);
+        g_free(def->data.sev_snp.id_block);
+        g_free(def->data.sev_snp.id_auth);
+        g_free(def->data.sev_snp.host_data);
         break;
     case VIR_DOMAIN_LAUNCH_SECURITY_PV:
     case VIR_DOMAIN_LAUNCH_SECURITY_CVM:
@@ -5458,8 +5465,7 @@ virDomainDeviceInfoFormat(virBuffer *buf,
             if (rombar)
                 virBufferAsprintf(buf, " bar='%s'", rombar);
         }
-        if (info->romfile)
-            virBufferEscapeString(buf, " file='%s'", info->romfile);
+        virBufferEscapeString(buf, " file='%s'", info->romfile);
         virBufferAddLit(buf, "/>\n");
     }
 
@@ -13801,20 +13807,14 @@ virDomainMemoryTargetDefParseXML(xmlNodePtr node,
 
 
 static int
-virDomainSEVDefParseXML(virDomainSEVDef *def,
-                        xmlXPathContextPtr ctxt)
+virDomainSEVCommonDefParseXML(virDomainSEVCommonDef *def,
+                              xmlXPathContextPtr ctxt)
 {
     int rc;
 
     if (virXMLPropTristateBool(ctxt->node, "kernelHashes", VIR_XML_PROP_NONE,
                                &def->kernel_hashes) < 0)
         return -1;
-
-    if (virXPathUIntBase("string(./policy)", ctxt, 16, &def->policy) < 0) {
-        virReportError(VIR_ERR_XML_ERROR, "%s",
-                       _("failed to get launch security policy"));
-        return -1;
-    }
 
     /* the following attributes are platform dependent and if missing, we can
      * autofill them from domain capabilities later
@@ -13835,6 +13835,23 @@ virDomainSEVDefParseXML(virDomainSEVDef *def,
     } else if (rc == -2) {
         virReportError(VIR_ERR_XML_ERROR, "%s",
                        _("Invalid format for launch security reduced-phys-bits"));
+        return -1;
+    }
+
+    return 0;
+}
+
+
+static int
+virDomainSEVDefParseXML(virDomainSEVDef *def,
+                        xmlXPathContextPtr ctxt)
+{
+    if (virDomainSEVCommonDefParseXML(&def->common, ctxt) < 0)
+        return -1;
+
+    if (virXPathUIntBase("string(./policy)", ctxt, 16, &def->policy) < 0) {
+        virReportError(VIR_ERR_XML_ERROR, "%s",
+                       _("failed to get launch security policy"));
         return -1;
     }
 
@@ -13866,6 +13883,36 @@ virDomainCCADefParseXML(virDomainCCADef *def,
 }
 
 
+static int
+virDomainSEVSNPDefParseXML(virDomainSEVSNPDef *def,
+                           xmlXPathContextPtr ctxt)
+{
+    if (virDomainSEVCommonDefParseXML(&def->common, ctxt) < 0)
+        return -1;
+
+    if (virXMLPropTristateBool(ctxt->node, "authorKey", VIR_XML_PROP_NONE,
+                               &def->author_key) < 0)
+        return -1;
+
+    if (virXMLPropTristateBool(ctxt->node, "vcek", VIR_XML_PROP_NONE,
+                               &def->vcek) < 0)
+        return -1;
+
+    if (virXPathULongLongBase("string(./policy)", ctxt, 16, &def->policy) < 0) {
+        virReportError(VIR_ERR_XML_ERROR, "%s",
+                       _("failed to get launch security policy"));
+        return -1;
+    }
+
+    def->guest_visible_workarounds = virXPathString("string(./guestVisibleWorkarounds)", ctxt);
+    def->id_block = virXPathString("string(./idBlock)", ctxt);
+    def->id_auth = virXPathString("string(./idAuth)", ctxt);
+    def->host_data = virXPathString("string(./hostData)", ctxt);
+
+    return 0;
+}
+
+
 static virDomainSecDef *
 virDomainSecDefParseXML(xmlNodePtr lsecNode,
                         xmlXPathContextPtr ctxt)
@@ -13880,9 +13927,13 @@ virDomainSecDefParseXML(xmlNodePtr lsecNode,
                        &sec->sectype) < 0)
         return NULL;
 
-    switch ((virDomainLaunchSecurity) sec->sectype) {
+    switch (sec->sectype) {
     case VIR_DOMAIN_LAUNCH_SECURITY_SEV:
         if (virDomainSEVDefParseXML(&sec->data.sev, ctxt) < 0)
+            return NULL;
+        break;
+    case VIR_DOMAIN_LAUNCH_SECURITY_SEV_SNP:
+        if (virDomainSEVSNPDefParseXML(&sec->data.sev_snp, ctxt) < 0)
             return NULL;
         break;
     case VIR_DOMAIN_LAUNCH_SECURITY_PV:
@@ -22605,8 +22656,7 @@ virSecurityDeviceLabelDefFormat(virBuffer *buf,
 
     virBufferAddLit(buf, "<seclabel");
 
-    if (def->model)
-        virBufferEscapeString(buf, " model='%s'", def->model);
+    virBufferEscapeString(buf, " model='%s'", def->model);
 
     if (def->labelskip)
         virBufferAddLit(buf, " labelskip='yes'");
@@ -22801,8 +22851,7 @@ virDomainDiskSourceFormatNetwork(virBuffer *attrBuf,
         virBufferAsprintf(childBuf, "<timeout seconds='%llu'/>\n", src->timeout);
 
     if (src->protocol == VIR_STORAGE_NET_PROTOCOL_SSH) {
-        if (src->ssh_known_hosts_file)
-            virBufferEscapeString(childBuf, "<knownHosts path='%s'/>\n", src->ssh_known_hosts_file);
+        virBufferEscapeString(childBuf, "<knownHosts path='%s'/>\n", src->ssh_known_hosts_file);
         if (src->ssh_keyfile || src->ssh_agent) {
             virBufferAddLit(childBuf, "<identity");
 
@@ -23570,8 +23619,7 @@ virDomainControllerDefFormat(virBuffer *buf,
                       " type='%s' index='%d'",
                       type, def->idx);
 
-    if (model)
-        virBufferEscapeString(&attrBuf, " model='%s'", model);
+    virBufferEscapeString(&attrBuf, " model='%s'", model);
 
     switch (def->type) {
     case VIR_DOMAIN_CONTROLLER_TYPE_VIRTIO_SERIAL:
@@ -25022,8 +25070,7 @@ virDomainChrTargetDefFormat(virBuffer *buf,
 
         case VIR_DOMAIN_CHR_CHANNEL_TARGET_TYPE_XEN:
         case VIR_DOMAIN_CHR_CHANNEL_TARGET_TYPE_VIRTIO:
-            if (def->target.name)
-                virBufferEscapeString(buf, " name='%s'", def->target.name);
+            virBufferEscapeString(buf, " name='%s'", def->target.name);
 
             if (def->targetType == VIR_DOMAIN_CHR_CHANNEL_TARGET_TYPE_VIRTIO &&
                 def->state != VIR_DOMAIN_CHR_DEVICE_STATE_DEFAULT &&
@@ -26430,9 +26477,8 @@ virDomainGraphicsDefFormat(virBuffer *buf,
             break;
         }
 
-        if (def->data.vnc.keymap)
-            virBufferEscapeString(buf, " keymap='%s'",
-                                  def->data.vnc.keymap);
+        virBufferEscapeString(buf, " keymap='%s'",
+                              def->data.vnc.keymap);
 
         if (def->data.vnc.sharePolicy)
             virBufferAsprintf(buf, " sharePolicy='%s'",
@@ -26447,13 +26493,11 @@ virDomainGraphicsDefFormat(virBuffer *buf,
         break;
 
     case VIR_DOMAIN_GRAPHICS_TYPE_SDL:
-        if (def->data.sdl.display)
-            virBufferEscapeString(buf, " display='%s'",
-                                  def->data.sdl.display);
+        virBufferEscapeString(buf, " display='%s'",
+                              def->data.sdl.display);
 
-        if (def->data.sdl.xauth)
-            virBufferEscapeString(buf, " xauth='%s'",
-                                  def->data.sdl.xauth);
+        virBufferEscapeString(buf, " xauth='%s'",
+                              def->data.sdl.xauth);
         if (def->data.sdl.fullscreen)
             virBufferAddLit(buf, " fullscreen='yes'");
 
@@ -26492,9 +26536,8 @@ virDomainGraphicsDefFormat(virBuffer *buf,
         break;
 
     case VIR_DOMAIN_GRAPHICS_TYPE_DESKTOP:
-        if (def->data.desktop.display)
-            virBufferEscapeString(buf, " display='%s'",
-                                  def->data.desktop.display);
+        virBufferEscapeString(buf, " display='%s'",
+                              def->data.desktop.display);
 
         if (def->data.desktop.fullscreen)
             virBufferAddLit(buf, " fullscreen='yes'");
@@ -26547,9 +26590,8 @@ virDomainGraphicsDefFormat(virBuffer *buf,
             break;
         }
 
-        if (def->data.spice.keymap)
-            virBufferEscapeString(buf, " keymap='%s'",
-                                  def->data.spice.keymap);
+        virBufferEscapeString(buf, " keymap='%s'",
+                              def->data.spice.keymap);
 
         if (def->data.spice.defaultMode != VIR_DOMAIN_GRAPHICS_SPICE_CHANNEL_MODE_ANY)
             virBufferAsprintf(buf, " defaultMode='%s'",
@@ -26932,11 +26974,9 @@ virDomainResourceDefFormat(virBuffer *buf,
     if (!def)
         return;
 
-    if (def->partition)
-        virBufferEscapeString(&childBuf, "<partition>%s</partition>\n", def->partition);
+    virBufferEscapeString(&childBuf, "<partition>%s</partition>\n", def->partition);
 
-    if (def->appid)
-        virBufferEscapeString(&childBuf, "<fibrechannel appid='%s'/>\n", def->appid);
+    virBufferEscapeString(&childBuf, "<fibrechannel appid='%s'/>\n", def->appid);
 
     virXMLFormatElement(buf, "resource", NULL, &childBuf);
 }
@@ -27083,6 +27123,72 @@ virDomainKeyWrapDefFormat(virBuffer *buf, virDomainKeyWrapDef *keywrap)
 
 
 static void
+virDomainSEVCommonDefFormat(virBuffer *attrBuf,
+                            virBuffer *childBuf,
+                            virDomainSEVCommonDef *def)
+{
+    if (def->kernel_hashes != VIR_TRISTATE_BOOL_ABSENT)
+        virBufferAsprintf(attrBuf, " kernelHashes='%s'",
+                          virTristateBoolTypeToString(def->kernel_hashes));
+
+    if (def->haveCbitpos)
+        virBufferAsprintf(childBuf, "<cbitpos>%d</cbitpos>\n", def->cbitpos);
+
+    if (def->haveReducedPhysBits)
+        virBufferAsprintf(childBuf, "<reducedPhysBits>%d</reducedPhysBits>\n",
+                          def->reduced_phys_bits);
+}
+
+
+static void
+virDomainSEVDefFormat(virBuffer *attrBuf,
+                      virBuffer *childBuf,
+                      virDomainSEVDef *def)
+{
+    virDomainSEVCommonDefFormat(attrBuf, childBuf, &def->common);
+
+    virBufferAsprintf(childBuf, "<policy>0x%04x</policy>\n", def->policy);
+    virBufferEscapeString(childBuf, "<dhCert>%s</dhCert>\n", def->dh_cert);
+    virBufferEscapeString(childBuf, "<session>%s</session>\n", def->session);
+	if (def->user_id)
+		virBufferEscapeString(childBuf, "<userid>%s</userid>\n", def->user_id);
+	if (def->secret_header)
+		virBufferEscapeString(childBuf, "<secretHeader>%s</secretHeader>\n",
+		def->secret_header);
+	if (def->secret)
+		virBufferEscapeString(childBuf, "<secret>%s</secret>\n", def->secret);
+}
+
+
+static void
+virDomainSEVSNPDefFormat(virBuffer *attrBuf,
+                         virBuffer *childBuf,
+                         virDomainSEVSNPDef *def)
+{
+    virDomainSEVCommonDefFormat(attrBuf, childBuf, &def->common);
+
+    if (def->author_key != VIR_TRISTATE_BOOL_ABSENT) {
+        virBufferAsprintf(attrBuf, " authorKey='%s'",
+                          virTristateBoolTypeToString(def->author_key));
+    }
+
+    if (def->vcek != VIR_TRISTATE_BOOL_ABSENT) {
+        virBufferAsprintf(attrBuf, " vcek='%s'",
+                          virTristateBoolTypeToString(def->vcek));
+    }
+
+    virBufferAsprintf(childBuf, "<policy>0x%08llx</policy>\n", def->policy);
+
+    virBufferEscapeString(childBuf,
+                          "<guestVisibleWorkarounds>%s</guestVisibleWorkarounds>\n",
+                          def->guest_visible_workarounds);
+    virBufferEscapeString(childBuf, "<idBlock>%s</idBlock>\n", def->id_block);
+    virBufferEscapeString(childBuf, "<idAuth>%s</idAuth>\n", def->id_auth);
+    virBufferEscapeString(childBuf, "<hostData>%s</hostData>\n", def->host_data);
+}
+
+
+static void
 virDomainSecDefFormat(virBuffer *buf, virDomainSecDef *sec)
 {
     g_auto(virBuffer) attrBuf = VIR_BUFFER_INITIALIZER;
@@ -27094,36 +27200,14 @@ virDomainSecDefFormat(virBuffer *buf, virDomainSecDef *sec)
     virBufferAsprintf(&attrBuf, " type='%s'",
                       virDomainLaunchSecurityTypeToString(sec->sectype));
 
-    switch ((virDomainLaunchSecurity) sec->sectype) {
-    case VIR_DOMAIN_LAUNCH_SECURITY_SEV: {
-        virDomainSEVDef *sev = &sec->data.sev;
-
-        if (sev->kernel_hashes != VIR_TRISTATE_BOOL_ABSENT)
-            virBufferAsprintf(&attrBuf, " kernelHashes='%s'",
-                              virTristateBoolTypeToString(sev->kernel_hashes));
-
-        if (sev->haveCbitpos)
-            virBufferAsprintf(&childBuf, "<cbitpos>%d</cbitpos>\n", sev->cbitpos);
-
-        if (sev->haveReducedPhysBits)
-            virBufferAsprintf(&childBuf, "<reducedPhysBits>%d</reducedPhysBits>\n",
-                              sev->reduced_phys_bits);
-        virBufferAsprintf(&childBuf, "<policy>0x%04x</policy>\n", sev->policy);
-        if (sev->dh_cert)
-            virBufferEscapeString(&childBuf, "<dhCert>%s</dhCert>\n", sev->dh_cert);
-
-        if (sev->session)
-            virBufferEscapeString(&childBuf, "<session>%s</session>\n", sev->session);
-
-        if (sev->user_id)
-            virBufferEscapeString(&childBuf, "<userid>%s</userid>\n", sev->user_id);
-        if (sev->secret_header)
-            virBufferEscapeString(&childBuf, "<secretHeader>%s</secretHeader>\n", sev->secret_header);
-        if (sev->secret)
-            virBufferEscapeString(&childBuf, "<secret>%s</secret>\n", sev->secret);
-
+    switch (sec->sectype) {
+    case VIR_DOMAIN_LAUNCH_SECURITY_SEV:
+        virDomainSEVDefFormat(&attrBuf, &childBuf, &sec->data.sev);
         break;
-    }
+
+    case VIR_DOMAIN_LAUNCH_SECURITY_SEV_SNP:
+        virDomainSEVSNPDefFormat(&attrBuf, &childBuf, &sec->data.sev_snp);
+        break;
 
     case VIR_DOMAIN_LAUNCH_SECURITY_PV:
     case VIR_DOMAIN_LAUNCH_SECURITY_CVM:
@@ -28396,9 +28480,8 @@ virDomainDefFormatInternalSetRootName(virDomainDef *def,
     for (i = 0; def->os.initenv && def->os.initenv[i]; i++)
         virBufferAsprintf(buf, "<initenv name='%s'>%s</initenv>\n",
                           def->os.initenv[i]->name, def->os.initenv[i]->value);
-    if (def->os.initdir)
-        virBufferEscapeString(buf, "<initdir>%s</initdir>\n",
-                              def->os.initdir);
+    virBufferEscapeString(buf, "<initdir>%s</initdir>\n",
+                          def->os.initdir);
     if (def->os.inituser)
         virBufferAsprintf(buf, "<inituser>%s</inituser>\n", def->os.inituser);
     if (def->os.initgroup)

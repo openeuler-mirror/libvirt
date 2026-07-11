@@ -2887,6 +2887,7 @@ struct _virDomainKeyWrapDef {
 typedef enum {
     VIR_DOMAIN_LAUNCH_SECURITY_NONE,
     VIR_DOMAIN_LAUNCH_SECURITY_SEV,
+    VIR_DOMAIN_LAUNCH_SECURITY_SEV_SNP,
     VIR_DOMAIN_LAUNCH_SECURITY_PV,
     VIR_DOMAIN_LAUNCH_SECURITY_CVM,
     VIR_DOMAIN_LAUNCH_SECURITY_CCA,
@@ -2895,18 +2896,12 @@ typedef enum {
 } virDomainLaunchSecurity;
 
 
-struct _virDomainSEVDef {
-    char *dh_cert;
-    char *session;
-    unsigned int policy;
+struct _virDomainSEVCommonDef {
     bool haveCbitpos;
     unsigned int cbitpos;
     bool haveReducedPhysBits;
     unsigned int reduced_phys_bits;
     virTristateBool kernel_hashes;
-    char *user_id;
-    char *secret_header;
-    char *secret;
 };
 
 struct _virDomainCCADef {
@@ -2916,10 +2911,35 @@ struct _virDomainCCADef {
     virTristateBool hisi_cca_enable;
 };
 
+
+struct _virDomainSEVDef {
+    virDomainSEVCommonDef common;
+    char *dh_cert;
+    char *session;
+    unsigned int policy;
+    char *user_id;
+    char *secret_header;
+    char *secret;
+};
+
+
+struct _virDomainSEVSNPDef {
+    virDomainSEVCommonDef common;
+    unsigned long long policy;
+    char *guest_visible_workarounds;
+    char *id_block;
+    char *id_auth;
+    char *host_data;
+    virTristateBool author_key;
+    virTristateBool vcek;
+};
+
+
 struct _virDomainSecDef {
     virDomainLaunchSecurity sectype;
     union {
         virDomainSEVDef sev;
+        virDomainSEVSNPDef sev_snp;
         virDomainCCADef cca;
     } data;
 };

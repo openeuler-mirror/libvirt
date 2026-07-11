@@ -698,8 +698,20 @@ VIR_ENUM_IMPL(virQEMUCaps,
               /* 450 */
               "run-with.async-teardown", /* QEMU_CAPS_RUN_WITH_ASYNC_TEARDOWN */
               "virtio-blk-vhost-vdpa", /* QEMU_CAPS_DEVICE_VIRTIO_BLK_VHOST_VDPA */
-              "smp-clusters", /* QEMU_CAPS_SMP_CLUSTERS */
-              "tmm-guest", /* QEMU_CAPS_VIRTCCA */
+			  "virtio-blk.iothread-mapping", /* QEMU_CAPS_VIRTIO_BLK_IOTHREAD_MAPPING */
+
+			  "smp-clusters", /* QEMU_CAPS_SMP_CLUSTERS */
+			  "tmm-guest", /* QEMU_CAPS_VIRTCCA */
+
+			  /* 455 */
+			  "blockjob.backing-mask-protocol", /* QEMU_CAPS_BLOCKJOB_BACKING_MASK_PROTOCOL */
+			  "display-reload", /* QEMU_CAPS_DISPLAY_RELOAD */
+			  "usb-mtp", /* QEMU_CAPS_DEVICE_USB_MTP */
+			  "machine.virt.ras", /* QEMU_CAPS_MACHINE_VIRT_RAS */
+			  "virtio-sound", /* QEMU_CAPS_DEVICE_VIRTIO_SOUND */
+
+			  /* 460 */
+			  "sev-snp-guest", /* QEMU_CAPS_SEV_SNP_GUEST */
               "rme-guest", /* QEMU_CAPS_CCA_GUEST */
 
               /* 455 */
@@ -1400,6 +1412,7 @@ struct virQEMUCapsStringFlags virQEMUCapsObjectTypes[] = {
     { "cryptodev-backend-lkcf", QEMU_CAPS_OBJECT_CRYPTO_LKCF },
     { "pvpanic-pci", QEMU_CAPS_DEVICE_PANIC_PCI },
     { "tmm-guest", QEMU_CAPS_VIRTCCA },
+    { "sev-snp-guest", QEMU_CAPS_SEV_SNP_GUEST },
     { "rme-guest", QEMU_CAPS_CCA_GUEST },
 };
 
@@ -1438,6 +1451,7 @@ static struct virQEMUCapsDevicePropsFlags virQEMUCapsDevicePropsVirtioBlk[] = {
     { "scsi", QEMU_CAPS_VIRTIO_BLK_SCSI, virQEMUCapsDevicePropsVirtioBlkSCSIDefault },
     { "queue-size", QEMU_CAPS_VIRTIO_BLK_QUEUE_SIZE, NULL },
     { "acpi-index", QEMU_CAPS_ACPI_INDEX, NULL },
+	{ "iothread-vq-mapping", QEMU_CAPS_VIRTIO_BLK_IOTHREAD_MAPPING, NULL },
 };
 
 static struct virQEMUCapsDevicePropsFlags virQEMUCapsDevicePropsVirtioNet[] = {
@@ -6735,6 +6749,8 @@ virQEMUCapsFillDomainLaunchSecurity(virQEMUCaps *qemuCaps,
 
     if (virQEMUCapsGet(qemuCaps, QEMU_CAPS_SEV_GUEST))
         VIR_DOMAIN_CAPS_ENUM_SET(launchSecurity->sectype, VIR_DOMAIN_LAUNCH_SECURITY_SEV);
+    if (virQEMUCapsGet(qemuCaps, QEMU_CAPS_SEV_SNP_GUEST))
+        VIR_DOMAIN_CAPS_ENUM_SET(launchSecurity->sectype, VIR_DOMAIN_LAUNCH_SECURITY_SEV_SNP);
     if (virQEMUCapsGet(qemuCaps, QEMU_CAPS_S390_PV_GUEST) &&
         virQEMUCapsGet(qemuCaps, QEMU_CAPS_MACHINE_CONFIDENTAL_GUEST_SUPPORT))
         VIR_DOMAIN_CAPS_ENUM_SET(launchSecurity->sectype, VIR_DOMAIN_LAUNCH_SECURITY_PV);
