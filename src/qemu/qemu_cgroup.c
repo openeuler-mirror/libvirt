@@ -863,7 +863,8 @@ qemuSetupDevicesCgroup(virDomainObj *vm)
             break;
         case VIR_DOMAIN_LAUNCH_SECURITY_CCA:
             break;
-	case VIR_DOMAIN_LAUNCH_SECURITY_CVM:
+        case VIR_DOMAIN_LAUNCH_SECURITY_CVM:
+            break;
         case VIR_DOMAIN_LAUNCH_SECURITY_NONE:
         case VIR_DOMAIN_LAUNCH_SECURITY_LAST:
             virReportEnumRangeError(virDomainLaunchSecurity, vm->def->sec->sectype);
