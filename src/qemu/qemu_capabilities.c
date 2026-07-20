@@ -30,6 +30,7 @@
 #include "virfilecache.h"
 #include "cpu/cpu.h"
 #include "cpu/cpu_x86.h"
+#include "cpu/cpu_arm.h"
 #include "domain_conf.h"
 #include "virbitmap.h"
 #include "virnodesuspend.h"
@@ -3671,6 +3672,64 @@ virQEMUCapsCPUFeatureTranslationTable virQEMUCapsCPUFeaturesX86[] = {
     {NULL, NULL}
 };
 
+virQEMUCapsCPUFeatureTranslationTable virQEMUCapsCPUFeaturesARM[] = {
+    {"f32mm", "SYSREG_ID_AA64ZFR0_EL1_F32MM"},
+    {"f64mm", "SYSREG_ID_AA64ZFR0_EL1_F64MM"},
+    {"lrcpc", "SYSREG_ID_AA64ISAR1_EL1_LRCPC"},
+    {"aes", "SYSREG_ID_AA64ZFR0_EL1_AES"},
+    {"bitperm", "SYSREG_ID_AA64ZFR0_EL1_BitPerm"},
+    {"sha3", "SYSREG_ID_AA64ZFR0_EL1_SHA3"},
+    {"sm4", "SYSREG_ID_AA64ZFR0_EL1_SM4"},
+    {"afp", "SYSREG_ID_AA64MMFR1_EL1_AFP"},
+    {"rpres", "SYSREG_ID_AA64ISAR2_EL1_RPRES"},
+    {"wfxt", "SYSREG_ID_AA64ISAR2_EL1_WFxT"},
+    {"rprfm", "SYSREG_ID_AA64ISAR2_EL1_RPRFM"},
+    {"bc", "SYSREG_ID_AA64ISAR2_EL1_BC"},
+    {"ls64", "SYSREG_ID_AA64ISAR1_EL1_LS64"},
+    {"nmi", "SYSREG_ID_AA64PFR1_EL1_NMI"},
+    {"xs", "SYSREG_ID_AA64ISAR1_EL1_XS"},
+    {"clrbhb", "SYSREG_ID_AA64ISAR2_EL1_CLRBHB"},
+    {"pac_frac", "SYSREG_ID_AA64ISAR2_EL1_PAC_frac"},
+    {"fgt", "SYSREG_ID_AA64MMFR0_EL1_FGT"},
+    {"bigend", "SYSREG_ID_AA64MMFR0_EL1_BIGEND"},
+    {"ecbhb", "SYSREG_ID_AA64MMFR1_EL1_ECBHB"},
+    {"cmow", "SYSREG_ID_AA64MMFR1_EL1_CMOW"},
+    {"tidcp1", "SYSREG_ID_AA64MMFR1_EL1_TIDCP1"},
+    {"ntlbpa", "SYSREG_ID_AA64MMFR1_EL1_nTLBPA"},
+    {"hcx", "SYSREG_ID_AA64MMFR1_EL1_HCX"},
+    {"ets", "SYSREG_ID_AA64MMFR1_EL1_ETS"},
+    {"pan", "SYSREG_ID_AA64MMFR1_EL1_PAN"},
+    {"hafdbs", "SYSREG_ID_AA64MMFR1_EL1_HAFDBS"},
+    {"cnp", "SYSREG_ID_AA64MMFR2_EL1_CnP"},
+    {"tcrx", "SYSREG_ID_AA64MMFR3_EL1_TCRX"},
+    {"pmuver", "SYSREG_ID_AA64DFR0_EL1_PMUVer"},
+    {"debugver", "SYSREG_ID_AA64DFR0_EL1_DebugVer"},
+    {"doublelock", "SYSREG_ID_AA64DFR0_EL1_DoubleLock"},
+    {"svever", "SYSREG_ID_AA64ZFR0_EL1_SVEver"},
+    {"l1ip", "SYSREG_CTR_EL0_L1Ip"},
+    {NULL, NULL}
+};
+
+static const char *sveVectorLengths[] = {
+    "sve128", "sve256", "sve384", "sve512",
+    "sve640", "sve768", "sve896", "sve1024",
+    "sve1152", "sve1280", "sve1408", "sve1536",
+    "sve1664", "sve1792", "sve1920", "sve2048",
+};
+
+bool
+virQEMUCapsIsSVEVectorLength(const char *name)
+{
+    size_t i;
+
+    for (i = 0; i < G_N_ELEMENTS(sveVectorLengths); i++) {
+        if (STREQ(name, sveVectorLengths[i]))
+            return true;
+    }
+
+    return false;
+}
+
 
 static const char *
 virQEMUCapsCPUFeatureTranslate(virArch arch,
@@ -3682,6 +3741,8 @@ virQEMUCapsCPUFeatureTranslate(virArch arch,
 
     if (ARCH_IS_X86(arch))
         table = virQEMUCapsCPUFeaturesX86;
+    else if (ARCH_IS_ARM(arch))
+        table = virQEMUCapsCPUFeaturesARM;
 
     if (!table ||
         !feature)
@@ -3703,6 +3764,16 @@ virQEMUCapsCPUFeatureToQEMU(virArch arch,
                             const char *feature)
 {
     return virQEMUCapsCPUFeatureTranslate(arch, feature, false);
+}
+
+const char *
+virQEMUCapsCPUFeatureGetValue(virArch arch,
+                              const char *feature)
+{
+    if (ARCH_IS_ARM(arch))
+        return virCPUarmGetFeatureSysregValue(feature);
+
+    return NULL;
 }
 
 

@@ -70,6 +70,8 @@ struct _virCPUarmModel {
 typedef struct _virCPUarmFeature virCPUarmFeature;
 struct _virCPUarmFeature {
     char *name;
+    char *sysreg;
+    char *sysreg_value;
 };
 
 static virCPUarmFeature *
@@ -85,6 +87,8 @@ virCPUarmFeatureFree(virCPUarmFeature *feature)
         return;
 
     g_free(feature->name);
+    g_free(feature->sysreg);
+    g_free(feature->sysreg_value);
 
     g_free(feature);
 }
@@ -258,6 +262,8 @@ virCPUarmMapFeatureParse(xmlXPathContextPtr ctxt G_GNUC_UNUSED,
 
     feature = virCPUarmFeatureNew();
     feature->name = g_strdup(name);
+    feature->sysreg = virXMLPropString(ctxt->node, "sysreg");
+    feature->sysreg_value = virXMLPropString(ctxt->node, "sysreg_value");
 
     g_ptr_array_add(map->features, g_steal_pointer(&feature));
 
@@ -443,6 +449,22 @@ virCPUarmGetMap(void)
         return NULL;
 
     return cpuMap;
+}
+
+const char *
+virCPUarmGetFeatureSysregValue(const char *name)
+{
+    virCPUarmMap *map = virCPUarmGetMap();
+    virCPUarmFeature *feature;
+
+    if (!map)
+        return NULL;
+
+    feature = virCPUarmMapFeatureFind(map, name);
+    if (!feature)
+        return NULL;
+
+    return feature->sysreg_value;
 }
 
 static int

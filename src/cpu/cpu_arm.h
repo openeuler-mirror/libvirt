@@ -23,3 +23,5 @@
 #include "cpu.h"
 
 extern struct cpuArchDriver cpuDriverArm;
+
+const char *virCPUarmGetFeatureSysregValue(const char *name);

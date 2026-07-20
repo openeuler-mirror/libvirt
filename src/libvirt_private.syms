@@ -1549,6 +1549,9 @@ virCPUUpdateLive;
 virCPUValidateFeatures;
 
 
+# cpu/cpu_arm.h
+virCPUarmGetFeatureSysregValue;
+
 # cpu/cpu_x86.h
 virCPUx86DataAdd;
 virCPUx86DataGetSignature;

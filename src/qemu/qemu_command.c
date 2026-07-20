@@ -6514,8 +6514,15 @@ qemuBuildCpuModelArgStr(virQEMUDriver *driver,
         switch ((virCPUFeaturePolicy) cpu->features[i].policy) {
         case VIR_CPU_FEATURE_FORCE:
         case VIR_CPU_FEATURE_REQUIRE:
-            virBufferAsprintf(buf, ",%s=on", featname);
+        {
+            const char *val = virQEMUCapsCPUFeatureGetValue(def->os.arch,
+                                                             cpu->features[i].name);
+            if (val)
+                virBufferAsprintf(buf, ",%s=%s", featname, val);
+            else
+                virBufferAsprintf(buf, ",%s=on", featname);
             break;
+        }
 
         case VIR_CPU_FEATURE_DISABLE:
         case VIR_CPU_FEATURE_FORBID:

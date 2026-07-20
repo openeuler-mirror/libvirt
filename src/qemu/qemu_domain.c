@@ -4754,7 +4754,7 @@ qemuDomainDefCPUPostParse(virDomainDef *def,
 
         if (STREQ(feature->name, "sve")) {
             sveFeature = feature;
-        } else if (STRPREFIX(feature->name, "sve")) {
+        } else if (virQEMUCapsIsSVEVectorLength(feature->name)) {
             sveVectorLengthsProvided = true;
         }
     }
