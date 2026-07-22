@@ -331,6 +331,26 @@
     </element>
   </define>
 
+  <define name="cpuTargetImplCpus">
+    <element name="targetImplCpus">
+      <oneOrMore>
+        <element name="cpu">
+          <attribute name="midr">
+            <data type="string">
+              <param name="pattern">(0x)?[0-9a-fA-F]{1,8}</param>
+            </data>
+          </attribute>
+          <attribute name="revidr">
+            <data type="string">
+              <param name="pattern">(0x)?[0-9a-fA-F]{1,8}</param>
+            </data>
+          </attribute>
+          <empty/>
+        </element>
+      </oneOrMore>
+    </element>
+  </define>
+
   <define name="hostcpu">
     <element name="cpu">
       <interleave>
@@ -469,6 +489,9 @@
         <zeroOrMore>
           <ref name="cpuCacheInfo"/>
         </zeroOrMore>
+        <optional>
+          <ref name="cpuTargetImplCpus"/>
+        </optional>
       </interleave>
     </element>
   </define>

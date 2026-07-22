@@ -7322,6 +7322,21 @@ qemuBuildMachineCommandLine(virCommand *cmd,
                 break;
             }
         }
+
+        if (cpu && cpu->targetImplCpus && cpu->targetImplCpus->nimplCpus > 0) {
+            virCPUDefTargetImplCpus *impl = cpu->targetImplCpus;
+            g_auto(virBuffer) implBuf = VIR_BUFFER_INITIALIZER;
+            size_t j;
+
+            for (j = 0; j < impl->nimplCpus; j++) {
+                if (j > 0)
+                    virBufferAddLit(&implBuf, "-");
+                virBufferAsprintf(&implBuf, "0x%08x:0x%08x",
+                                  impl->midr[j], impl->revidr[j]);
+            }
+            virBufferAsprintf(&buf, ",x-target-impl-cpus=%s",
+                              virBufferCurrentContent(&implBuf));
+        }
     }
 
     if (cpu) {

@@ -47,6 +47,9 @@
 
 VIR_LOG_INIT("conf.cpu_conf");
 
+#define CPU_PARSE_HEX_BASE 16
+#define INDENT_STEP 2
+
 VIR_ENUM_IMPL(virCPU,
               VIR_CPU_TYPE_LAST,
               "host", "guest", "auto",
@@ -171,6 +174,11 @@ virCPUDefFree(virCPUDef *def)
         g_free(def->addr);
         g_free(def->tsc);
         g_free(def->cacheinfo);
+        if (def->targetImplCpus) {
+            g_free(def->targetImplCpus->midr);
+            g_free(def->targetImplCpus->revidr);
+            g_free(def->targetImplCpus);
+        }
         g_free(def);
     }
 }
@@ -311,6 +319,19 @@ virCPUDefCopyWithoutModel(const virCPUDef *cpu)
         *copy->tsc = *cpu->tsc;
     }
 
+    if (cpu->targetImplCpus) {
+        copy->targetImplCpus = g_new0(virCPUDefTargetImplCpus, 1);
+        copy->targetImplCpus->nimplCpus = cpu->targetImplCpus->nimplCpus;
+        copy->targetImplCpus->midr = g_new0(unsigned int,
+                                            cpu->targetImplCpus->nimplCpus);
+        copy->targetImplCpus->revidr = g_new0(unsigned int,
+                                              cpu->targetImplCpus->nimplCpus);
+        for (size_t i = 0; i < cpu->targetImplCpus->nimplCpus; i++) {
+            copy->targetImplCpus->midr[i] = cpu->targetImplCpus->midr[i];
+            copy->targetImplCpus->revidr[i] = cpu->targetImplCpus->revidr[i];
+        }
+    }
+
     return g_steal_pointer(&copy);
 }
 
@@ -416,6 +437,54 @@ virGetCacheInfoDefaultSize(virCPUCacheLevelAndType cache_type)
     }
 }
 
+static int
+virCPUDefParseXMLTargetImplCpus(virCPUDef *def,
+                                xmlNodePtr node)
+{
+    xmlNodePtr cur;
+    size_t nimpl = 0;
+
+    def->targetImplCpus = g_new0(virCPUDefTargetImplCpus, 1);
+
+    for (cur = node->children; cur; cur = cur->next) {
+        if (cur->type == XML_ELEMENT_NODE &&
+            virXMLNodeNameEqual(cur, "cpu"))
+            nimpl++;
+    }
+
+    if (nimpl == 0) {
+        virReportError(VIR_ERR_XML_ERROR, "%s",
+                       _("targetImplCpus requires at least one <cpu> element"));
+        return -1;
+    }
+
+    def->targetImplCpus->nimplCpus = nimpl;
+    def->targetImplCpus->midr = g_new0(unsigned int, nimpl);
+    def->targetImplCpus->revidr = g_new0(unsigned int, nimpl);
+
+    nimpl = 0;
+    for (cur = node->children; cur; cur = cur->next) {
+        if (cur->type != XML_ELEMENT_NODE ||
+            !virXMLNodeNameEqual(cur, "cpu"))
+            continue;
+
+        if (virXMLPropUInt(cur, "midr", CPU_PARSE_HEX_BASE,
+                           VIR_XML_PROP_REQUIRED,
+                           &def->targetImplCpus->midr[nimpl]) < 0)
+            return -1;
+
+        if (virXMLPropUInt(cur, "revidr", CPU_PARSE_HEX_BASE,
+                           VIR_XML_PROP_REQUIRED,
+                           &def->targetImplCpus->revidr[nimpl]) < 0)
+            return -1;
+
+        nimpl++;
+    }
+
+    return 0;
+}
+
+
 /*
  * Parses CPU definition XML from a node pointed to by @xpath. If @xpath is
  * NULL, the current node of @ctxt is used (i.e., it is a shortcut to ".").
@@ -439,6 +508,7 @@ virCPUDefParseXML(xmlXPathContextPtr ctxt,
     g_autofree xmlNodePtr *nodes = NULL;
     xmlNodePtr topology = NULL;
     xmlNodePtr maxphysaddrNode = NULL;
+    xmlNodePtr targetImplNode = NULL;
     g_autofree xmlNodePtr *cacheNodes = NULL;
     ssize_t ncacheNodes = 0;
     VIR_XPATH_NODE_AUTORESTORE(ctxt)
@@ -833,6 +903,11 @@ virCPUDefParseXML(xmlXPathContextPtr ctxt,
 
     }
 
+    if ((targetImplNode = virXPathNode("./targetImplCpus[1]", ctxt))) {
+        if (virCPUDefParseXMLTargetImplCpus(def, targetImplNode) < 0)
+            return -1;
+    }
+
     *cpu = g_steal_pointer(&def);
     return 0;
 }
@@ -1020,6 +1095,18 @@ virCPUDefFormatBuf(virBuffer *buf,
                           virCPUCacheLevelAndTypeTypeToString(cacheinfo->cache),
                           virCPUCacheTopologyLevelTypeToString(cacheinfo->topology),
                           cacheinfo->size);
+    }
+
+    if (def->targetImplCpus) {
+        virBufferAddLit(buf, "<targetImplCpus>\n");
+        virBufferAdjustIndent(buf, INDENT_STEP);
+        for (i = 0; i < def->targetImplCpus->nimplCpus; i++) {
+            virBufferAsprintf(buf, "<cpu midr='0x%08x' revidr='0x%08x'/>\n",
+                              def->targetImplCpus->midr[i],
+                              def->targetImplCpus->revidr[i]);
+        }
+        virBufferAdjustIndent(buf, -INDENT_STEP);
+        virBufferAddLit(buf, "</targetImplCpus>\n");
     }
 
     for (i = 0; i < def->nfeatures; i++) {
@@ -1340,6 +1427,28 @@ virCPUDefIsEqual(virCPUDef *src,
             src->cacheinfo[i].topology != dst->cacheinfo[i].topology ||
             src->cacheinfo[i].size != dst->cacheinfo[i].size) {
             MISMATCH("%s", _("Target CPU cacheinfo does not match source"));
+            return false;
+        }
+    }
+
+    if ((src->targetImplCpus && !dst->targetImplCpus) ||
+        (!src->targetImplCpus && dst->targetImplCpus)) {
+        MISMATCH("%s", _("Target CPU targetImplCpus does not match source"));
+        return false;
+    }
+
+    if (src->targetImplCpus && dst->targetImplCpus) {
+        if (src->targetImplCpus->nimplCpus != dst->targetImplCpus->nimplCpus) {
+            MISMATCH("%s", _("Target CPU targetImplCpus count does not match source"));
+            return false;
+        }
+        for (i = 0; i < src->targetImplCpus->nimplCpus &&
+             src->targetImplCpus->midr[i] == dst->targetImplCpus->midr[i] &&
+             src->targetImplCpus->revidr[i] == dst->targetImplCpus->revidr[i]; i++)
+            ;
+
+        if (i < src->targetImplCpus->nimplCpus) {
+            MISMATCH("%s", _("Target CPU targetImplCpus value does not match source"));
             return false;
         }
     }
