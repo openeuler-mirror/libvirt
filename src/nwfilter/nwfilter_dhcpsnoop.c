@@ -837,6 +837,15 @@ virNWFilterSnoopDHCPDecode(virNWFilterSnoopReq *req,
     if (len < 0)
         return -2;
 
+    /* Verify the IP header length */
+    /* The minimum value is 5 (20 bytes), and the maximum value is 15 (60 bytes) */
+    if (pip->ihl < 5 || pip->ihl > 15)
+        return -2;
+
+    /* Ensure that the IP header length does not exceed the available data */
+    if ((size_t)(pip->ihl << 2) > (size_t)len)
+        return -2;
+
     VIR_WARNINGS_NO_CAST_ALIGN
     pup = (struct udphdr *)((char *)pip + (pip->ihl << 2));
     VIR_WARNINGS_RESET
