@@ -769,6 +769,7 @@ virNWFilterSnoopDHCPGetOpt(virNWFilterSnoopDHCPHdr *pd, int len,
     *pleasetime = 0;
 
     while (oind < olen) {
+        uint8_t opt_len;
         switch (pd->d_opts[oind]) {
         case DHCPO_LEASE:
             if (olen - oind < 6)
@@ -793,8 +794,13 @@ virNWFilterSnoopDHCPGetOpt(virNWFilterSnoopDHCPHdr *pd, int len,
         default:
             if (olen - oind < 2)
                 goto error;
+            break;
         }
-        oind += pd->d_opts[oind + 1] + 2;
+        /* Verify that the option length field does not cause out-of-bounds errors */
+        opt_len = pd->d_opts[oind + 1];
+        if (olen - oind < (int)(opt_len + 2))
+            goto error;
+        oind += opt_len + 2;
     }
     return 0;
  error:
