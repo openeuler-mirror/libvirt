@@ -641,9 +641,16 @@ qemuSaveImageOpen(virQEMUDriver *driver,
         return -1;
     }
 
-    if (header->cookieOffset)
+    if (header->cookieOffset) {
+        /* Verify that cookieOffset does not exceed data_len */
+        if (header->cookieOffset > header->data_len) {
+            virReportError(VIR_ERR_OPERATION_FAILED,
+                           _("invalid cookie offset %1$u exceeds data length %2$u"),
+                           header->cookieOffset, header->data_len);
+            return -1;
+        }
         xml_len = header->cookieOffset;
-    else
+    } else
         xml_len = header->data_len;
 
     cookie_len = header->data_len - xml_len;
