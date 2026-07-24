@@ -133,6 +133,12 @@ main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
+    /* Verify that the interface name does not contain path separators */
+    if (strchr(interface, '/') != NULL || strstr(interface, "..") != NULL) {
+        fprintf(stderr, _("invalid interface name: %1$s\n"), interface);
+        exit(EXIT_FAILURE);
+    }
+
     ip = argv[3];
     mac = argv[2];
 
