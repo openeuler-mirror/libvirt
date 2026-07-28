@@ -504,6 +504,7 @@ virStorageBackendCreateExecCommand(virStoragePoolObjPtr pool,
     bool filecreated = false;
     int ret = -1;
 
+    virCommandSetUmask(cmd, S_IRWXUGO ^ mode);
     if ((def->type == VIR_STORAGE_POOL_NETFS)
         && (((geteuid() == 0)
              && (vol->target.perms->uid != (uid_t)-1)
@@ -513,7 +514,6 @@ virStorageBackendCreateExecCommand(virStoragePoolObjPtr pool,
 
         virCommandSetUID(cmd, vol->target.perms->uid);
         virCommandSetGID(cmd, vol->target.perms->gid);
-        virCommandSetUmask(cmd, S_IRWXUGO ^ mode);
 
         if (virCommandRun(cmd, NULL) == 0) {
             /* command was successfully run, check if the file was created */
@@ -545,7 +545,6 @@ virStorageBackendCreateExecCommand(virStoragePoolObjPtr pool,
         /* don't change uid/gid/mode if we retry */
         virCommandSetUID(cmd, -1);
         virCommandSetGID(cmd, -1);
-        virCommandSetUmask(cmd, 0);
 
         if (virCommandRun(cmd, NULL) < 0)
             goto cleanup;
