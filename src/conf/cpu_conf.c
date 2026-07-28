@@ -27,6 +27,7 @@
 #include "virfile.h"
 #include "cpu_conf.h"
 #include "virlog.h"
+#include "virstring.h"
 
 #define VIR_FROM_THIS VIR_FROM_CPU
 
@@ -88,6 +89,26 @@ VIR_ENUM_IMPL(virCPUMaxPhysAddrMode,
               "passthrough",
 );
 
+VIR_ENUM_IMPL(virCPUCacheLevelAndType,
+              VIR_CPU_CACHE_LEVEL_AND_TYPE_LAST,
+              "l1d",
+              "l1i",
+              "l1",
+              "l2",
+              "l3",
+);
+
+VIR_ENUM_IMPL(virCPUCacheTopologyLevel,
+              VIR_CPU_CACHE_TOPOLOGY_LEVEL_LAST,
+              "thread",
+              "core",
+              "module",
+              "cluster",
+              "die",
+              "socket",
+              "book",
+              "drawer",
+);
 
 virCPUDef *virCPUDefNew(void)
 {
@@ -135,6 +156,7 @@ virCPUDefFree(virCPUDef *def)
         g_free(def->cache);
         g_free(def->addr);
         g_free(def->tsc);
+        g_free(def->cacheinfo);
         g_free(def);
     }
 }
@@ -260,6 +282,16 @@ virCPUDefCopyWithoutModel(const virCPUDef *cpu)
         *copy->addr = *cpu->addr;
     }
 
+    if (cpu->ncacheinfo > 0) {
+        copy->cacheinfo = g_new0(virCPUCacheInfoDef, cpu->ncacheinfo);
+
+        for (size_t i = 0; i < cpu->ncacheinfo; i++) {
+            copy->cacheinfo[i] = cpu->cacheinfo[i];
+        }
+
+        copy->ncacheinfo = cpu->ncacheinfo;
+    }
+
     if (cpu->tsc) {
         copy->tsc = g_new0(virHostCPUTscInfo, 1);
         *copy->tsc = *cpu->tsc;
@@ -278,7 +310,6 @@ virCPUDefCopy(const virCPUDef *cpu)
 
     return g_steal_pointer(&copy);
 }
-
 
 int
 virCPUDefParseXMLString(const char *xml,
@@ -331,6 +362,25 @@ virCPUDefParseXMLCache(virCPUDef *def,
     return 0;
 }
 
+/*
+ * Default value function for cache info passthrough related parameters
+ */
+static virCPUCacheTopologyLevel
+virGetCacheInfoDefaultTopology(virCPUCacheLevelAndType cache_type)
+{
+    switch (cache_type) {
+    case VIR_CPU_CACHE_LEVEL_AND_TYPE_L1D:
+    case VIR_CPU_CACHE_LEVEL_AND_TYPE_L1I:
+    case VIR_CPU_CACHE_LEVEL_AND_TYPE_L1:
+    case VIR_CPU_CACHE_LEVEL_AND_TYPE_L2:
+        return VIR_CPU_CACHE_TOPOLOGY_LEVEL_CORE;
+    case VIR_CPU_CACHE_LEVEL_AND_TYPE_L3:
+        return VIR_CPU_CACHE_TOPOLOGY_LEVEL_CLUSTER;
+    case VIR_CPU_CACHE_LEVEL_AND_TYPE_LAST:
+    default:
+        return VIR_CPU_CACHE_TOPOLOGY_LEVEL_LAST;
+    }
+}
 
 /*
  * Parses CPU definition XML from a node pointed to by @xpath. If @xpath is
@@ -648,6 +698,57 @@ virCPUDefParseXML(xmlXPathContextPtr ctxt,
         def->features[i].policy = policy;
     }
 
+    if ((n = virXPathNodeSet("./cacheinfo", ctxt, &nodes)) < 0)
+        return -1;
+
+    if (n > VIR_CPU_CACHE_LEVEL_AND_TYPE_LAST) {
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+            _("Exceeded the maximum number of cacheinfo"));
+        return -1;
+    }
+
+    if (n > 0) {
+        def->cacheinfo = g_new0(virCPUCacheInfoDef, n);
+        def->ncacheinfo = n;
+    }
+
+    for (i = 0; i < n; i++) {
+        virCPUCacheLevelAndType cache_type;
+        virCPUCacheTopologyLevel cache_topology;
+        char *tmp;
+
+        tmp = virXMLPropString(nodes[i], "cache");
+        if (tmp == NULL) {
+            virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                           _("Missing cache level and type"));
+            return -1;
+        }
+        cache_type = virCPUCacheLevelAndTypeTypeFromString(tmp);
+        VIR_FREE(tmp);
+
+        if (cache_type < 0) {
+            virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                           _("Invalid CPU cache level and type"));
+            return -1;
+        }
+
+        tmp = virXMLPropString(nodes[i], "topology");
+        if (tmp == NULL) {
+            cache_topology = virGetCacheInfoDefaultTopology(cache_type);
+        } else {
+            cache_topology = virCPUCacheTopologyLevelTypeFromString(tmp);
+        }
+        VIR_FREE(tmp);
+        if (cache_topology < 0) {
+            virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                           _("Invalid cache topology level"));
+            return -1;
+        }
+
+        def->cacheinfo[i].cache = cache_type;
+        def->cacheinfo[i].topology = cache_topology;
+    }
+
     if ((ncacheNodes = virXPathNodeSet("./cache", ctxt, &cacheNodes)) > 0) {
         if (ncacheNodes > 1) {
             virReportError(VIR_ERR_XML_ERROR, "%s",
@@ -862,6 +963,15 @@ virCPUDefFormatBuf(virBuffer *buf,
         if (def->addr->limit > 0)
             virBufferAsprintf(buf, " limit='%d'", def->addr->limit);
         virBufferAddLit(buf, "/>\n");
+    }
+
+    for (i = 0; i < def->ncacheinfo; i++) {
+        virCPUCacheInfoDefPtr cacheinfo = def->cacheinfo + i;
+
+        virBufferAsprintf(buf,
+                          "<cacheinfo cache='%s' topology='%s'/>\n",
+                          virCPUCacheLevelAndTypeTypeToString(cacheinfo->cache),
+                          virCPUCacheTopologyLevelTypeToString(cacheinfo->topology));
     }
 
     for (i = 0; i < def->nfeatures; i++) {
@@ -1169,6 +1279,20 @@ virCPUDefIsEqual(virCPUDef *src,
           src->cache->mode != dst->cache->mode))) {
         MISMATCH("%s", _("Target CPU cache does not match source"));
         return false;
+    }
+
+    if (src->ncacheinfo != dst->ncacheinfo) {
+        MISMATCH(_("Target CPU cacheinfo count %zu does not match source %zu"),
+                 dst->ncacheinfo, src->ncacheinfo);
+        return false;
+    }
+
+    for (i = 0; i < src->ncacheinfo; i++) {
+        if (src->cacheinfo[i].cache != dst->cacheinfo[i].cache ||
+            src->cacheinfo[i].topology != dst->cacheinfo[i].topology) {
+            MISMATCH("%s", _("Target CPU cacheinfo does not match source"));
+            return false;
+        }
     }
 
 #undef MISMATCH

@@ -2298,6 +2298,7 @@ mymain(void)
     DO_TEST_CAPS_LATEST_PARSE_ERROR("cpu-cache-emulate-l2");
     DO_TEST_CAPS_LATEST_PARSE_ERROR("cpu-cache-passthrough3");
     DO_TEST_CAPS_LATEST_PARSE_ERROR("cpu-cache-passthrough-l3");
+    DO_TEST_CAPS_LATEST("cpu-cacheinfo");
     DO_TEST_CAPS_LATEST("vmcoreinfo");
 
     DO_TEST_CAPS_LATEST("user-aliases");

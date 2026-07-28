@@ -466,8 +466,38 @@
         <optional>
           <ref name="cpuMaxPhysAddr"/>
         </optional>
+        <zeroOrMore>
+          <ref name="cpuCacheInfo"/>
+        </zeroOrMore>
       </interleave>
     </element>
   </define>
 
+  <define name="cpuCacheInfo">
+    <element name="cacheinfo">
+      <attribute name="cache">
+        <choice>
+          <value>l1i</value>
+          <value>l1d</value>
+          <value>l1</value>
+          <value>l2</value>
+          <value>l3</value>
+        </choice>
+      </attribute>
+      <optional>
+        <attribute name="topology">
+          <choice>
+            <value>thread</value>
+            <value>core</value>
+            <value>module</value>
+            <value>cluster</value>
+            <value>die</value>
+            <value>socket</value>
+            <value>book</value>
+            <value>drawer</value>
+          </choice>
+        </attribute>
+      </optional>
+    </element>
+  </define>
 </grammar>
