@@ -2971,6 +2971,12 @@ void virDirClose(DIR **dirp)
  *
  * Change ownership of all regular files in a directory.
  *
+ * This will NOT follow any symlinks, to avoid security risks.
+ * It is assumed the process using content under @name will
+ * be unprivileged, thus less trusted than libvirt. If it is
+ * compromised it might attempt to create symlinks in @name to
+ * escalate privileges on a subsequent call to virFileChownFiles.
+ *
  * Returns -1 on error, with error already reported, 0 on success.
  */
 #ifndef WIN32
@@ -2988,13 +2994,19 @@ int virFileChownFiles(const char *name,
 
     while ((direrr = virDirRead(dir, &ent, name)) > 0) {
         g_autofree char *path = NULL;
+        struct stat sb;
 
         path = g_strdup_printf("%s/%s", name, ent->d_name);
 
-        if (!virFileIsRegular(path))
+        if (g_lstat(path, &sb) < 0) {
+            virReportSystemError(errno, _("cannot stat '%1$s'"), path);
+            goto cleanup;
+        }
+
+        if (!S_ISREG(sb.st_mode))
             continue;
 
-        if (chown(path, uid, gid) < 0) {
+        if (lchown(path, uid, gid) < 0) {
             virReportSystemError(errno,
                                  _("cannot chown '%s' to (%u, %u)"),
                                  ent->d_name, (unsigned int) uid,
