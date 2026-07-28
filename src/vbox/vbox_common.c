@@ -495,6 +495,7 @@ vboxSetStorageController(virDomainControllerDef *controller,
     case VIR_DOMAIN_CONTROLLER_TYPE_XENBUS:
     case VIR_DOMAIN_CONTROLLER_TYPE_ISA:
     case VIR_DOMAIN_CONTROLLER_TYPE_LAST:
+    case VIR_DOMAIN_CONTROLLER_TYPE_UB:
         vboxReportError(VIR_ERR_CONFIG_UNSUPPORTED,
                         _("The vbox driver does not support %1$s controller type"),
                         virDomainControllerTypeToString(controller->type));

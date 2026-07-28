@@ -373,6 +373,21 @@ cpuTestUpdate(const void *arg)
 
 
 static int
+cpuTestCacheInfo(const struct data *data)
+{
+    g_autoptr(virCPUDef) cpu = NULL;
+    g_autofree char *result = NULL;
+
+    if (!(cpu = cpuTestLoadXML(data->arch, data->name)))
+        return -1;
+
+    result = g_strdup_printf("%s-result", data->name);
+
+    return cpuTestCompareXML(data->arch, cpu, result);
+}
+
+
+static int
 cpuTestHasFeature(const void *arg)
 {
     const struct data *data = arg;
@@ -1091,6 +1106,24 @@ mymain(void)
     DO_TEST_UPDATE(VIR_ARCH_X86_64, "host-invtsc", "host-model", VIR_CPU_COMPARE_SUPERSET);
     DO_TEST_UPDATE_ONLY(VIR_ARCH_X86_64, "host", "host-passthrough");
     DO_TEST_UPDATE_ONLY(VIR_ARCH_X86_64, "host", "host-passthrough-features");
+
+    /* cacheinfo parameter details tests */
+    do {
+        struct data data = { VIR_ARCH_X86_64, NULL, "cacheinfo-full", NULL, NULL, NULL, 0, 0, 0 };
+        g_autofree char *testLabel = NULL;
+        testLabel = g_strdup_printf("%s(%s): %s", "cpuTestCacheInfo",
+                                    virArchToString(VIR_ARCH_X86_64), "cacheinfo-full");
+        virTestRunLog(&ret, testLabel,
+                      (int (*)(const void *))cpuTestCacheInfo, &data);
+    } while (0);
+    do {
+        struct data data = { VIR_ARCH_X86_64, NULL, "cacheinfo-defaults", NULL, NULL, NULL, 0, 0, 0 };
+        g_autofree char *testLabel = NULL;
+        testLabel = g_strdup_printf("%s(%s): %s", "cpuTestCacheInfo",
+                                    virArchToString(VIR_ARCH_X86_64), "cacheinfo-defaults");
+        virTestRunLog(&ret, testLabel,
+                      (int (*)(const void *))cpuTestCacheInfo, &data);
+    } while (0);
 
     DO_TEST_UPDATE(VIR_ARCH_PPC64, "host", "guest", VIR_CPU_COMPARE_IDENTICAL);
     DO_TEST_UPDATE(VIR_ARCH_PPC64, "host", "guest-nofallback", VIR_CPU_COMPARE_INCOMPATIBLE);

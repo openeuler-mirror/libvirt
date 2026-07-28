@@ -1781,6 +1781,8 @@ virLXCControllerSetupHostdevSubsys(virDomainDef *vmDef,
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_SCSI_HOST:
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_MDEV:
     case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_LAST:
+    case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
+    case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB:
     default:
         virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
                        _("Unsupported host device mode %1$s"),

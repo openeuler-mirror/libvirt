@@ -115,6 +115,40 @@ struct _virCPUCacheDef {
     virCPUCacheMode mode;
 };
 
+typedef enum {
+    VIR_CPU_CACHE_LEVEL_AND_TYPE_L1D,
+    VIR_CPU_CACHE_LEVEL_AND_TYPE_L1I,
+    VIR_CPU_CACHE_LEVEL_AND_TYPE_L1,
+    VIR_CPU_CACHE_LEVEL_AND_TYPE_L2,
+    VIR_CPU_CACHE_LEVEL_AND_TYPE_L3,
+
+    VIR_CPU_CACHE_LEVEL_AND_TYPE_LAST
+} virCPUCacheLevelAndType;
+
+VIR_ENUM_DECL(virCPUCacheLevelAndType);
+
+typedef enum {
+    VIR_CPU_CACHE_TOPOLOGY_LEVEL_THREAD,
+    VIR_CPU_CACHE_TOPOLOGY_LEVEL_CORE,
+    VIR_CPU_CACHE_TOPOLOGY_LEVEL_MODULE,
+    VIR_CPU_CACHE_TOPOLOGY_LEVEL_CLUSTER,
+    VIR_CPU_CACHE_TOPOLOGY_LEVEL_DIE,
+    VIR_CPU_CACHE_TOPOLOGY_LEVEL_SOCKET,
+    VIR_CPU_CACHE_TOPOLOGY_LEVEL_BOOK,
+    VIR_CPU_CACHE_TOPOLOGY_LEVEL_DRAWER,
+
+    VIR_CPU_CACHE_TOPOLOGY_LEVEL_LAST
+} virCPUCacheTopologyLevel;
+
+VIR_ENUM_DECL(virCPUCacheTopologyLevel);
+
+typedef struct _virCPUCacheInfoDef virCPUCacheInfoDef;
+typedef virCPUCacheInfoDef *virCPUCacheInfoDefPtr;
+struct _virCPUCacheInfoDef {
+    virCPUCacheLevelAndType cache;
+    virCPUCacheTopologyLevel topology;
+};
+
 
 typedef enum {
     VIR_CPU_MAX_PHYS_ADDR_MODE_EMULATE,
@@ -161,6 +195,8 @@ struct _virCPUDef {
     virCPUMaxPhysAddrDef *addr;
     virHostCPUTscInfo *tsc;
     virTristateSwitch migratable; /* for host-passthrough mode */
+    size_t ncacheinfo;
+    virCPUCacheInfoDef *cacheinfo;
 };
 
 virCPUDef *virCPUDefNew(void);

@@ -7316,6 +7316,16 @@ qemuBuildMachineCommandLine(virCommand *cmd,
         }
     }
 
+    if (cpu) {
+        for (i = 0; i < cpu->ncacheinfo; i++) {
+            const char *str;
+            str = virCPUCacheLevelAndTypeTypeToString(cpu->cacheinfo[i].cache);
+            virBufferAsprintf(&buf, ",smp-cache.%zu.cache=%s", i, str);
+            virBufferAsprintf(&buf, ",smp-cache.%zu.topology=%s", i,
+                              virCPUCacheTopologyLevelTypeToString(cpu->cacheinfo[i].topology));
+        }
+    }
+
     virCommandAddArgBuffer(cmd, &buf);
 
     return 0;

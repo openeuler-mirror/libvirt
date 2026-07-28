@@ -1,0 +1,7 @@
+<cpu mode='host-passthrough' migratable='off'>
+  <topology sockets='2' dies='1' clusters='2' cores='8' threads='2'/>
+  <cacheinfo cache='l1i' topology='core'/>
+  <cacheinfo cache='l1d' topology='core'/>
+  <cacheinfo cache='l2' topology='core'/>
+  <cacheinfo cache='l3' topology='cluster'/>
+</cpu>

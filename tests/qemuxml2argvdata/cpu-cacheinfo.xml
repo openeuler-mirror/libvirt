@@ -1,0 +1,24 @@
+<domain type='kvm'>
+  <name>foo</name>
+  <uuid>c7a5fdbd-edaf-9455-926a-d65c16db1809</uuid>
+  <memory unit='KiB'>219136</memory>
+  <currentMemory unit='KiB'>219136</currentMemory>
+  <vcpu placement='static'>4</vcpu>
+  <os>
+    <type arch='x86_64' machine='pc'>hvm</type>
+    <boot dev='hd'/>
+  </os>
+  <cpu mode='host-passthrough' migratable='off'>
+    <topology sockets='1' dies='1' clusters='1' cores='4' threads='1'/>
+    <cacheinfo cache='l1i' topology='core'/>
+    <cacheinfo cache='l1d' topology='core'/>
+    <cacheinfo cache='l2' topology='core'/>
+    <cacheinfo cache='l3' topology='cluster'/>
+  </cpu>
+  <clock offset='utc'/>
+  <on_poweroff>destroy</on_poweroff>
+  <on_reboot>restart</on_reboot>
+  <on_crash>destroy</on_crash>
+  <devices>
+  </devices>
+</domain>

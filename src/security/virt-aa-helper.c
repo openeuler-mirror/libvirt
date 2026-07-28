@@ -1109,6 +1109,8 @@ get_files(vahControl * ctl)
 
             case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_SCSI:
             case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_SCSI_HOST:
+            case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_VDPA:
+            case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_UB:
             case VIR_DOMAIN_HOSTDEV_SUBSYS_TYPE_LAST:
             default:
                 rc = 0;

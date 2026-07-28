@@ -93,8 +93,11 @@ virDomainCheckpointTypeToString;
 
 
 # conf/cpu_conf.h
+virCPUCacheLevelAndTypeTypeFromString;
+virCPUCacheLevelAndTypeTypeToString;
 virCPUCacheModeTypeFromString;
 virCPUCacheModeTypeToString;
+virCPUCacheTopologyLevelTypeToString;
 virCPUDefAddFeature;
 virCPUDefAddFeatureIfMissing;
 virCPUDefCheckFeatures;
