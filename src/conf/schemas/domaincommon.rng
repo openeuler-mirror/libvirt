@@ -5765,6 +5765,11 @@
            <ref name="virOnOff"/>
          </attribute>
        </optional>
+      <optional>
+        <attribute name="memop">
+          <ref name="virOnOff"/>
+        </attribute>
+      </optional>
       <interleave>
         <optional>
           <ref name="alias"/>

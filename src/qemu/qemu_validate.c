@@ -4836,6 +4836,13 @@ qemuValidateDomainDeviceDefMemballoon(const virDomainMemballoonDef *memballoon,
         return -1;
     }
 
+    if (memballoon->memop != VIR_TRISTATE_SWITCH_ABSENT &&
+        !virQEMUCapsGet(qemuCaps, QEMU_CAPS_VIRTIO_BALLOON_MEMOP)) {
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                       _("memop is not supported by this QEMU binary"));
+        return -1;
+    }
+
     return 0;
 }
 
