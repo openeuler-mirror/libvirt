@@ -147,6 +147,7 @@ typedef virCPUCacheInfoDef *virCPUCacheInfoDefPtr;
 struct _virCPUCacheInfoDef {
     virCPUCacheLevelAndType cache;
     virCPUCacheTopologyLevel topology;
+    unsigned int size;
 };
 
 

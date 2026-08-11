@@ -7323,6 +7323,8 @@ qemuBuildMachineCommandLine(virCommand *cmd,
             virBufferAsprintf(&buf, ",smp-cache.%zu.cache=%s", i, str);
             virBufferAsprintf(&buf, ",smp-cache.%zu.topology=%s", i,
                               virCPUCacheTopologyLevelTypeToString(cpu->cacheinfo[i].topology));
+            virBufferAsprintf(&buf, ",smp-cache.%zu.size=%u", i,
+                              cpu->cacheinfo[i].size);
         }
     }
 

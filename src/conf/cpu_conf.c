@@ -31,6 +31,20 @@
 
 #define VIR_FROM_THIS VIR_FROM_CPU
 
+/* Cache size unit conversion */
+#define CACHE_KB                    1024
+#define CACHE_MB                    (1024 * 1024)
+
+/* String to integer conversion base */
+#define CACHE_STR_TO_INT_BASE       10
+
+/* Default cache sizes (in bytes) */
+#define CACHE_L1D_DEFAULT_SIZE      (32 * CACHE_KB)
+#define CACHE_L1I_DEFAULT_SIZE      (64 * CACHE_KB)
+#define CACHE_L1_DEFAULT_SIZE       (64 * CACHE_KB)
+#define CACHE_L2_DEFAULT_SIZE       (1 * CACHE_MB)
+#define CACHE_L3_DEFAULT_SIZE       (22 * CACHE_MB)
+
 VIR_LOG_INIT("conf.cpu_conf");
 
 VIR_ENUM_IMPL(virCPU,
@@ -382,6 +396,26 @@ virGetCacheInfoDefaultTopology(virCPUCacheLevelAndType cache_type)
     }
 }
 
+static unsigned int
+virGetCacheInfoDefaultSize(virCPUCacheLevelAndType cache_type)
+{
+    switch (cache_type) {
+    case VIR_CPU_CACHE_LEVEL_AND_TYPE_L1D:
+        return CACHE_L1D_DEFAULT_SIZE;
+    case VIR_CPU_CACHE_LEVEL_AND_TYPE_L1I:
+        return CACHE_L1I_DEFAULT_SIZE;
+    case VIR_CPU_CACHE_LEVEL_AND_TYPE_L1:
+        return CACHE_L1_DEFAULT_SIZE;
+    case VIR_CPU_CACHE_LEVEL_AND_TYPE_L2:
+        return CACHE_L2_DEFAULT_SIZE;
+    case VIR_CPU_CACHE_LEVEL_AND_TYPE_L3:
+        return CACHE_L3_DEFAULT_SIZE;
+    case VIR_CPU_CACHE_LEVEL_AND_TYPE_LAST:
+    default:
+        return 0;
+    }
+}
+
 /*
  * Parses CPU definition XML from a node pointed to by @xpath. If @xpath is
  * NULL, the current node of @ctxt is used (i.e., it is a shortcut to ".").
@@ -716,6 +750,7 @@ virCPUDefParseXML(xmlXPathContextPtr ctxt,
         virCPUCacheLevelAndType cache_type;
         virCPUCacheTopologyLevel cache_topology;
         char *tmp;
+        unsigned int size;
 
         tmp = virXMLPropString(nodes[i], "cache");
         if (tmp == NULL) {
@@ -745,7 +780,19 @@ virCPUDefParseXML(xmlXPathContextPtr ctxt,
             return -1;
         }
 
+        tmp = virXMLPropString(nodes[i], "size");
+        if (tmp == NULL) {
+            size = virGetCacheInfoDefaultSize(cache_type);
+        } else if (virStrToLong_ui(tmp, NULL, CACHE_STR_TO_INT_BASE, &size) < 0) {
+            virReportError(VIR_ERR_XML_ERROR,
+                           _("invalid setting for cache size '%s'"), tmp);
+            VIR_FREE(tmp);
+            return -1;
+        }
+        VIR_FREE(tmp);
+
         def->cacheinfo[i].cache = cache_type;
+        def->cacheinfo[i].size = size;
         def->cacheinfo[i].topology = cache_topology;
     }
 
@@ -969,9 +1016,10 @@ virCPUDefFormatBuf(virBuffer *buf,
         virCPUCacheInfoDefPtr cacheinfo = def->cacheinfo + i;
 
         virBufferAsprintf(buf,
-                          "<cacheinfo cache='%s' topology='%s'/>\n",
+                          "<cacheinfo cache='%s' topology='%s' size='%u'/>\n",
                           virCPUCacheLevelAndTypeTypeToString(cacheinfo->cache),
-                          virCPUCacheTopologyLevelTypeToString(cacheinfo->topology));
+                          virCPUCacheTopologyLevelTypeToString(cacheinfo->topology),
+                          cacheinfo->size);
     }
 
     for (i = 0; i < def->nfeatures; i++) {
@@ -1289,7 +1337,8 @@ virCPUDefIsEqual(virCPUDef *src,
 
     for (i = 0; i < src->ncacheinfo; i++) {
         if (src->cacheinfo[i].cache != dst->cacheinfo[i].cache ||
-            src->cacheinfo[i].topology != dst->cacheinfo[i].topology) {
+            src->cacheinfo[i].topology != dst->cacheinfo[i].topology ||
+            src->cacheinfo[i].size != dst->cacheinfo[i].size) {
             MISMATCH("%s", _("Target CPU cacheinfo does not match source"));
             return false;
         }
