@@ -10,7 +10,7 @@ XDG_CONFIG_HOME=/var/lib/libvirt/qemu/domain--1-foo/.config \
 -name guest=foo,debug-threads=on \
 -S \
 -object '{"qom-type":"secret","id":"masterKey0","format":"raw","file":"/var/lib/libvirt/qemu/domain--1-foo/master-key.aes"}' \
--machine pc,usb=off,dump-guest-core=off,memory-backend=pc.ram,acpi=off,smp-cache.0.cache=l1i,smp-cache.0.topology=core,smp-cache.1.cache=l1d,smp-cache.1.topology=core,smp-cache.2.cache=l2,smp-cache.2.topology=core,smp-cache.3.cache=l3,smp-cache.3.topology=cluster \
+-machine pc,usb=off,dump-guest-core=off,memory-backend=pc.ram,acpi=off,smp-cache.0.cache=l1i,smp-cache.0.topology=core,smp-cache.0.size=131072,smp-cache.1.cache=l1d,smp-cache.1.topology=core,smp-cache.1.size=32768,smp-cache.2.cache=l2,smp-cache.2.topology=core,smp-cache.2.size=1048576,smp-cache.3.cache=l3,smp-cache.3.topology=cluster,smp-cache.3.size=23068672 \
 -accel kvm \
 -cpu host,migratable=off \
 -m size=219136k \

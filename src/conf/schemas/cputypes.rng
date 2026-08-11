@@ -498,6 +498,11 @@
           </choice>
         </attribute>
       </optional>
+      <optional>
+        <attribute name="size">
+          <ref name="positiveInteger"/>
+        </attribute>
+      </optional>
     </element>
   </define>
 </grammar>
