@@ -2099,6 +2099,7 @@ struct _virDomainMemballoonDef {
     int period; /* seconds between collections */
     virTristateSwitch autodeflate;
     virTristateSwitch free_page_reporting;
+    virTristateSwitch memop;
     virDomainVirtioOptions *virtio;
 };
 

@@ -12620,6 +12620,11 @@ virDomainMemballoonDefParseXML(virDomainXMLOption *xmlopt,
                                  &def->free_page_reporting) < 0)
         goto error;
 
+    if (virXMLPropTristateSwitch(node, "memop",
+                                 VIR_XML_PROP_NONE,
+                                 &def->memop) < 0)
+        goto error;
+
     if ((stats = virXPathNode("./stats", ctxt))) {
         if (virXMLPropInt(stats, "period", 0, VIR_XML_PROP_NONE,
                           &def->period, 0) < 0)
@@ -21031,6 +21036,14 @@ virDomainMemballoonDefCheckABIStability(virDomainMemballoonDef *src,
         return false;
     }
 
+    if (src->memop != dst->memop) {
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                       _("Target balloon memop attribute value '%1$s' does not match source '%2$s'"),
+                       virTristateSwitchTypeToString(dst->memop),
+                       virTristateSwitchTypeToString(src->memop));
+        return false;
+    }
+
     if (!virDomainVirtioOptionsCheckABIStability(src->virtio, dst->virtio))
         return false;
 
@@ -25641,6 +25654,10 @@ virDomainMemballoonDefFormat(virBuffer *buf,
     if (def->free_page_reporting != VIR_TRISTATE_SWITCH_ABSENT)
         virBufferAsprintf(&attrBuf, " freePageReporting='%s'",
                           virTristateSwitchTypeToString(def->free_page_reporting));
+
+    if (def->memop != VIR_TRISTATE_SWITCH_ABSENT)
+        virBufferAsprintf(&attrBuf, " memop='%s'",
+                          virTristateSwitchTypeToString(def->memop));
 
     if (def->period)
         virBufferAsprintf(&childrenBuf, "<stats period='%i'/>\n", def->period);

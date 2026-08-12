@@ -719,6 +719,8 @@ VIR_ENUM_IMPL(virQEMUCaps,
 
               /* 475 */
               "machine.virt.highmem-mmio-size", /* QEMU_CAPS_MACHINE_VIRT_HIGHMEM_MMIO_SIZE */
+
+              "virtio-balloon.memop", /* QEMU_CAPS_VIRTIO_BALLOON_MEMOP */
     );
 
 
@@ -1427,6 +1429,7 @@ struct virQEMUCapsDevicePropsFlags {
 static struct virQEMUCapsDevicePropsFlags virQEMUCapsDevicePropsVirtioBalloon[] = {
     { "deflate-on-oom", QEMU_CAPS_VIRTIO_BALLOON_AUTODEFLATE, NULL },
     { "free-page-reporting", QEMU_CAPS_VIRTIO_BALLOON_FREE_PAGE_REPORTING, NULL },
+    { "memop", QEMU_CAPS_VIRTIO_BALLOON_MEMOP, NULL },
     { "acpi-index", QEMU_CAPS_ACPI_INDEX, NULL },
 };
 

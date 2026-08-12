@@ -4354,6 +4354,7 @@ qemuBuildMemballoonCommandLine(virCommand *cmd,
                               "s:id", def->memballoon->info.alias,
                               "T:deflate-on-oom", def->memballoon->autodeflate,
                               "T:free-page-reporting", def->memballoon->free_page_reporting,
+                              "T:memop", def->memballoon->memop,
                               NULL) < 0)
         return -1;
 
