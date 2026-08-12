@@ -169,7 +169,7 @@ qemuValidateDomainDefFeatures(const virDomainDef *def,
 
         case VIR_DOMAIN_FEATURE_PVSPINLOCK:
             if (def->features[i] != VIR_TRISTATE_SWITCH_ABSENT &&
-                !ARCH_IS_X86(def->os.arch)) {
+                !ARCH_IS_X86(def->os.arch) && !qemuDomainIsARMVirt(def)) {
                 virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
                                _("The '%1$s' feature is not supported for architecture '%2$s' or machine type '%3$s'"),
                                  featureName,
