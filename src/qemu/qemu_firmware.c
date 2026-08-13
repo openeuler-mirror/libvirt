@@ -441,6 +441,7 @@ qemuFirmwareMappingKernelParse(const char *path,
         virReportError(VIR_ERR_INTERNAL_ERROR,
                        _("missing 'filename' in '%1$s'"),
                        path);
+        return -1;
     }
 
     kernel->filename = g_strdup(filename);
@@ -460,6 +461,7 @@ qemuFirmwareMappingMemoryParse(const char *path,
         virReportError(VIR_ERR_INTERNAL_ERROR,
                        _("missing 'filename' in '%1$s'"),
                        path);
+        return -1;
     }
 
     memory->filename = g_strdup(filename);
