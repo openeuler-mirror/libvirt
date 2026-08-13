@@ -2887,7 +2887,7 @@ qemuBuildControllerUBDevProps(virDomainDeviceInfo *info,
 }
 
 /**
- * qemuBuildControllerDevStr:
+ * qemuBuildControllerDevProps:
  * @domainDef: domain definition
  * @def: controller definition
  * @qemuCaps: QEMU binary capabilities
@@ -3146,10 +3146,10 @@ qemuBuildControllersByTypeCommandLine(virCommand *cmd,
              *
              * Note that we *don't* want to end up with the legacy USB
              * controller for q35 and virt machines, so we go ahead and
-             * fail in qemuBuildControllerDevStr(); on the other hand,
+             * fail in qemuBuildControllerDevProps(); on the other hand,
              * for s390 machines we want to ignore any USB controller
              * (see 548ba43028 for the full story), so we skip
-             * qemuBuildControllerDevStr() but we don't ultimately end
+             * qemuBuildControllerDevProps() but we don't ultimately end
              * up adding the legacy USB controller */
             continue;
         }
