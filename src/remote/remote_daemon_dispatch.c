@@ -6716,9 +6716,11 @@ remoteDispatchNodeGetFreePages(virNetServerPtr server G_GNUC_UNUSED,
     if (!conn)
         goto cleanup;
 
-    if (args->pages.pages_len * args->cellCount > REMOTE_NODE_MAX_CELLS) {
-        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
-                       _("the result won't fit into REMOTE_NODE_MAX_CELLS"));
+    if (VIR_INT_MULTIPLY_OVERFLOW(args->pages.pages_len, args->cellCount) ||
+        args->pages.pages_len * args->cellCount > REMOTE_NODE_MAX_CELLS) {
+        virReportError(VIR_ERR_INTERNAL_ERROR,
+                   _("npages * cellcount > REMOTE_NODE_MAX_CELLS (%1$u)"),
+                   REMOTE_NODE_MAX_CELLS);
         goto cleanup;
     }
 
