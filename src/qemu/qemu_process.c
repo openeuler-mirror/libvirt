@@ -4576,14 +4576,17 @@ qemuProcessVerifyKVMFeatures(virDomainDef *def,
     if (def->features[VIR_DOMAIN_FEATURE_PVSPINLOCK] != VIR_TRISTATE_SWITCH_ON)
         return 0;
 
-    rc = virCPUDataCheckFeature(cpu, VIR_CPU_x86_KVM_PV_UNHALT);
-
-    if (rc <= 0) {
-        if (rc == 0)
-            virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
-                           _("host doesn't support paravirtual spinlocks"));
-        return -1;
+    /* x86: verify CPU feature via CPUID */
+    if (ARCH_IS_X86(def->os.arch)) {
+        rc = virCPUDataCheckFeature(cpu, VIR_CPU_x86_KVM_PV_UNHALT);
+        if (rc <= 0) {
+            if (rc == 0)
+                virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                               _("host doesn't support paravirtual spinlocks"));
+            return -1;
+        }
     }
+    /* ARM: feature detection handled at runtime by KVM via SMCCC */
 
     return 0;
 }
