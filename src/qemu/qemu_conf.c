@@ -443,8 +443,7 @@ virQEMUDriverConfigLoadVNCEntry(virQEMUDriverConfig *cfg,
 
     if (cfg->vncPassword &&
         strlen(cfg->vncPassword) > 8) {
-        VIR_WARN("VNC password is %zu characters long, only 8 permitted, truncating",
-                 strlen(cfg->vncPassword));
+        VIR_WARN("VNC password exceeds maximum length, truncating");
         cfg->vncPassword[8] = '\0';
     }
     return 0;
