@@ -31,6 +31,7 @@
 #include "virhash.h"
 #include "virlog.h"
 #include "virstring.h"
+#include "virsecureerase.h"
 
 #define VIR_FROM_THIS VIR_FROM_SECRET
 
@@ -135,7 +136,7 @@ virSecretObjDispose(void *opaque)
     virSecretDefFree(obj->def);
     if (obj->value) {
         /* Wipe before free to ensure we don't leave a secret on the heap */
-        memset(obj->value, 0, obj->value_size);
+        virSecureErase(obj->value, obj->value_size);
         g_free(obj->value);
     }
     g_free(obj->configFile);
@@ -758,7 +759,7 @@ virSecretObjSetValue(virSecretObj *obj,
 
     /* Saved successfully - drop old value */
     if (old_value)
-        memset(old_value, 0, old_value_size);
+        virSecureErase(old_value, old_value_size);
 
     return 0;
 

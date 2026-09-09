@@ -769,6 +769,7 @@ virNWFilterSnoopDHCPGetOpt(virNWFilterSnoopDHCPHdr *pd, int len,
     *pleasetime = 0;
 
     while (oind < olen) {
+        uint8_t opt_len;
         switch (pd->d_opts[oind]) {
         case DHCPO_LEASE:
             if (olen - oind < 6)
@@ -793,8 +794,13 @@ virNWFilterSnoopDHCPGetOpt(virNWFilterSnoopDHCPHdr *pd, int len,
         default:
             if (olen - oind < 2)
                 goto error;
+            break;
         }
-        oind += pd->d_opts[oind + 1] + 2;
+        /* Verify that the option length field does not cause out-of-bounds errors */
+        opt_len = pd->d_opts[oind + 1];
+        if (olen - oind < (int)(opt_len + 2))
+            goto error;
+        oind += opt_len + 2;
     }
     return 0;
  error:
@@ -835,6 +841,15 @@ virNWFilterSnoopDHCPDecode(virNWFilterSnoopReq *req,
     }
 
     if (len < 0)
+        return -2;
+
+    /* Verify the IP header length */
+    /* The minimum value is 5 (20 bytes), and the maximum value is 15 (60 bytes) */
+    if (pip->ihl < 5 || pip->ihl > 15)
+        return -2;
+
+    /* Ensure that the IP header length does not exceed the available data */
+    if ((size_t)(pip->ihl << 2) > (size_t)len)
         return -2;
 
     VIR_WARNINGS_NO_CAST_ALIGN
