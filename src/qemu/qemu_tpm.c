@@ -301,6 +301,8 @@ qemuTPMEmulatorPrepareHost(virDomainTPMDefPtr tpm,
                            uid_t qemu_user,
                            const char *shortName)
 {
+    VIR_AUTOCLOSE logfd = -1;
+
     if (virTPMEmulatorInit() < 0)
         return -1;
 
@@ -313,13 +315,20 @@ qemuTPMEmulatorPrepareHost(virDomainTPMDefPtr tpm,
                      VIR_DIR_CREATE_ALLOW_EXIST) < 0)
         return -1;
 
-    if (!virFileExists(tpm->data.emulator.logfile) &&
-        virFileTouch(tpm->data.emulator.logfile, 0644) < 0) {
+    /* Open (creating if necessary) the logfile without following a
+     * symlink. The log directory is writable by swtpm_user, so we want
+     * to avoid chown'ing a symlink to an arbitrary path.
+     */
+    if ((logfd = open(tpm->data.emulator.logfile,
+                      O_WRONLY | O_CREAT | O_NOFOLLOW | O_CLOEXEC, 0644)) < 0) {
+        virReportSystemError(errno,
+                             _("Could not open swtpm logfile %1$s"),
+                             tpm->data.emulator.logfile);
         return -1;
     }
 
     /* ... and make sure it can be accessed by swtpm_user */
-    if (chown(tpm->data.emulator.logfile, swtpm_user, swtpm_group) < 0) {
+    if (fchown(logfd, swtpm_user, swtpm_group) < 0) {
         virReportSystemError(errno,
                              _("Could not chown on swtpm logfile %s"),
                              tpm->data.emulator.logfile);
