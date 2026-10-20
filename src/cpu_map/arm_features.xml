@@ -23,7 +23,7 @@
   <feature name='fp'/>
   <feature name='asimd'/>
   <feature name='evtstrm'/>
-  <feature name='aes'          sysreg='SYSREG_ID_AA64ZFR0_EL1_AES'       sysreg_value='0x0'/>
+  <feature name='aes'/>
   <feature name='pmull'/>
   <feature name='sha1'/>
   <feature name='sha2'/>
@@ -44,10 +44,10 @@
   <feature name='svef64mm'/>
 
   <!-- Kunpeng-920-V2 cpu features -->
-  <feature name='lrcpc'       sysreg='SYSREG_ID_AA64ISAR1_EL1_LRCPC'    sysreg_value='0x2'/>
-  <feature name='sha3'         sysreg='SYSREG_ID_AA64ZFR0_EL1_SHA3'      sysreg_value='0x0'/>
+  <feature name='lrcpc'/>
+  <feature name='sha3'/>
   <feature name='sm3'/>
-  <feature name='sm4'          sysreg='SYSREG_ID_AA64ZFR0_EL1_SM4'       sysreg_value='0x0'/>
+  <feature name='sm4'/>
   <feature name='sha512'/>
   <feature name='dit'/>
   <feature name='uscat'/>
@@ -76,42 +76,53 @@
 
   <!-- Kunpeng-950-V1 cpu features -->
   <feature name='bti'/>
-  <feature name='afp'        sysreg='SYSREG_ID_AA64MMFR1_EL1_AFP'       sysreg_value='0x0'/>
-  <feature name='rpres'      sysreg='SYSREG_ID_AA64ISAR2_EL1_RPRES'     sysreg_value='0x0'/>
-  <feature name='wfxt'       sysreg='SYSREG_ID_AA64ISAR2_EL1_WFxT'      sysreg_value='0x0'/>
-  <feature name='rprfm'      sysreg='SYSREG_ID_AA64ISAR2_EL1_RPRFM'     sysreg_value='0x0'/>
+  <feature name='afp'/>
+  <feature name='rpres'/>
+  <feature name='wfxt'/>
+  <feature name='rprfm'/>
   <feature name='hbc'/>
-  <feature name='ls64'       sysreg='SYSREG_ID_AA64ISAR1_EL1_LS64'      sysreg_value='0x0'/>
+  <feature name='ls64'/>
   <feature name='ls64_v'/>
-
-  <!-- SYSREG features -->
-  <feature name='nmi'        sysreg='SYSREG_ID_AA64PFR1_EL1_NMI'        sysreg_value='0x0'/>
-  <feature name='xs'         sysreg='SYSREG_ID_AA64ISAR1_EL1_XS'        sysreg_value='0x0'/>
-  <feature name='clrbhb'     sysreg='SYSREG_ID_AA64ISAR2_EL1_CLRBHB'    sysreg_value='0x0'/>
-  <feature name='pac_frac'   sysreg='SYSREG_ID_AA64ISAR2_EL1_PAC_frac'  sysreg_value='0x0'/>
-  <feature name='fgt'        sysreg='SYSREG_ID_AA64MMFR0_EL1_FGT'       sysreg_value='0x0'/>
-  <feature name='bigend'     sysreg='SYSREG_ID_AA64MMFR0_EL1_BIGEND'    sysreg_value='0x0'/>
-  <feature name='ecbhb'      sysreg='SYSREG_ID_AA64MMFR1_EL1_ECBHB'     sysreg_value='0x0'/>
-  <feature name='cmow'       sysreg='SYSREG_ID_AA64MMFR1_EL1_CMOW'      sysreg_value='0x0'/>
-  <feature name='tidcp1'     sysreg='SYSREG_ID_AA64MMFR1_EL1_TIDCP1'    sysreg_value='0x0'/>
-  <feature name='ntlbpa'     sysreg='SYSREG_ID_AA64MMFR1_EL1_nTLBPA'    sysreg_value='0x0'/>
-  <feature name='hcx'        sysreg='SYSREG_ID_AA64MMFR1_EL1_HCX'       sysreg_value='0x0'/>
-  <feature name='ets'        sysreg='SYSREG_ID_AA64MMFR1_EL1_ETS'       sysreg_value='0x0'/>
-  <feature name='pan'        sysreg='SYSREG_ID_AA64MMFR1_EL1_PAN'       sysreg_value='0x2'/>
-  <feature name='hafdbs'     sysreg='SYSREG_ID_AA64MMFR1_EL1_HAFDBS'    sysreg_value='0x2'/>
-  <feature name='cnp'        sysreg='SYSREG_ID_AA64MMFR2_EL1_CnP'       sysreg_value='0x0'/>
-  <feature name='tcrx'       sysreg='SYSREG_ID_AA64MMFR3_EL1_TCRX'      sysreg_value='0x0'/>
-  <feature name='pmuver'     sysreg='SYSREG_ID_AA64DFR0_EL1_PMUVer'     sysreg_value='0x6'/>
-  <feature name='debugver'   sysreg='SYSREG_ID_AA64DFR0_EL1_DebugVer'   sysreg_value='0x9'/>
-  <feature name='doublelock' sysreg='SYSREG_ID_AA64DFR0_EL1_DoubleLock' sysreg_value='0xf'/>
-  <feature name='f64mm'      sysreg='SYSREG_ID_AA64ZFR0_EL1_F64MM'      sysreg_value='0x0'/>
-  <feature name='f32mm'      sysreg='SYSREG_ID_AA64ZFR0_EL1_F32MM'      sysreg_value='0x0'/>
-  <feature name='bitperm'    sysreg='SYSREG_ID_AA64ZFR0_EL1_BitPerm'    sysreg_value='0x0'/>
-  <feature name='svever'     sysreg='SYSREG_ID_AA64ZFR0_EL1_SVEver'     sysreg_value='0x0'/>
-  <feature name='l1ip'       sysreg='SYSREG_CTR_EL0_L1Ip'               sysreg_value='0x2'/>
-  <feature name='bc'         sysreg='SYSREG_ID_AA64ISAR2_EL1_BC'        sysreg_value='0x0'/>
 
   <!-- Common ARM v8 processor features -->
   <feature name='pauth'/>
   <feature name='pmu'/>
+
+  <!-- SYSREG features: named as <register>_<field>, each translates to
+       QEMU's -cpu host,SYSREG_<REG>_<FIELD>=<value> property for pinning
+       implementation-defined ID register fields across live migration -->
+  <feature name='pfr1_el1_nmi'        sysreg='SYSREG_ID_AA64PFR1_EL1_NMI'          sysreg_value='0x0'/>
+  <feature name='isar1_el1_ls64'      sysreg='SYSREG_ID_AA64ISAR1_EL1_LS64'        sysreg_value='0x0'/>
+  <feature name='isar1_el1_xs'        sysreg='SYSREG_ID_AA64ISAR1_EL1_XS'          sysreg_value='0x0'/>
+  <feature name='isar1_el1_lrcpc'     sysreg='SYSREG_ID_AA64ISAR1_EL1_LRCPC'       sysreg_value='0x2'/>
+  <feature name='isar2_el1_rprfm'     sysreg='SYSREG_ID_AA64ISAR2_EL1_RPRFM'       sysreg_value='0x0'/>
+  <feature name='isar2_el1_clrbhb'    sysreg='SYSREG_ID_AA64ISAR2_EL1_CLRBHB'      sysreg_value='0x0'/>
+  <feature name='isar2_el1_pac_frac'  sysreg='SYSREG_ID_AA64ISAR2_EL1_PAC_frac'    sysreg_value='0x0'/>
+  <feature name='isar2_el1_bc'        sysreg='SYSREG_ID_AA64ISAR2_EL1_BC'          sysreg_value='0x0'/>
+  <feature name='isar2_el1_rpres'     sysreg='SYSREG_ID_AA64ISAR2_EL1_RPRES'       sysreg_value='0x0'/>
+  <feature name='isar2_el1_wfxt'      sysreg='SYSREG_ID_AA64ISAR2_EL1_WFxT'        sysreg_value='0x0'/>
+  <feature name='mmfr0_el1_fgt'       sysreg='SYSREG_ID_AA64MMFR0_EL1_FGT'         sysreg_value='0x0'/>
+  <feature name='mmfr0_el1_bigend'    sysreg='SYSREG_ID_AA64MMFR0_EL1_BIGEND'      sysreg_value='0x0'/>
+  <feature name='mmfr1_el1_ecbhb'     sysreg='SYSREG_ID_AA64MMFR1_EL1_ECBHB'       sysreg_value='0x0'/>
+  <feature name='mmfr1_el1_cmow'      sysreg='SYSREG_ID_AA64MMFR1_EL1_CMOW'        sysreg_value='0x0'/>
+  <feature name='mmfr1_el1_tidcp1'    sysreg='SYSREG_ID_AA64MMFR1_EL1_TIDCP1'      sysreg_value='0x0'/>
+  <feature name='mmfr1_el1_ntlbpa'    sysreg='SYSREG_ID_AA64MMFR1_EL1_nTLBPA'      sysreg_value='0x0'/>
+  <feature name='mmfr1_el1_afp'       sysreg='SYSREG_ID_AA64MMFR1_EL1_AFP'         sysreg_value='0x0'/>
+  <feature name='mmfr1_el1_hcx'       sysreg='SYSREG_ID_AA64MMFR1_EL1_HCX'         sysreg_value='0x0'/>
+  <feature name='mmfr1_el1_ets'       sysreg='SYSREG_ID_AA64MMFR1_EL1_ETS'         sysreg_value='0x0'/>
+  <feature name='mmfr1_el1_pan'       sysreg='SYSREG_ID_AA64MMFR1_EL1_PAN'         sysreg_value='0x2'/>
+  <feature name='mmfr1_el1_hafdbs'    sysreg='SYSREG_ID_AA64MMFR1_EL1_HAFDBS'      sysreg_value='0x2'/>
+  <feature name='mmfr2_el1_cnp'       sysreg='SYSREG_ID_AA64MMFR2_EL1_CnP'         sysreg_value='0x0'/>
+  <feature name='mmfr3_el1_tcrx'      sysreg='SYSREG_ID_AA64MMFR3_EL1_TCRX'        sysreg_value='0x0'/>
+  <feature name='dfr0_el1_pmuver'     sysreg='SYSREG_ID_AA64DFR0_EL1_PMUVer'       sysreg_value='0x6'/>
+  <feature name='dfr0_el1_debugver'   sysreg='SYSREG_ID_AA64DFR0_EL1_DebugVer'     sysreg_value='0x9'/>
+  <feature name='dfr0_el1_doublelock' sysreg='SYSREG_ID_AA64DFR0_EL1_DoubleLock'   sysreg_value='0xf'/>
+  <feature name='zfr0_el1_f64mm'      sysreg='SYSREG_ID_AA64ZFR0_EL1_F64MM'        sysreg_value='0x0'/>
+  <feature name='zfr0_el1_f32mm'      sysreg='SYSREG_ID_AA64ZFR0_EL1_F32MM'        sysreg_value='0x0'/>
+  <feature name='zfr0_el1_sm4'        sysreg='SYSREG_ID_AA64ZFR0_EL1_SM4'          sysreg_value='0x0'/>
+  <feature name='zfr0_el1_sha3'       sysreg='SYSREG_ID_AA64ZFR0_EL1_SHA3'         sysreg_value='0x0'/>
+  <feature name='zfr0_el1_bitperm'    sysreg='SYSREG_ID_AA64ZFR0_EL1_BitPerm'      sysreg_value='0x0'/>
+  <feature name='zfr0_el1_aes'        sysreg='SYSREG_ID_AA64ZFR0_EL1_AES'          sysreg_value='0x0'/>
+  <feature name='zfr0_el1_svever'     sysreg='SYSREG_ID_AA64ZFR0_EL1_SVEver'       sysreg_value='0x0'/>
+  <feature name='ctr_el0_l1ip'        sysreg='SYSREG_CTR_EL0_L1Ip'                 sysreg_value='0x2'/>
 </cpus>
