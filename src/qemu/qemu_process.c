@@ -64,6 +64,7 @@
 #include "qemu_hotpatch.h"
 
 #include "cpu/cpu.h"
+#include "cpu/cpu_arm.h"
 #include "cpu/cpu_x86.h"
 #include "datatypes.h"
 #include "virlog.h"
@@ -6842,6 +6843,72 @@ qemuProcessPrepareChardevSource(virDomainDef *def,
 
 
 /**
+ * qemuProcessVerifyTargetImplCpus:
+ * @def: domain definition
+ *
+ * When the domain pins the target CPU implementations via
+ * <targetImplCpus>, require that the host this domain is about to
+ * start on (either the source host or the migration destination) is
+ * part of the pinned list.  This keeps the guest-visible MIDR/REVIDR
+ * consistent with what QEMU is told via x-target-impl-cpus and blocks
+ * starting or migrating in the domain on a host type that was never
+ * declared in the XML.
+ *
+ * MIDR matches but REVIDR differs is reported separately since it
+ * usually means a same-silicon host with a different revision was
+ * pinned with the wrong REVIDR value.
+ *
+ * When the host implementation ID registers cannot be read from sysfs
+ * the check is skipped: there is nothing to compare against and this
+ * must not turn into a regression for hosts not exposing the files.
+ */
+static int
+qemuProcessVerifyTargetImplCpus(const virDomainDef *def)
+{
+    virCPUDefTargetImplCpus *impl;
+    unsigned int host_midr = 0;
+    unsigned int host_revidr = 0;
+    size_t i;
+
+    if (!def->cpu || !def->cpu->targetImplCpus)
+        return 0;
+
+    if (!ARCH_IS_ARM(def->os.arch))
+        return 0;
+
+    impl = def->cpu->targetImplCpus;
+
+    if (virCPUarmGetHostImplId(0, &host_midr, &host_revidr) < 0) {
+        VIR_WARN("Cannot read host MIDR/REVIDR from sysfs, "
+                 "skipping <targetImplCpus> host consistency check for domain %s",
+                 def->name);
+        return 0;
+    }
+
+    for (i = 0; i < impl->nimplCpus; i++) {
+        if (impl->midr[i] != host_midr)
+            continue;
+
+        if (impl->revidr[i] == host_revidr)
+            return 0;
+
+        virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                       _("host CPU MIDR 0x%1$08x matches <targetImplCpus> entry %2$zu "
+                         "but REVIDR differs (host: 0x%3$08x, XML: 0x%4$08x)"),
+                       host_midr, i, host_revidr, impl->revidr[i]);
+        return -1;
+    }
+
+    virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                   _("host CPU (MIDR=0x%1$08x, REVIDR=0x%2$08x) is not listed in "
+                     "<targetImplCpus> of domain %3$s"),
+                   host_midr, host_revidr, def->name);
+
+    return -1;
+}
+
+
+/**
  * qemuProcessPrepareDomain:
  * @driver: qemu driver
  * @vm: domain object
@@ -6869,6 +6936,9 @@ qemuProcessPrepareDomain(virQEMUDriver *driver,
 
     priv->machineName = qemuDomainGetMachineName(vm);
     if (!priv->machineName)
+        return -1;
+
+    if (qemuProcessVerifyTargetImplCpus(vm->def) < 0)
         return -1;
 
     if (!(flags & VIR_QEMU_PROCESS_START_PRETEND)) {

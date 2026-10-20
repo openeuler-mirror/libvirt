@@ -34,6 +34,7 @@
 #include "cpu.h"
 #include "cpu_arm.h"
 #include "cpu_map.h"
+#include "virfile.h"
 #include "virlog.h"
 #include "virxml.h"
 
@@ -43,6 +44,13 @@
 #define BIT_SHIFTS(n) (1UL << (n))
 /* The current max number of cpu flags on ARM is 32 */
 #define MAX_CPU_FLAGS 32
+
+/* sysfs path to the implementation ID registers of host CPU @cpu,
+ * e.g. /sys/devices/system/cpu/cpu0/regs/identification/midr_el1 */
+#define SYSREG_ID_PATH_FMT "/sys/devices/system/cpu/cpu%zu/regs/identification/%s"
+/* the sysfs files contain a short hex string with optional 0x prefix */
+#define SYSREG_ID_STR_MAX 64
+#define SYSREG_ID_HEX_BASE 16
 
 
 VIR_LOG_INIT("cpu.cpu_arm");
@@ -465,6 +473,36 @@ virCPUarmGetFeatureSysregValue(const char *name)
         return NULL;
 
     return feature->sysreg_value;
+}
+
+/* Read the MIDR_EL1/REVIDR_EL1 implementation ID registers of host CPU
+ * @cpu from sysfs.  The files contain a hex string with an optional 0x
+ * prefix, e.g. "0x00000000480fd020".  Returns -1 without reporting an
+ * error when the sysfs interface is not available (non-aarch64 host or
+ * a kernel not exposing the identification registers); callers are
+ * expected to treat that as "cannot verify" rather than a failure.
+ */
+int
+virCPUarmGetHostImplId(size_t cpu,
+                       unsigned int *midr,
+                       unsigned int *revidr)
+{
+    g_autofree char *midr_path = NULL;
+    g_autofree char *revidr_path = NULL;
+    g_autofree char *midr_str = NULL;
+    g_autofree char *revidr_str = NULL;
+
+    midr_path = g_strdup_printf(SYSREG_ID_PATH_FMT, cpu, "midr_el1");
+    revidr_path = g_strdup_printf(SYSREG_ID_PATH_FMT, cpu, "revidr_el1");
+
+    if (virFileReadAllQuiet(midr_path, SYSREG_ID_STR_MAX, &midr_str) < 0 ||
+        virFileReadAllQuiet(revidr_path, SYSREG_ID_STR_MAX, &revidr_str) < 0)
+        return -1;
+
+    *midr = (unsigned int) g_ascii_strtoull(midr_str, NULL, SYSREG_ID_HEX_BASE);
+    *revidr = (unsigned int) g_ascii_strtoull(revidr_str, NULL, SYSREG_ID_HEX_BASE);
+
+    return 0;
 }
 
 static int
