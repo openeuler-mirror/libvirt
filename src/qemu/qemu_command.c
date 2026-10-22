@@ -5883,6 +5883,31 @@ qemuBuildSmbiosChassisStr(virSysinfoChassisDef *def)
 }
 
 
+static char *
+qemuBuildSmbiosType131Str(virSysinfoType131Def *def)
+{
+    g_auto(virBuffer) buf = VIR_BUFFER_INITIALIZER;
+
+    if (!def)
+        return NULL;
+
+    virBufferAddLit(&buf, "type=131");
+    virBufferAsprintf(&buf, ",flag=%u", def->flag);
+    virBufferAsprintf(&buf, ",pod_id=%u", def->pod_id);
+    virBufferAsprintf(&buf, ",slot_id=%u", def->slot_id);
+    virBufferAsprintf(&buf, ",mesh_type=%u", def->mesh_type);
+    virBufferAsprintf(&buf, ",super_pod_id=%u", def->super_pod_id);
+    virBufferAsprintf(&buf, ",served_index=%u", def->served_index);
+
+    if (def->type_name) {
+        virBufferAddLit(&buf, ",type_name=");
+        virQEMUBuildBufferEscapeComma(&buf, def->type_name);
+    }
+
+    return virBufferContentAndReset(&buf);
+}
+
+
 static int
 qemuBuildSmbiosCommandLine(virCommand *cmd,
                            virQEMUDriver *driver,
@@ -5959,6 +5984,16 @@ qemuBuildSmbiosCommandLine(virCommand *cmd,
 
         if (source->oemStrings) {
             if (!(smbioscmd = qemuBuildSmbiosOEMStringsStr(source->oemStrings)))
+                return -1;
+
+            virCommandAddArgList(cmd, "-smbios", smbioscmd, NULL);
+            VIR_FREE(smbioscmd);
+        }
+
+        /* Type 131 - UB Info (multiple instances) */
+        for (i = 0; i < source->ntype131; i++) {
+            if (!(smbioscmd =
+                  qemuBuildSmbiosType131Str(source->type131 + i)))
                 return -1;
 
             virCommandAddArgList(cmd, "-smbios", smbioscmd, NULL);

@@ -12937,6 +12937,45 @@ virSysinfoOEMStringsParseXML(xmlNodePtr node,
 
 
 static int
+virSysinfoType131ParseXML(xmlNodePtr node,
+                          xmlXPathContextPtr ctxt,
+                          virSysinfoType131Def **typedefs,
+                          size_t *ntype131)
+{
+    VIR_XPATH_NODE_AUTORESTORE(ctxt)
+    g_autofree xmlNodePtr *nodes = NULL;
+    int n;
+    size_t i;
+    g_autofree virSysinfoType131Def *defs = NULL;
+    unsigned int val;
+
+    ctxt->node = node;
+
+    if ((n = virXPathNodeSet("./entry", ctxt, &nodes)) < 0)
+        return -1;
+    if (n == 0)
+        return 0;
+
+    defs = g_new0(virSysinfoType131Def, n);
+
+    for (i = 0; i < n; i++) {
+        ctxt->node = nodes[i];
+        defs[i].flag         = virXPathUInt("string(@flag)", ctxt, &val) == 0 ? val : 0xFF;
+        defs[i].pod_id       = virXPathUInt("string(@pod_id)", ctxt, &val) == 0 ? val : 0;
+        defs[i].slot_id      = virXPathUInt("string(@slot_id)", ctxt, &val) == 0 ? val : 0;
+        defs[i].mesh_type    = virXPathUInt("string(@mesh_type)", ctxt, &val) == 0 ? val : 0;
+        defs[i].super_pod_id = virXPathUInt("string(@super_pod_id)", ctxt, &val) == 0 ? val : 0;
+        defs[i].served_index = virXPathUInt("string(@served_index)", ctxt, &val) == 0 ? val : 0;
+        defs[i].type_name    = virXPathString("string(@type_name)", ctxt);
+    }
+
+    *typedefs = g_steal_pointer(&defs);
+    *ntype131 = n;
+    return 0;
+}
+
+
+static int
 virSysinfoChassisParseXML(xmlNodePtr node,
                          xmlXPathContextPtr ctxt,
                          virSysinfoChassisDef **chassisdef)
@@ -12995,6 +13034,13 @@ virSysinfoParseSMBIOSDef(virSysinfoDef *def,
     /* Extract system related metadata */
     if ((tmpnode = virXPathNode("./oemStrings[1]", ctxt)) != NULL) {
         if (virSysinfoOEMStringsParseXML(tmpnode, ctxt, &def->oemStrings) < 0)
+            return -1;
+    }
+
+    /* Extract OEM Type 131 (UB Info) metadata */
+    if ((tmpnode = virXPathNode("./type131[1]", ctxt)) != NULL) {
+        if (virSysinfoType131ParseXML(tmpnode, ctxt,
+                                      &def->type131, &def->ntype131) < 0)
             return -1;
     }
 

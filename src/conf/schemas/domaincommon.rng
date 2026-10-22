@@ -7060,6 +7060,33 @@
                 </oneOrMore>
               </element>
             </optional>
+            <optional>
+              <element name="type131">
+                <oneOrMore>
+                  <element name="entry">
+                    <attribute name="flag"><ref name="unsignedInt"/></attribute>
+                    <optional>
+                      <attribute name="pod_id"><ref name="unsignedInt"/></attribute>
+                    </optional>
+                    <optional>
+                      <attribute name="slot_id"><ref name="unsignedInt"/></attribute>
+                    </optional>
+                    <optional>
+                      <attribute name="mesh_type"><ref name="unsignedInt"/></attribute>
+                    </optional>
+                    <optional>
+                      <attribute name="super_pod_id"><ref name="unsignedInt"/></attribute>
+                    </optional>
+                    <optional>
+                      <attribute name="served_index"><ref name="unsignedInt"/></attribute>
+                    </optional>
+                    <optional>
+                      <attribute name="type_name"><text/></attribute>
+                    </optional>
+                  </element>
+                </oneOrMore>
+              </element>
+            </optional>
           </interleave>
         </group>
         <group>
