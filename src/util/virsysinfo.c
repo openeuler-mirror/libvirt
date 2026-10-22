@@ -54,6 +54,9 @@ static const char *sysinfoCpuinfo = "/proc/cpuinfo";
 #define CPUINFO sysinfoCpuinfo
 #define CPUINFO_FILE_LEN (1024*1024)    /* 1MB limit for /proc/cpuinfo file */
 
+/* Width of a single XML indentation level, in spaces */
+#define VIR_SYSINFO_XML_INDENT 2
+
 
 void
 virSysinfoSetup(const char *sysinfo,
@@ -1516,7 +1519,7 @@ virSysinfoType131Format(virBuffer *buf,
         return;
 
     virBufferAddLit(buf, "<type131>\n");
-    virBufferAdjustIndent(buf, 2);
+    virBufferAdjustIndent(buf, VIR_SYSINFO_XML_INDENT);
     for (i = 0; i < ndefs; i++) {
         virBufferAsprintf(buf,
                           "<entry flag='%u' pod_id='%u' "
@@ -1530,7 +1533,7 @@ virSysinfoType131Format(virBuffer *buf,
             virBufferEscapeString(buf, " type_name='%s'", defs[i].type_name);
         virBufferAddLit(buf, "/>\n");
     }
-    virBufferAdjustIndent(buf, -2);
+    virBufferAdjustIndent(buf, -VIR_SYSINFO_XML_INDENT);
     virBufferAddLit(buf, "</type131>\n");
 }
 
