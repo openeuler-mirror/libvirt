@@ -6549,8 +6549,15 @@ qemuBuildCpuModelArgStr(virQEMUDriver *driver,
         switch ((virCPUFeaturePolicy) cpu->features[i].policy) {
         case VIR_CPU_FEATURE_FORCE:
         case VIR_CPU_FEATURE_REQUIRE:
-            virBufferAsprintf(buf, ",%s=on", featname);
+        {
+            const char *val = virQEMUCapsCPUFeatureGetValue(def->os.arch,
+                                                             cpu->features[i].name);
+            if (val)
+                virBufferAsprintf(buf, ",%s=%s", featname, val);
+            else
+                virBufferAsprintf(buf, ",%s=on", featname);
             break;
+        }
 
         case VIR_CPU_FEATURE_DISABLE:
         case VIR_CPU_FEATURE_FORBID:
@@ -7349,6 +7356,21 @@ qemuBuildMachineCommandLine(virCommand *cmd,
                 virBufferAsprintf(&buf, ",highmem-mmio-size=%lluK", cont->opts.pciopts.pcihole64size);
                 break;
             }
+        }
+
+        if (cpu && cpu->targetImplCpus && cpu->targetImplCpus->nimplCpus > 0) {
+            virCPUDefTargetImplCpus *impl = cpu->targetImplCpus;
+            g_auto(virBuffer) implBuf = VIR_BUFFER_INITIALIZER;
+            size_t j;
+
+            for (j = 0; j < impl->nimplCpus; j++) {
+                if (j > 0)
+                    virBufferAddLit(&implBuf, "-");
+                virBufferAsprintf(&implBuf, "0x%08x:0x%08x",
+                                  impl->midr[j], impl->revidr[j]);
+            }
+            virBufferAsprintf(&buf, ",x-target-impl-cpus=%s",
+                              virBufferCurrentContent(&implBuf));
         }
     }
 

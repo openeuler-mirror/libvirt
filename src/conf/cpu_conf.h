@@ -168,6 +168,14 @@ struct _virCPUMaxPhysAddrDef {
 };
 
 
+typedef struct _virCPUDefTargetImplCpus virCPUDefTargetImplCpus;
+struct _virCPUDefTargetImplCpus {
+    size_t nimplCpus;                     /* number of entries */
+    unsigned int *midr;                    /* MIDR_EL1 value array */
+    unsigned int *revidr;                  /* REVIDR_EL1 value array */
+};
+
+
 typedef struct _virCPUDef virCPUDef;
 struct _virCPUDef {
     int refs;
@@ -198,6 +206,7 @@ struct _virCPUDef {
     virTristateSwitch migratable; /* for host-passthrough mode */
     size_t ncacheinfo;
     virCPUCacheInfoDef *cacheinfo;
+    virCPUDefTargetImplCpus *targetImplCpus;
 };
 
 virCPUDef *virCPUDefNew(void);

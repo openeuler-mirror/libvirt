@@ -892,6 +892,10 @@ virQEMUCapsCPUFeatureToQEMU(virArch arch,
                             const char *feature);
 
 const char *
+virQEMUCapsCPUFeatureGetValue(virArch arch,
+                              const char *feature);
+
+const char *
 virQEMUCapsCPUFeatureFromQEMU(virArch arch,
                               const char *feature);
 
@@ -925,3 +929,6 @@ int
 virQEMUCapsProbeQMPMachineTypes(virQEMUCaps *qemuCaps,
                                 virDomainVirtType virtType,
                                 qemuMonitor *mon);
+
+bool
+virQEMUCapsIsSVEVectorLength(const char *name);
