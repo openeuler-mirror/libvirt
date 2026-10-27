@@ -54,6 +54,9 @@ static const char *sysinfoCpuinfo = "/proc/cpuinfo";
 #define CPUINFO sysinfoCpuinfo
 #define CPUINFO_FILE_LEN (1024*1024)    /* 1MB limit for /proc/cpuinfo file */
 
+/* Width of a single XML indentation level, in spaces */
+#define VIR_SYSINFO_XML_INDENT 2
+
 
 void
 virSysinfoSetup(const char *sysinfo,
@@ -133,6 +136,19 @@ void virSysinfoOEMStringsDefFree(virSysinfoOEMStringsDef *def)
 }
 
 
+void virSysinfoType131DefFree(virSysinfoType131Def *def, size_t ntype131)
+{
+    size_t i;
+
+    if (!def)
+        return;
+
+    for (i = 0; i < ntype131; i++)
+        g_free(def[i].type_name);
+    g_free(def);
+}
+
+
 static void
 virSysinfoFWCfgDefClear(virSysinfoFWCfgDef *def)
 {
@@ -198,6 +214,8 @@ void virSysinfoDefFree(virSysinfoDef *def)
 
     virSysinfoOEMStringsDefFree(def->oemStrings);
 
+    virSysinfoType131DefFree(def->type131, def->ntype131);
+
     for (i = 0; i < def->nfw_cfgs; i++)
         virSysinfoFWCfgDefClear(&def->fw_cfgs[i]);
     g_free(def->fw_cfgs);
@@ -211,7 +229,8 @@ virSysinfoDefIsEmpty(const virSysinfoDef *def)
 {
     return !(def->bios || def->system || def->nbaseBoard > 0 ||
              def->chassis || def->nprocessor > 0 ||
-             def->nmemory > 0 || def->oemStrings);
+             def->nmemory > 0 || def->oemStrings ||
+             def->ntype131 > 0);
 }
 
 
@@ -1490,6 +1509,36 @@ virSysinfoOEMStringsFormat(virBuffer *buf, virSysinfoOEMStringsDef *def)
 
 
 static void
+virSysinfoType131Format(virBuffer *buf,
+                        virSysinfoType131Def *defs,
+                        size_t ndefs)
+{
+    size_t i;
+
+    if (!defs || ndefs == 0)
+        return;
+
+    virBufferAddLit(buf, "<type131>\n");
+    virBufferAdjustIndent(buf, VIR_SYSINFO_XML_INDENT);
+    for (i = 0; i < ndefs; i++) {
+        virBufferAsprintf(buf,
+                          "<entry flag='%u' pod_id='%u' "
+                          "slot_id='%u' mesh_type='%u' super_pod_id='%u' "
+                          "served_index='%u'",
+                          defs[i].flag, defs[i].pod_id,
+                          defs[i].slot_id, defs[i].mesh_type,
+                          defs[i].super_pod_id,
+                          defs[i].served_index);
+        if (defs[i].type_name)
+            virBufferEscapeString(buf, " type_name='%s'", defs[i].type_name);
+        virBufferAddLit(buf, "/>\n");
+    }
+    virBufferAdjustIndent(buf, -VIR_SYSINFO_XML_INDENT);
+    virBufferAddLit(buf, "</type131>\n");
+}
+
+
+static void
 virSysinfoFormatSMBIOS(virBuffer *buf,
                        virSysinfoDef *def)
 {
@@ -1500,6 +1549,7 @@ virSysinfoFormatSMBIOS(virBuffer *buf,
     virSysinfoProcessorFormat(buf, def);
     virSysinfoMemoryFormat(buf, def);
     virSysinfoOEMStringsFormat(buf, def->oemStrings);
+    virSysinfoType131Format(buf, def->type131, def->ntype131);
 }
 
 

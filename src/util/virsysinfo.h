@@ -106,6 +106,17 @@ struct _virSysinfoOEMStringsDef {
     char **values;
 };
 
+typedef struct _virSysinfoType131Def virSysinfoType131Def;
+struct _virSysinfoType131Def {
+    unsigned int flag;
+    unsigned int pod_id;
+    unsigned int slot_id;
+    unsigned int mesh_type;
+    unsigned int super_pod_id;
+    unsigned int served_index;
+    char *type_name;
+};
+
 typedef struct _virSysinfoFWCfgDef virSysinfoFWCfgDef;
 struct _virSysinfoFWCfgDef {
     char *name;
@@ -134,6 +145,10 @@ struct _virSysinfoDef {
 
     virSysinfoOEMStringsDef *oemStrings;
 
+    /* OEM Type 131 - UB Info (supports multiple instances) */
+    size_t ntype131;
+    virSysinfoType131Def *type131;
+
     /* The following members are valid for type == VIR_SYSINFO_FWCFG */
     size_t nfw_cfgs;
     virSysinfoFWCfgDef *fw_cfgs;
@@ -149,6 +164,7 @@ void virSysinfoBaseBoardDefClear(virSysinfoBaseBoardDef *def);
 void virSysinfoChassisDefFree(virSysinfoChassisDef *def);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(virSysinfoChassisDef, virSysinfoChassisDefFree);
 void virSysinfoOEMStringsDefFree(virSysinfoOEMStringsDef *def);
+void virSysinfoType131DefFree(virSysinfoType131Def *def, size_t ntype131);
 void virSysinfoDefFree(virSysinfoDef *def);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(virSysinfoDef, virSysinfoDefFree);
