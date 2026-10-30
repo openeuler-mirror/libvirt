@@ -413,6 +413,73 @@ testQemuMigrationCookieXML2XMLBitmaps(const char *name,
 }
 
 
+/*
+ * Verify the wiring of the VIR_MIGRATE_PARAM_CVM_MIGAGENT_URI typed
+ * parameter: it must be parsed into migParams and converted to the
+ * 'cvm-migagent-uri' JSON parameter on the source side of the migration,
+ * and ignored on the destination side.
+ */
+static int
+testQemuMigrationParamsCVMMigagent(const void *opaque)
+{
+    qemuMigrationParty party = GPOINTER_TO_INT(opaque);
+    virTypedParameterPtr params = NULL;
+    int nparams = 0;
+    int maxparams = 0;
+    g_autoptr(qemuMigrationParams) migParams = NULL;
+    g_autoptr(virJSONValue) json = NULL;
+    g_auto(virBuffer) buf = VIR_BUFFER_INITIALIZER;
+    const char *expectedXML = "<migParams>\n"
+                              "  <param name='cvm-migagent-uri' value='192.168.100.200:6000'/>\n"
+                              "</migParams>\n";
+    const char *actualXML;
+    const char *str;
+
+    if (virTypedParamsAddString(&params, &nparams, &maxparams,
+                                VIR_MIGRATE_PARAM_CVM_MIGAGENT_URI,
+                                "192.168.100.200:6000") < 0)
+        return -1;
+
+    if (!(migParams = qemuMigrationParamsFromFlags(params, nparams, 0, party))) {
+        virTypedParamsFree(params, nparams);
+        return -1;
+    }
+
+    virTypedParamsFree(params, nparams);
+
+    if (!(json = qemuMigrationParamsToJSON(migParams, false)))
+        return -1;
+
+    if (party & QEMU_MIGRATION_SOURCE) {
+        if (virJSONValueObjectKeysNumber(json) != 1 ||
+            !(str = virJSONValueObjectGetString(json, "cvm-migagent-uri")) ||
+            STRNEQ(str, "192.168.100.200:6000")) {
+            VIR_TEST_DEBUG("bad 'migrate-set-parameters' JSON: '%s' key expected",
+                           "cvm-migagent-uri");
+            return -1;
+        }
+
+        /* the parameter is also serialized into the migration job XML */
+        qemuMigrationParamsFormat(&buf, migParams);
+        actualXML = virBufferCurrentContent(&buf);
+        if (!actualXML || STRNEQ(actualXML, expectedXML)) {
+            VIR_TEST_DEBUG("\nexpected:\n%s\ngot:\n%s\n",
+                           expectedXML, NULLSTR(actualXML));
+            return -1;
+        }
+    } else {
+        /* destination party must silently ignore the parameter */
+        if (virJSONValueObjectKeysNumber(json) != 0) {
+            VIR_TEST_DEBUG("'%s' must not be set on the destination side",
+                           "cvm-migagent-uri");
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+
 static int
 mymain(void)
 {
@@ -440,6 +507,16 @@ mymain(void)
         ret = -1;
 
     if (testQemuMigrationCookieXML2XMLBitmaps("nbd-bitmaps", "qemustatusxml2xmldata/migration-out-nbd-bitmaps-in.xml", 0) < 0)
+        ret = -1;
+
+    if (virTestRun("qemumigrationparams-cvm-migagent-source",
+                   testQemuMigrationParamsCVMMigagent,
+                   GINT_TO_POINTER(QEMU_MIGRATION_SOURCE)) < 0)
+        ret = -1;
+
+    if (virTestRun("qemumigrationparams-cvm-migagent-destination",
+                   testQemuMigrationParamsCVMMigagent,
+                   GINT_TO_POINTER(QEMU_MIGRATION_DESTINATION)) < 0)
         ret = -1;
 
     virBufferFreeAndReset(&testnamebuf);
