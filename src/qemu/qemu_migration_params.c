@@ -126,6 +126,7 @@ VIR_ENUM_IMPL(qemuMigrationParam,
               "multifd-zlib-level",
               "multifd-zstd-level",
               "migrationpin",
+              "cvm-migagent-uri",
 );
 
 typedef struct _qemuMigrationParamsAlwaysOnItem qemuMigrationParamsAlwaysOnItem;
@@ -264,6 +265,10 @@ static const qemuMigrationParamsTPMapItem qemuMigrationParamsTPMap[] = {
     {.typedParam = VIR_MIGRATE_PARAM_MIGRATIONPIN,
      .param = QEMU_MIGRATION_PARAM_MIGRATIONPIN,
      .party = QEMU_MIGRATION_SOURCE},
+
+    {.typedParam = VIR_MIGRATE_PARAM_CVM_MIGAGENT_URI,
+     .param = QEMU_MIGRATION_PARAM_CVM_MIGAGENT_URI,
+     .party = QEMU_MIGRATION_SOURCE},
 };
 
 static const qemuMigrationParamInfoItem qemuMigrationParamInfo[] = {
@@ -317,6 +322,9 @@ static const qemuMigrationParamInfoItem qemuMigrationParamInfo[] = {
         .type = QEMU_MIGRATION_PARAM_TYPE_INT,
     },
     [QEMU_MIGRATION_PARAM_MIGRATIONPIN] = {
+        .type = QEMU_MIGRATION_PARAM_TYPE_STRING,
+    },
+    [QEMU_MIGRATION_PARAM_CVM_MIGAGENT_URI] = {
         .type = QEMU_MIGRATION_PARAM_TYPE_STRING,
     }
 };

@@ -478,6 +478,42 @@ guest doing a lot of I/O to a local fast storage the
 synchronously written to the destination. This may harm I/O performance during
 the migration.
 
+CVM confidential guest migration with remote attestation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Confidential virtual machines (CVMs) require that the migration traffic is
+protected by a session key negotiated between the source and the destination
+hypervisors. The key is set up during a remote attestation of the destination
+host performed via a trusted mig-agent running on the destination side
+(e.g. using rats-tls).
+
+Note that this mechanism is currently available only for confidential guests
+using the virtcca technology, which is specific to the ARM (aarch64)
+architecture.
+
+The address of the destination CVM mig-agent can be provided by the
+``cvm.migagent.uri`` parameter (``VIR_MIGRATE_PARAM_CVM_MIGAGENT_URI`` typed
+parameter of the virDomainMigrate* APIs, ``--cvm-miguri`` option of
+``virsh migrate``). The address is in ``host:port`` format. The parameter is
+used only on the source side of the migration where it is passed to the
+hypervisor using the ``migrate-set-parameters`` QMP command as the
+``cvm-migagent-uri`` parameter::
+
+   syntax: virsh migrate GUESTNAME [OPTIONS] DEST-LIBVIRT-URI --cvm-miguri MIGAGENT-ADDR
+
+   eg migrating a confidential guest and setting up the session key
+      via the destination mig-agent listening on 10.0.0.1 port 6000
+
+   virsh migrate --live web1 qemu+ssh://desthost/system --cvm-miguri 10.0.0.1:6000
+
+This parameter requires QEMU with CVM migration support on the source host.
+When the parameter is provided and the source QEMU does not support the
+``cvm-migagent-uri`` migration parameter the migration will fail before any
+data is transferred. Migrations started without the parameter are not
+affected in any way.
+
+Supported by QEMU driver
+
 .. |Migration native path| image:: images/migration-native.png
    :class: diagram
 .. |Migration tunnel path| image:: images/migration-tunnel.png

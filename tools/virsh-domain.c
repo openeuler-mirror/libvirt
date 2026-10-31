@@ -11153,6 +11153,11 @@ static const vshCmdOptDef opts_migrate[] = {
      .help = N_("enable ham migration")
     },
 #endif
+    {.name = "cvm-miguri",
+     .type = VSH_OT_STRING,
+     .completer = virshCompleteEmpty,
+     .help = N_("CVM migration address (host:port)")
+    },
     {.name = NULL}
 };
 
@@ -11240,6 +11245,13 @@ doMigrate(void *opaque)
     if (opt &&
         virTypedParamsAddString(&params, &nparams, &maxparams,
                                 VIR_MIGRATE_PARAM_URI, opt) < 0)
+        goto save_error;
+
+    if (vshCommandOptStringReq(ctl, cmd, "cvm-miguri", &opt) < 0)
+        goto out;
+    if (opt &&
+        virTypedParamsAddString(&params, &nparams, &maxparams,
+                                VIR_MIGRATE_PARAM_CVM_MIGAGENT_URI, opt) < 0)
         goto save_error;
 
     if (vshCommandOptStringReq(ctl, cmd, "graphicsuri", &opt) < 0)

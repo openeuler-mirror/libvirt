@@ -1424,6 +1424,16 @@ typedef enum {
  */
 # define VIR_MIGRATE_PARAM_TLS_DESTINATION          "tls.destination"
 
+/**
+ * VIR_MIGRATE_PARAM_CVM_MIGAGENT_URI:
+ *
+ * virDomainMigrate* params field: the destination CVM mig-agent ip for rats-tls
+ * attestation and migrate session key exchange.
+ *
+ * Since: 9.10.0
+ */
+# define VIR_MIGRATE_PARAM_CVM_MIGAGENT_URI         "cvm.migagent.uri"
+
 /* Domain migration. */
 virDomainPtr virDomainMigrate (virDomainPtr domain, virConnectPtr dconn,
                                unsigned long flags, const char *dname,
